@@ -42,7 +42,7 @@ export function createButton(scene, x, y, opts = {}) {
   const text = scene.add.text(0, 0, label, {
     fontFamily: 'Trebuchet MS, sans-serif',
     fontSize: `${fontSize}px`,
-    color: enabled ? CSS.paper : '#888078',
+    color: enabled ? CSS.paper : '#a89e90',
     fontStyle: 'bold',
   }).setOrigin(0.5)
 

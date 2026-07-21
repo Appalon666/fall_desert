@@ -44,7 +44,7 @@ export default class HeroScene extends Phaser.Scene {
 
     const cx = GAME.WIDTH / 2 + 80
     const info = this.add.text(cx, 110, `Уровень ${State.hero.level}    Опыт ${fmt(State.hero.xp)}/${fmt(State.xpToNext())}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.paper }).setOrigin(0.5)
-    const pts = this.add.text(cx, 144, State.hero.points > 0 ? `Свободных очков: ${State.hero.points}` : 'Нет свободных очков', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: State.hero.points > 0 ? CSS.cap : '#8a8072', fontStyle: 'bold' }).setOrigin(0.5)
+    const pts = this.add.text(cx, 144, State.hero.points > 0 ? `Свободных очков: ${State.hero.points}` : 'Нет свободных очков', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: State.hero.points > 0 ? CSS.cap : '#b8ad9a', fontStyle: 'bold' }).setOrigin(0.5)
     this.uiObjs.push(info, pts)
 
     let y = 210
@@ -52,7 +52,7 @@ export default class HeroScene extends Phaser.Scene {
       const row = this.add.container(cx - 300, y)
       const icon = this.add.text(0, 0, s.icon, { fontSize: '32px' }).setOrigin(0, 0.5)
       const label = this.add.text(50, -12, `${s.name}: ${State.hero[s.id]}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0, 0.5)
-      const desc = this.add.text(50, 14, s.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: '#b7ad93' }).setOrigin(0, 0.5)
+      const desc = this.add.text(50, 14, s.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0, 0.5)
       row.add([icon, label, desc])
       this.uiObjs.push(row)
 
@@ -84,7 +84,7 @@ export default class HeroScene extends Phaser.Scene {
       `Макс. HP: ${fmt(State.heroMaxHp())}`,
       `Крит: ${(State.critChance() * 100).toFixed(0)}%`,
       `Урон союзников: ${fmt(State.allyDps())}/сек`,
-    ].join('     '), { fontFamily: 'monospace', fontSize: '16px', color: '#c9bfa6' }).setOrigin(0.5)
+    ].join('     '), { fontFamily: 'monospace', fontSize: '16px', color: '#e8ddc0' }).setOrigin(0.5)
     this.uiObjs.push(summary)
   }
 }

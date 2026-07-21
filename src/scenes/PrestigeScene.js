@@ -47,7 +47,7 @@ export default class PrestigeScene extends Phaser.Scene {
     const info = this.add.text(GAME.WIDTH / 2, 148, can
       ? `За этот забег получишь: +${gain} ☢   (убито ${fmt(State.totalKills)})`
       : `Нужно больше убийств за забег (сейчас ${fmt(State.totalKills)}). Копи прогресс и возвращайся.`,
-      { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: can ? '#b6ff5a' : '#8a8072', fontStyle: 'bold' }).setOrigin(0.5)
+      { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: can ? '#b6ff5a' : '#b8ad9a', fontStyle: 'bold' }).setOrigin(0.5)
     const pb = createButton(this, GAME.WIDTH / 2, 196, {
       label: can ? `☢ Переродиться (+${gain})` : '☢ Пока рано',
       width: 360, height: 54, fontSize: 22, enabled: can,
@@ -80,8 +80,8 @@ export default class PrestigeScene extends Phaser.Scene {
     paint(false)
     const icon = this.add.text(16, h / 2, p.icon, { fontSize: '30px' }).setOrigin(0, 0.5)
     const title = this.add.text(58, 16, `${p.name}  ур.${level}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '17px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
-    const desc = this.add.text(58, 40, p.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: '#b7ad93', wordWrap: { width: w - 66 } }).setOrigin(0)
-    const cost1 = this.add.text(w - 14, h / 2, `${fmt(cost)} ☢`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: afford ? '#b6ff5a' : '#7a6f58', fontStyle: 'bold' }).setOrigin(1, 0.5)
+    const desc = this.add.text(58, 40, p.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: '#ddd2b4', wordWrap: { width: w - 66 } }).setOrigin(0)
+    const cost1 = this.add.text(w - 14, h / 2, `${fmt(cost)} ☢`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: afford ? '#b6ff5a' : '#ab9e80', fontStyle: 'bold' }).setOrigin(1, 0.5)
     c.add([bg, icon, title, desc, cost1])
     const z = this.add.zone(0, 0, w, h).setOrigin(0).setInteractive({ useHandCursor: afford })
     z.on('pointerover', () => paint(true))

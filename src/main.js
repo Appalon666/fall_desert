@@ -12,6 +12,7 @@ import InventoryScene from './scenes/InventoryScene.js'
 import HeroScene from './scenes/HeroScene.js'
 import PrestigeScene from './scenes/PrestigeScene.js'
 import LeaderboardScene from './scenes/LeaderboardScene.js'
+import ForgeScene from './scenes/ForgeScene.js'
 
 const config = {
   type: Phaser.AUTO,
@@ -27,7 +28,7 @@ const config = {
     pixelArt: false,
     antialias: true,
   },
-  scene: [BootScene, ClassSelectScene, HubScene, BattleScene, ShopScene, InventoryScene, HeroScene, PrestigeScene, LeaderboardScene],
+  scene: [BootScene, ClassSelectScene, HubScene, BattleScene, ShopScene, InventoryScene, HeroScene, PrestigeScene, LeaderboardScene, ForgeScene],
 }
 
 // eslint-disable-next-line no-new

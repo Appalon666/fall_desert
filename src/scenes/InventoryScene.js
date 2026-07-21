@@ -5,9 +5,10 @@
 import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
-import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL } from '../data/loot.js'
+import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
+import { Sfx } from '../audio/sfx.js'
 import { fmt } from '../util/format.js'
 
 // Метаданные гнёзд «куклы».
@@ -36,10 +37,17 @@ export default class InventoryScene extends Phaser.Scene {
     titleText(this, GAME.WIDTH / 2, 36, 'ИНВЕНТАРЬ', { size: 32 })
     this.add.image(40, 36, TEX.CAP).setScale(1.4)
     this.capsText = this.add.text(62, 36, '', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
+    this.add.text(220, 36, '🔩', { fontSize: '22px' }).setOrigin(0.5)
+    this.scrapText = this.add.text(242, 36, '', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: '#d8d8e0', fontStyle: 'bold' }).setOrigin(0, 0.5)
 
-    this.add.text(GAME.WIDTH * 0.72, 78, 'ДОБЫЧА', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    this.add.text(GAME.WIDTH * 0.72, 74, 'ДОБЫЧА', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    // Массовый разбор хлама (серое+зелёное) в металлолом
+    createButton(this, GAME.WIDTH * 0.72, GAME.HEIGHT - 40, {
+      label: '🔩 Разобрать хлам', width: 260, height: 44, fontSize: 16, color: COLORS.steelDark, hover: COLORS.steel,
+      onClick: () => { const r = State.scrapAllUpTo(1); if (r.count) Sfx.click(); this.safeRender() },
+    })
 
-    createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 40, { label: '⟵ В лагерь', width: 300, height: 50, onClick: () => this.scene.start(SCENES.HUB) })
+    createButton(this, GAME.WIDTH * 0.28, GAME.HEIGHT - 40, { label: '⟵ В лагерь', width: 260, height: 50, onClick: () => this.scene.start(SCENES.HUB) })
 
     this.uiObjs = []
     this.safeRender()
@@ -59,6 +67,7 @@ export default class InventoryScene extends Phaser.Scene {
     this.uiObjs.forEach(o => o.destroy())
     this.uiObjs = []
     this.capsText.setText(fmt(State.caps))
+    this.scrapText.setText(fmt(State.scrap))
 
     // --- Кукла персонажа ---
     const hx = GAME.WIDTH * 0.26, hy = 330
@@ -82,7 +91,7 @@ export default class InventoryScene extends Phaser.Scene {
     }
 
     // Сводка бонусов экипировки
-    const sum = this.add.text(hx, hy + 240, this.equipSummary(), { fontFamily: 'monospace', fontSize: '14px', color: '#b7ad93', align: 'center', lineSpacing: 4 }).setOrigin(0.5, 0)
+    const sum = this.add.text(hx, hy + 240, this.equipSummary(), { fontFamily: 'monospace', fontSize: '14px', color: '#ddd2b4', align: 'center', lineSpacing: 4 }).setOrigin(0.5, 0)
     this.uiObjs.push(sum)
 
     // --- Список добычи ---
@@ -112,10 +121,10 @@ export default class InventoryScene extends Phaser.Scene {
     bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(-w / 2, -h / 2, w, h, 8)
     bg.lineStyle(2, rar ? rar.color : COLORS.ink, 0.9); bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8)
     const icon = this.add.text(-w / 2 + 12, 0, meta.icon, { fontSize: '26px' }).setOrigin(0, 0.5)
-    const head = this.add.text(-w / 2 + 46, -16, meta.name, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: '#9a8f78' }).setOrigin(0, 0.5)
+    const head = this.add.text(-w / 2 + 46, -16, meta.name, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: '#c4b998' }).setOrigin(0, 0.5)
     const body = this.add.text(-w / 2 + 46, 4, it ? it.name : '— пусто —', {
       fontFamily: 'Trebuchet MS, sans-serif', fontSize: it ? '13px' : '14px',
-      color: it ? rar.css : '#6f6858', fontStyle: 'bold', wordWrap: { width: w - 52 },
+      color: it ? rar.css : '#9a9078', fontStyle: 'bold', wordWrap: { width: w - 52 },
     }).setOrigin(0, 0.5)
     const st = this.add.text(-w / 2 + 46, 20, it ? statText(it) : '', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '12px', color: CSS.toxic }).setOrigin(0, 0.5)
     c.add([bg, icon, head, body, st])
@@ -134,10 +143,10 @@ export default class InventoryScene extends Phaser.Scene {
       (RARITY_BY_ID[b.rarity].mul - RARITY_BY_ID[a.rarity].mul) || (b.value - a.value))
     const ix = GAME.WIDTH * 0.72 - 260
     let iy = 108
-    const maxRows = 10
+    const maxRows = 8
 
     if (items.length === 0) {
-      this.uiObjs.push(this.add.text(GAME.WIDTH * 0.72, 200, 'Пусто. Иди в поход за лутом!', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: '#8a8072' }).setOrigin(0.5))
+      this.uiObjs.push(this.add.text(GAME.WIDTH * 0.72, 200, 'Пусто. Иди в поход за лутом!', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: '#b8ad9a' }).setOrigin(0.5))
       return
     }
 
@@ -152,21 +161,26 @@ export default class InventoryScene extends Phaser.Scene {
       bg.lineStyle(2, rar.color, 1); bg.strokeRoundedRect(0, 0, w, h, 8)
       const icon = this.add.text(14, h / 2, slot.icon, { fontSize: '24px' }).setOrigin(0, 0.5)
       const name = this.add.text(50, 12, it.name, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '17px', color: rar.css, fontStyle: 'bold' }).setOrigin(0)
-      const st = this.add.text(50, 33, `${slot.name} · ${rar.name} · ${statText(it)}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: '#b7ad93' }).setOrigin(0)
+      const st = this.add.text(50, 33, `${slot.name} · ${rar.name} · ${statText(it)}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: '#ddd2b4' }).setOrigin(0)
       c.add([bg, icon, name, st])
 
-      const equipZone = this.add.zone(0, 0, w - 90, h).setOrigin(0).setInteractive({ useHandCursor: true })
+      const equipZone = this.add.zone(0, 0, w - 150, h).setOrigin(0).setInteractive({ useHandCursor: true })
       equipZone.on('pointerup', () => { State.equip(it.uid); this.safeRender() })
-      const sell = this.add.text(w - 18, h / 2, '💰 продать', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: CSS.cap }).setOrigin(1, 0.5)
-      const sellZone = this.add.zone(w - 90, 0, 90, h).setOrigin(0).setInteractive({ useHandCursor: true })
+      // разобрать на металлолом
+      const scrapTxt = this.add.text(w - 142, h / 2, `🔩${scrapValue(it)}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '14px', color: '#c8c8d2', fontStyle: 'bold' }).setOrigin(0, 0.5)
+      const scrapZone = this.add.zone(w - 150, 0, 80, h).setOrigin(0).setInteractive({ useHandCursor: true })
+      scrapZone.on('pointerup', () => { State.scrapItem(it.uid); Sfx.click(); this.safeRender() })
+      // продать за крышки
+      const sell = this.add.text(w - 16, h / 2, '💰', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.cap }).setOrigin(1, 0.5)
+      const sellZone = this.add.zone(w - 66, 0, 66, h).setOrigin(0).setInteractive({ useHandCursor: true })
       sellZone.on('pointerup', () => { State.sellItem(it.uid); this.safeRender() })
-      c.add([equipZone, sell, sellZone])
+      c.add([equipZone, scrapTxt, scrapZone, sell, sellZone])
       this.uiObjs.push(c)
       iy += h + 8
     })
 
     if (items.length > maxRows) {
-      this.uiObjs.push(this.add.text(GAME.WIDTH * 0.72, iy + 6, `…и ещё ${items.length - maxRows} предметов`, { fontFamily: 'monospace', fontSize: '14px', color: '#8a8072' }).setOrigin(0.5))
+      this.uiObjs.push(this.add.text(GAME.WIDTH * 0.72, iy + 6, `…и ещё ${items.length - maxRows} предметов`, { fontFamily: 'monospace', fontSize: '14px', color: '#b8ad9a' }).setOrigin(0.5))
     }
   }
 }

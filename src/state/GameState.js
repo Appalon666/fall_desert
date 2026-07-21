@@ -7,7 +7,7 @@ import { BAL } from '../data/balance.js'
 import { UPGRADES, upgradeCost } from '../data/upgrades.js'
 import { ALLIES, allyCost } from '../data/allies.js'
 import { CLASS_BY_ID } from '../data/classes.js'
-import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID } from '../data/loot.js'
+import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, CRAFT_TIERS } from '../data/loot.js'
 import { Platform } from '../platform/yandex.js'
 
 const SAVE_KEY = 'wasteland_save_v1'
@@ -29,6 +29,7 @@ class GameState extends Phaser.Events.EventEmitter {
     this.allies = {}
     this.equipment = { weapon: null, helmet: null, armor: null, boots: null, acc1: null, acc2: null }
     this.inventory = []
+    this.scrap = 0 // металлолом (сохраняется между перерождениями)
     this.zoneIndex = 0
     this.killsInZone = 0
     this.totalKills = 0
@@ -244,6 +245,39 @@ class GameState extends Phaser.Events.EventEmitter {
     this.addCaps(10 + it.level * 3)
     this.emit('inventory'); this.save()
   }
+  // Разобрать предмет на металлолом.
+  scrapItem(uid) {
+    const idx = this.inventory.findIndex(i => i.uid === uid)
+    if (idx < 0) return 0
+    const it = this.inventory[idx]
+    const gain = scrapValue(it)
+    this.inventory.splice(idx, 1)
+    this.scrap += gain
+    this.emit('inventory'); this.emit('scrap'); this.save()
+    return gain
+  }
+  // Разобрать весь хлам до заданной редкости включительно (по индексу RARITIES).
+  scrapAllUpTo(maxIdx) {
+    const order = ['common', 'uncommon', 'rare', 'epic', 'relic']
+    let gained = 0, count = 0
+    this.inventory = this.inventory.filter((it) => {
+      const rIdx = order.indexOf(it.rarity)
+      if (rIdx >= 0 && rIdx <= maxIdx) { gained += scrapValue(it); count++; return false }
+      return true
+    })
+    if (count) { this.scrap += gained; this.emit('inventory'); this.emit('scrap'); this.save() }
+    return { count, gained }
+  }
+  // Крафт случайного предмета за металлолом; тир задаёт шанс качества (luck).
+  craft(tierId) {
+    const t = CRAFT_TIERS.find(c => c.id === tierId)
+    if (!t || this.scrap < t.cost) return null
+    this.scrap -= t.cost
+    const item = rollItem(Math.random, Math.floor(this.enemyLevel()), t.luck + this.lootLuck())
+    this.addItem(item)
+    this.emit('scrap'); this.save()
+    return item
+  }
 
   // ---------- зоны / убийства ----------
   enemyLevel() { return 1 + this.totalKills * 0.5 + this.zoneIndex * 8 }
@@ -290,7 +324,7 @@ class GameState extends Phaser.Events.EventEmitter {
     return {
       caps: this.caps, heroClass: this.heroClass, hero: this.hero,
       upgrades: this.upgrades, allies: this.allies,
-      equipment: this.equipment, inventory: this.inventory,
+      equipment: this.equipment, inventory: this.inventory, scrap: this.scrap,
       zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills,
       cores: this.cores, prestige: this.prestige, prestigeCount: this.prestigeCount,
       bestScore: this.bestScore, lastSeen: Date.now(),
@@ -321,6 +355,7 @@ class GameState extends Phaser.Events.EventEmitter {
       allies: d.allies || {},
       equipment: { weapon: null, helmet: null, armor: null, boots: null, acc1: null, acc2: null, ...(d.equipment || {}) },
       inventory: d.inventory || [],
+      scrap: d.scrap || 0,
       zoneIndex: d.zoneIndex || 0,
       killsInZone: d.killsInZone || 0,
       totalKills: d.totalKills || 0,

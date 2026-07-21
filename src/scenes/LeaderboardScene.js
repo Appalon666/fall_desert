@@ -20,7 +20,7 @@ export default class LeaderboardScene extends Phaser.Scene {
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: '⟵ В лагерь', width: 300, height: 50, onClick: () => this.scene.start(SCENES.HUB) })
 
-    this.status = this.add.text(GAME.WIDTH / 2, 150, 'Загрузка таблицы…', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: '#b7ad93' }).setOrigin(0.5)
+    this.status = this.add.text(GAME.WIDTH / 2, 150, 'Загрузка таблицы…', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: '#ddd2b4' }).setOrigin(0.5)
     this.loadBoard()
   }
 

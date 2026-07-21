@@ -94,7 +94,7 @@ export default class BattleScene extends Phaser.Scene {
       stroke: '#120d09', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(60)
     this.progressLabel = this.add.text(W / 2, 62, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#c9b58a',
+      fontFamily: 'monospace', fontSize: '14px', color: '#e6d2a4',
       stroke: '#120d09', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(60)
   }
@@ -151,7 +151,7 @@ export default class BattleScene extends Phaser.Scene {
 
     // Инфо-статы
     this.statsText = this.add.text(px + 24, 300, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#c9bfa6', lineSpacing: 6,
+      fontFamily: 'monospace', fontSize: '14px', color: '#e8ddc0', lineSpacing: 6,
     }).setOrigin(0)
 
     // Назад

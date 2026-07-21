@@ -32,7 +32,7 @@ export default class HubScene extends Phaser.Scene {
 
     // Рекорд
     this.add.text(GAME.WIDTH - 20, 30, `Рекорд: ${fmt(State.bestScore)} убийств`, { fontFamily: 'monospace', fontSize: '16px', color: CSS.sand }).setOrigin(1, 0.5)
-    this.add.text(GAME.WIDTH - 20, 54, `Зона ${State.zoneIndex + 1} · ур. ${State.hero.level}`, { fontFamily: 'monospace', fontSize: '16px', color: '#9a8a68' }).setOrigin(1, 0.5)
+    this.add.text(GAME.WIDTH - 20, 54, `Зона ${State.zoneIndex + 1} · ур. ${State.hero.level}`, { fontFamily: 'monospace', fontSize: '16px', color: '#cbb98e' }).setOrigin(1, 0.5)
     createButton(this, GAME.WIDTH - 100, 92, { label: '🏆 Рекорды', width: 170, height: 38, fontSize: 15, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
     // Переключатель звука
     const muteTxt = this.add.text(GAME.WIDTH - 20, 128, Sfx.muted ? '🔇 Звук выкл' : '🔊 Звук вкл', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.sand }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
@@ -60,6 +60,8 @@ export default class HubScene extends Phaser.Scene {
     by += gap
     createButton(this, bx, by, { label: '🎒  Инвентарь', width: 340, height: 58, onClick: () => this.scene.start(SCENES.INVENTORY) })
     by += gap
+    createButton(this, bx, by, { label: '🔨  Верстак (крафт)', width: 340, height: 58, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.scene.start(SCENES.FORGE) })
+    by += gap
     createButton(this, bx, by, {
       label: State.hero.points > 0 ? `🦸  Герой (+${State.hero.points})` : '🦸  Герой',
       width: 340, height: 58, color: State.hero.points > 0 ? COLORS.rustLight : COLORS.rust,
@@ -73,7 +75,7 @@ export default class HubScene extends Phaser.Scene {
       onClick: () => this.scene.start(SCENES.PRESTIGE),
     })
 
-    this.add.text(cx, GAME.HEIGHT - 20, 'v0.1.0 — Этапы 1-6', { fontFamily: 'monospace', fontSize: '13px', color: '#6b5f4a' }).setOrigin(0.5)
+    this.add.text(cx, GAME.HEIGHT - 20, 'v0.1.0 — Этапы 1-6', { fontFamily: 'monospace', fontSize: '13px', color: '#9a8c70' }).setOrigin(0.5)
 
     // Debug: мгновенный сброс прогресса
     createButton(this, 110, GAME.HEIGHT - 30, {

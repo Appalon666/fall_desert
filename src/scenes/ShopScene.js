@@ -71,9 +71,9 @@ export default class ShopScene extends Phaser.Scene {
 
     const icon = this.add.text(16, h / 2, opts.icon, { fontSize: '34px' }).setOrigin(0, 0.5)
     const title = this.add.text(64, 18, opts.title, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
-    const desc = this.add.text(64, 46, opts.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: '#b7ad93' }).setOrigin(0)
+    const desc = this.add.text(64, 46, opts.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0)
     const cap = this.add.image(w - 118, h / 2, TEX.CAP).setScale(1.1)
-    const cost = this.add.text(w - 100, h / 2, fmt(opts.cost), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: afford ? CSS.cap : '#7a6f58', fontStyle: 'bold' }).setOrigin(0, 0.5)
+    const cost = this.add.text(w - 100, h / 2, fmt(opts.cost), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: afford ? CSS.cap : '#ab9e80', fontStyle: 'bold' }).setOrigin(0, 0.5)
     c.add([bg, icon, title, desc, cap, cost])
 
     const zone = this.add.zone(0, 0, w, h).setOrigin(0)

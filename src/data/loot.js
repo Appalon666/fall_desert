@@ -2,10 +2,11 @@
 // Каждый предмет даёт один % бонус к стату, зависящий от слота.
 
 export const RARITIES = [
-  { id: 'common',   name: 'Хлам',    color: 0x9a9a9a, css: '#9a9a9a', weight: 56, mul: 1.0 },
-  { id: 'uncommon', name: 'Годное',  color: 0x6fbf4f, css: '#6fbf4f', weight: 27, mul: 1.8 },
-  { id: 'rare',     name: 'Редкое',  color: 0x4f9fef, css: '#4f9fef', weight: 13, mul: 3.0 },
-  { id: 'epic',     name: 'Легенда', color: 0xb96ff0, css: '#b96ff0', weight: 4,  mul: 5.0 },
+  { id: 'common',   name: 'Хлам',     color: 0x9a9a9a, css: '#9a9a9a', weight: 56, mul: 1.0 },
+  { id: 'uncommon', name: 'Годное',   color: 0x6fbf4f, css: '#6fbf4f', weight: 27, mul: 1.8 },
+  { id: 'rare',     name: 'Редкое',   color: 0x4f9fef, css: '#4f9fef', weight: 13, mul: 3.0 },
+  { id: 'epic',     name: 'Легенда',  color: 0xb96ff0, css: '#b96ff0', weight: 3.4, mul: 5.0 },
+  { id: 'relic',    name: 'Реликвия', color: 0xff8a2a, css: '#ff8a2a', weight: 0.6, mul: 8.0 },
 ]
 
 // Слоты экипировки. accessory занимает два гнезда (acc1/acc2).
@@ -69,3 +70,18 @@ export function rollItem(rng, level = 1, luckBonus = 0) {
 
 export const RARITY_BY_ID = Object.fromEntries(RARITIES.map(r => [r.id, r]))
 export const SLOT_BY_ID = Object.fromEntries(SLOTS.map(s => [s.id, s]))
+
+// Сколько металлолома даёт разбор предмета (по редкости и уровню).
+const SCRAP_BASE = { common: 1, uncommon: 3, rare: 8, epic: 22, relic: 60 }
+export function scrapValue(item) {
+  const base = SCRAP_BASE[item.rarity] || 1
+  return Math.ceil(base * (1 + (item.level || 1) * 0.08))
+}
+
+// Тиры крафта: больше металлолома → выше шанс качественного предмета (luck).
+export const CRAFT_TIERS = [
+  { id: 'cheap',  name: 'На коленке',      cost: 25,   luck: 0.2, css: '#9a9a9a' },
+  { id: 'solid',  name: 'Годная сборка',   cost: 100,  luck: 1.5, css: '#6fbf4f' },
+  { id: 'fine',   name: 'Точная работа',   cost: 400,  luck: 4,   css: '#4f9fef' },
+  { id: 'master', name: 'Мастерская ковка', cost: 1500, luck: 10,  css: '#b96ff0' },
+]

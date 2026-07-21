@@ -27,14 +27,14 @@ export const COLORS = {
 
 // CSS-строки тех же цветов (для текста/обводок Phaser, где нужен '#rrggbb').
 export const CSS = {
-  sand: '#c9a76a',
-  rust: '#b5652f',
-  toxic: '#8fbf3f',
-  cap: '#d8b64a',
-  paper: '#e8dcc0',
-  gold: '#c9a227',
+  sand: '#e6c98a',
+  rust: '#e0824a',
+  toxic: '#b6f24a',
+  cap: '#ffd24a',
+  paper: '#fbf3df',
+  gold: '#e8bf3a',
   ink: '#120d09',
-  steel: '#6b6b73',
+  steel: '#9a9aa6',
 }
 
 export const SCENES = {
@@ -47,6 +47,7 @@ export const SCENES = {
   HERO: 'HeroScene',
   PRESTIGE: 'PrestigeScene',
   LEADERBOARD: 'LeaderboardScene',
+  FORGE: 'ForgeScene',
 }
 
 // Ключи процедурно сгенерированных текстур.
