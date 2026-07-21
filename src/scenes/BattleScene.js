@@ -170,18 +170,25 @@ export default class BattleScene extends Phaser.Scene {
     const def = ENEMIES[defId]
     const { hp, reward, dmg } = enemyStats(def, State.totalKills, isBoss)
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1)
-    const scale = isBoss ? BAL.bossScale * 1.35 : def.scale
-    const texH = isBoss ? 100 : 72
+    const texH = 72
+    const scale = isBoss ? 3.1 : def.scale
     const yPos = this.groundY - texH * scale * 0.42
+    const texKey = `tex-e-${defId}`
 
-    const sprite = this.add.image(this.arenaW - 90, yPos, isBoss ? TEX.BOSS : TEX.ENEMY).setScale(scale)
-    if (!isBoss) sprite.setTint(def.tint)
+    // аура босса
+    let aura = null
+    if (isBoss) {
+      aura = this.add.image(this.arenaW - 90, yPos, TEX.GLOW).setTint(0xff3a1a).setScale(scale * 1.7).setAlpha(0.5).setBlendMode('ADD').setDepth(-1)
+      this.tweens.add({ targets: aura, alpha: { from: 0.5, to: 0.85 }, scale: scale * 1.95, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
+    }
+
+    const sprite = this.add.image(this.arenaW - 90, yPos, texKey).setScale(scale)
     sprite.setAlpha(0)
     this.tweens.add({ targets: sprite, alpha: 1, duration: 200 })
     this.tweens.add({ targets: sprite, y: yPos - 10, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
 
     // полоска HP над врагом
-    const barW = (isBoss ? 90 : 64) * scale
+    const barW = (isBoss ? 30 : 40) * scale
     const bg = this.add.rectangle(sprite.x, 0, barW + 4, 12, COLORS.ink).setOrigin(0.5).setDepth(40)
     const fill = this.add.rectangle(sprite.x, 0, barW, 8, COLORS.toxic).setOrigin(0.5).setDepth(41)
     const nameLabel = this.add.text(sprite.x, 0, isBoss ? `☠ ${def.name}` : def.name, {
@@ -190,9 +197,9 @@ export default class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(41)
 
     this.enemy = {
-      sprite, bg, fill, nameLabel, barW, def, isBoss,
+      sprite, aura, bg, fill, nameLabel, barW, def, isBoss,
       maxHp: hp, hp, reward, dmg, speed, scale, texH,
-      hitR: (isBoss ? 44 : 30) * scale,
+      hitR: 30 * scale,
       state: 'approach', attackTimer: 0,
     }
     if (isBoss) {
@@ -248,7 +255,7 @@ export default class BattleScene extends Phaser.Scene {
     const e = this.enemy
     if (!e) return
     e.sprite.setTintFill(0xffffff)
-    this.time.delayedCall(45, () => { if (this.enemy === e) { if (e.isBoss) e.sprite.clearTint(); else e.sprite.setTint(e.def.tint) } })
+    this.time.delayedCall(45, () => { if (this.enemy === e) e.sprite.clearTint() })
     this.tweens.add({ targets: e.sprite, scaleX: e.scale * 1.14, scaleY: e.scale * 0.86, duration: 55, yoyo: true, ease: 'Quad.out' })
   }
 
@@ -283,7 +290,8 @@ export default class BattleScene extends Phaser.Scene {
 
     // очистка спрайтов врага
     this.tweens.killTweensOf(e.sprite)
-    ;[e.sprite, e.bg, e.fill, e.nameLabel].forEach(o => o.destroy())
+    if (e.aura) this.tweens.killTweensOf(e.aura)
+    ;[e.sprite, e.aura, e.bg, e.fill, e.nameLabel].filter(Boolean).forEach(o => o.destroy())
 
     const advanced = State.registerKill()
     if (advanced) { this.applyZoneVisuals(); this.cameras.main.flash(300, 40, 60, 20); Platform.showInterstitial() }
@@ -330,7 +338,8 @@ export default class BattleScene extends Phaser.Scene {
     this.cameras.main.flash(400, 120, 0, 0)
     if (this.enemy) {
       this.tweens.killTweensOf(this.enemy.sprite)
-      ;[this.enemy.sprite, this.enemy.bg, this.enemy.fill, this.enemy.nameLabel].forEach(o => o.destroy())
+      if (this.enemy.aura) this.tweens.killTweensOf(this.enemy.aura)
+      ;[this.enemy.sprite, this.enemy.aura, this.enemy.bg, this.enemy.fill, this.enemy.nameLabel].filter(Boolean).forEach(o => o.destroy())
       this.enemy = null
     }
     Platform.submitScore(State.bestScore)
@@ -469,6 +478,7 @@ export default class BattleScene extends Phaser.Scene {
         }
       }
       // позиция полоски HP и имени
+      if (e.aura) { e.aura.x = e.sprite.x; e.aura.y = e.sprite.y }
       e.bg.x = e.sprite.x; e.fill.x = e.sprite.x
       const topY = e.sprite.y - e.texH * e.scale * 0.5 - 12
       e.bg.y = topY; e.fill.y = topY

@@ -2,6 +2,7 @@
 // текстуры (свечение/виньетка/пыль) через Canvas. Без внешних ассетов.
 
 import { COLORS, TEX } from '../config.js'
+import { ENEMY_IDS } from '../data/enemies.js'
 
 function make(scene, key, w, h, drawFn) {
   const g = scene.make.graphics({ x: 0, y: 0, add: false })
@@ -217,6 +218,129 @@ function drawRuin(g) {
   g.fillStyle(0x000000, 1)
 }
 
+// === Детальные монстры (каждый тип — свой силуэт), холст 72x72 ===
+function esh(g) { g.fillStyle(COLORS.ink, 0.28); g.fillEllipse(36, 66, 46, 9) }
+
+function drawRadrat(g) {
+  esh(g)
+  g.lineStyle(4, 0x8a7a5a, 1); g.beginPath(); g.moveTo(16, 52); g.lineTo(5, 44); g.lineTo(9, 33); g.strokePath()
+  g.fillStyle(0x8a9a5a, 1); g.fillEllipse(36, 46, 44, 30)
+  g.fillStyle(0xa3b36a, 1); g.fillEllipse(32, 42, 24, 14)
+  g.fillStyle(0x8a9a5a, 1); g.fillCircle(56, 40, 14)
+  g.fillStyle(0x6f7d47, 1); g.fillTriangle(52, 28, 60, 19, 65, 32)
+  g.fillStyle(0xd88aa0, 1); g.fillTriangle(55, 28, 60, 23, 63, 31)
+  g.fillStyle(0x7a8a4a, 1); g.fillTriangle(66, 38, 75, 42, 66, 46)
+  g.fillStyle(0xff8aa0, 1); g.fillCircle(73, 42, 2)
+  g.fillStyle(0xff3a3a, 1); g.fillCircle(58, 37, 3.2); g.fillStyle(0xffd0d0, 1); g.fillCircle(59, 36, 1.2)
+  g.fillStyle(0xffffff, 1); g.fillRect(66, 45, 3, 4)
+  g.fillStyle(0x6b5f45, 1); g.fillRect(30, 58, 5, 8); g.fillRect(44, 58, 5, 8)
+}
+function drawCrawler(g) {
+  esh(g)
+  g.lineStyle(2, 0x3a2a1a, 1)
+  for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(14 + i * 8, 54); g.lineTo(11 + i * 8, 64); g.strokePath() }
+  g.fillStyle(0x7a4a2a, 1); for (let i = 0; i < 5; i++) g.fillCircle(16 + i * 10, 50, 9 - i * 0.4)
+  g.fillStyle(0x9a6a3a, 1); for (let i = 0; i < 5; i++) g.fillCircle(16 + i * 10, 47, 4.5)
+  g.fillStyle(0x8a5a2a, 1); g.fillCircle(60, 47, 11)
+  g.fillStyle(0xff3a3a, 1); g.fillCircle(62, 44, 2.5); g.fillCircle(57, 45, 2.2)
+  g.fillStyle(0x2a1a0a, 1); g.fillTriangle(68, 45, 75, 41, 70, 49); g.fillTriangle(68, 51, 75, 55, 70, 47)
+}
+function drawWasp(g) {
+  g.fillStyle(COLORS.ink, 0.2); g.fillEllipse(40, 66, 30, 7)
+  g.fillStyle(0xcfe8ff, 0.5); g.fillEllipse(30, 26, 26, 15); g.fillEllipse(46, 26, 26, 15)
+  g.fillStyle(0xe8c23a, 1); g.fillEllipse(40, 44, 32, 18)
+  g.fillStyle(0x1a1a1a, 1); g.fillRect(33, 36, 4, 16); g.fillRect(43, 36, 4, 16)
+  g.fillStyle(0x2a2a1a, 1); g.fillCircle(58, 44, 9)
+  g.fillStyle(0xff3a3a, 1); g.fillCircle(60, 42, 3); g.fillCircle(56, 46, 2.5)
+  g.fillStyle(0x1a1a1a, 1); g.fillTriangle(24, 44, 11, 42, 24, 48)
+  g.lineStyle(2, 0x1a1a1a, 1); g.beginPath(); g.moveTo(60, 38); g.lineTo(66, 29); g.moveTo(56, 38); g.lineTo(59, 29); g.strokePath()
+}
+function drawGhoul(g) {
+  esh(g)
+  g.fillStyle(0x5a6a3a, 1); g.fillRect(30, 52, 7, 14); g.fillRect(40, 52, 7, 14)
+  g.fillStyle(0x8a9a5a, 1); g.fillRoundedRect(28, 26, 22, 30, 5)
+  g.fillStyle(0x6f7d47, 1); g.fillRect(28, 34, 22, 2); g.fillRect(28, 40, 22, 2)
+  g.fillStyle(0x8a9a5a, 1); g.fillRect(48, 30, 16, 6); g.fillStyle(0x6f7d47, 1); g.fillCircle(64, 33, 4)
+  g.fillStyle(0x9aaa6a, 1); g.fillCircle(39, 20, 11)
+  g.fillStyle(0x14130f, 1); g.fillCircle(35, 19, 3.2); g.fillCircle(43, 19, 3.2)
+  g.fillStyle(0xbfff3a, 0.95); g.fillCircle(35, 19, 1.4); g.fillCircle(43, 19, 1.4)
+  g.fillStyle(0x14130f, 1); g.fillRect(34, 26, 10, 3)
+}
+function drawRaider(g) {
+  esh(g)
+  g.fillStyle(0x3a2f22, 1); g.fillRect(30, 54, 8, 12); g.fillRect(40, 54, 8, 12)
+  g.fillStyle(0x6b4a2a, 1); g.fillRoundedRect(26, 28, 26, 30, 5)
+  g.fillStyle(0x8a8a92, 1); g.fillRect(26, 30, 26, 5)
+  g.fillStyle(0x3a2a1a, 1); g.fillRect(26, 44, 26, 4)
+  g.fillStyle(0x6b4a2a, 1); g.fillRect(48, 32, 8, 6)
+  g.fillStyle(0x8a8a92, 1); g.fillRect(54, 18, 4, 24)
+  g.fillStyle(0xc8a074, 1); g.fillCircle(39, 20, 11)
+  g.fillStyle(0x2a2a2a, 1); g.fillRect(30, 19, 18, 5)
+  g.fillStyle(0xff3a3a, 1); g.fillRect(33, 20, 4, 2); g.fillRect(43, 20, 4, 2)
+  g.fillStyle(0xb03030, 1); g.fillTriangle(36, 10, 39, 2, 42, 10); g.fillTriangle(33, 12, 36, 5, 39, 12); g.fillTriangle(39, 12, 42, 5, 45, 12)
+}
+function drawDogMut(g) {
+  esh(g)
+  g.fillStyle(0x4a4a52, 1); g.fillRect(22, 54, 6, 12); g.fillRect(32, 54, 6, 12); g.fillRect(46, 54, 6, 12); g.fillRect(56, 54, 6, 12)
+  g.fillStyle(0x5a5a62, 1); g.fillEllipse(40, 44, 44, 22)
+  g.fillStyle(0x6b6b73, 1); g.fillEllipse(38, 40, 28, 12)
+  g.fillStyle(0x5a5a62, 1); g.fillCircle(60, 40, 12)
+  g.fillStyle(0x4a4a52, 1); g.fillRect(64, 40, 10, 7); g.fillStyle(0x1a1a1a, 1); g.fillCircle(74, 42, 2.5)
+  g.fillStyle(0x3a3a42, 1); g.fillTriangle(56, 30, 58, 20, 64, 30)
+  g.fillStyle(0xff3a3a, 1); g.fillCircle(60, 37, 3)
+  g.fillStyle(0xffffff, 1); g.fillTriangle(66, 46, 69, 46, 67, 50)
+  g.lineStyle(4, 0x4a4a52, 1); g.beginPath(); g.moveTo(18, 42); g.lineTo(7, 33); g.strokePath()
+  g.fillStyle(0x2a2a30, 1); g.fillTriangle(34, 30, 37, 22, 40, 30); g.fillTriangle(42, 30, 45, 22, 48, 30)
+}
+function drawLurker(g) {
+  esh(g)
+  g.fillStyle(0x2a2438, 1); g.fillTriangle(36, 14, 17, 64, 55, 64)
+  g.fillStyle(0x3a3350, 1); g.fillTriangle(36, 18, 25, 62, 36, 62)
+  g.fillStyle(0x1e1a2c, 1); g.fillCircle(36, 20, 13)
+  g.fillStyle(0x120f1c, 1); g.fillEllipse(36, 23, 18, 20)
+  g.fillStyle(0x8f6fff, 1); g.fillCircle(31, 22, 2.6); g.fillCircle(41, 22, 2.6)
+  g.fillStyle(0xd0c0ff, 1); g.fillCircle(31, 21, 1); g.fillCircle(41, 21, 1)
+  g.fillStyle(0x3a3350, 1); g.fillCircle(20, 46, 4); g.fillCircle(52, 46, 4)
+}
+function drawSpitter(g) {
+  esh(g)
+  g.fillStyle(0x4a6a1a, 1); g.fillCircle(36, 42, 26)
+  g.fillStyle(0x6f9a2a, 1); g.fillCircle(32, 36, 16)
+  g.fillStyle(0x9aff3a, 0.85); g.fillCircle(22, 50, 6); g.fillCircle(50, 48, 7)
+  g.fillStyle(0x14200a, 1); g.fillEllipse(40, 50, 26, 14)
+  g.fillStyle(0x9aff3a, 1); g.fillRect(34, 54, 3, 10); g.fillRect(44, 54, 3, 8)
+  g.fillStyle(0xffffff, 1); for (let i = 0; i < 4; i++) g.fillTriangle(30 + i * 6, 44, 33 + i * 6, 44, 31 + i * 6, 50)
+  g.fillStyle(0xffff3a, 1); g.fillCircle(28, 32, 5); g.fillCircle(44, 32, 5)
+  g.fillStyle(0x14130f, 1); g.fillCircle(29, 33, 2); g.fillCircle(45, 33, 2)
+}
+function drawBloat(g) {
+  esh(g)
+  g.fillStyle(0x5a7a2a, 1); g.fillCircle(36, 40, 30)
+  g.fillStyle(0x7fae3a, 1); g.fillCircle(36, 38, 26)
+  g.fillStyle(0x9fce5a, 1); g.fillCircle(28, 30, 14)
+  g.fillStyle(0xbfe87a, 1); g.fillCircle(48, 48, 7); g.fillCircle(22, 46, 6); g.fillCircle(44, 24, 5)
+  g.fillStyle(0xffffff, 1); g.fillCircle(30, 38, 5); g.fillCircle(44, 38, 5)
+  g.fillStyle(0x14130f, 1); g.fillCircle(31, 39, 2.2); g.fillCircle(45, 39, 2.2)
+  g.fillStyle(0x14200a, 1); g.fillEllipse(37, 50, 12, 5)
+}
+function drawBruteMut(g) {
+  esh(g)
+  g.fillStyle(0x6a2a2a, 1); g.fillRect(26, 54, 10, 12); g.fillRect(40, 54, 10, 12)
+  g.fillStyle(0x9a3a3a, 1); g.fillRoundedRect(16, 26, 44, 34, 8)
+  g.fillStyle(0xb85a5a, 1); g.fillEllipse(30, 34, 20, 14)
+  g.fillStyle(0x6a2020, 1); g.fillRect(36, 26, 4, 34)
+  g.fillStyle(0x9a3a3a, 1); g.fillCircle(14, 36, 10); g.fillCircle(62, 36, 10)
+  g.fillStyle(0xb85a5a, 1); g.fillCircle(12, 33, 4); g.fillCircle(60, 33, 4)
+  g.fillStyle(0x8a5a3a, 1); g.fillCircle(38, 18, 9)
+  g.fillStyle(0xffd23a, 1); g.fillCircle(35, 18, 2.5); g.fillCircle(41, 18, 2.5)
+  g.fillStyle(0xffffff, 1); g.fillTriangle(34, 22, 36, 26, 32, 26); g.fillTriangle(42, 22, 44, 26, 40, 26)
+}
+
+const ENEMY_DRAW = {
+  radrat: drawRadrat, crawler: drawCrawler, wasp: drawWasp, ghoul: drawGhoul, raider: drawRaider,
+  dog: drawDogMut, lurker: drawLurker, spitter: drawSpitter, bloat: drawBloat, brute: drawBruteMut,
+}
+
 export function generateTextures(scene) {
   make(scene, TEX.HERO, 96, 124, drawHero)
   make(scene, TEX.HERO_GUNNER, 96, 124, drawGunner)
@@ -225,6 +349,7 @@ export function generateTextures(scene) {
   make(scene, TEX.HERO_SCAVENGER, 96, 124, drawScavenger)
   make(scene, TEX.ENEMY, 72, 72, drawEnemy)
   make(scene, TEX.BOSS, 100, 100, drawBoss)
+  ENEMY_IDS.forEach(id => make(scene, `tex-e-${id}`, 72, 72, ENEMY_DRAW[id] || drawEnemy))
   make(scene, TEX.BULLET, 16, 10, drawBullet)
   make(scene, TEX.CAP, 26, 26, drawCap)
   make(scene, TEX.RUIN, 92, 80, drawRuin)
