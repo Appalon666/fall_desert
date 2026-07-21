@@ -5,8 +5,8 @@
 export const UPGRADES = [
   {
     id: 'damage', name: 'Калибр', icon: '🔫',
-    desc: 'Урон клика ×1.13 за уровень',
-    baseCost: 15, costMult: 1.16, kind: 'pow', stat: 'clickPow', mul: 1.13,
+    desc: 'Урон клика ×1.15 за уровень',
+    baseCost: 15, costMult: 1.16, kind: 'pow', stat: 'clickPow', mul: 1.15,
   },
   {
     id: 'hp', name: 'Броня', icon: '🛡️',

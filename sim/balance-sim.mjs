@@ -86,7 +86,8 @@ function runOne(classId, rng) {
     const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
     const { hp, reward, dmg } = enemyStats(def, st.totalKills, isBoss)
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1)
-    const approachTime = Math.max(0, (710 - BAL.enemyAttackRange) / speed)
+    // боссы появляются вплотную и сразу бьют; обычные враги подходят
+    const approachTime = isBoss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed)
     enemy = { hp, maxHp: hp, reward, dmg, approachTime, attackAccum: 0, isBoss }
     curStart = t
   }

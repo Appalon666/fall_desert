@@ -174,15 +174,17 @@ export default class BattleScene extends Phaser.Scene {
     const scale = isBoss ? 3.1 : def.scale
     const yPos = this.groundY - texH * scale * 0.42
     const texKey = `tex-e-${defId}`
+    // боссы выходят почти вплотную (сразу обмен ударами = угроза), мобы — справа
+    const spawnX = isBoss ? (this.hero.x + BAL.enemyAttackRange + 50) : (this.arenaW - 90)
 
     // аура босса
     let aura = null
     if (isBoss) {
-      aura = this.add.image(this.arenaW - 90, yPos, TEX.GLOW).setTint(0xff3a1a).setScale(scale * 1.7).setAlpha(0.5).setBlendMode('ADD').setDepth(-1)
+      aura = this.add.image(spawnX, yPos, TEX.GLOW).setTint(0xff3a1a).setScale(scale * 1.7).setAlpha(0.5).setBlendMode('ADD').setDepth(-1)
       this.tweens.add({ targets: aura, alpha: { from: 0.5, to: 0.85 }, scale: scale * 1.95, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
     }
 
-    const sprite = this.add.image(this.arenaW - 90, yPos, texKey).setScale(scale)
+    const sprite = this.add.image(spawnX, yPos, texKey).setScale(scale)
     sprite.setAlpha(0)
     this.tweens.add({ targets: sprite, alpha: 1, duration: 200 })
     this.tweens.add({ targets: sprite, y: yPos - 10, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
