@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Ядрён-Пустошь</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      /* Тёплый радиальный фон пустоши — леттербокс на широком мониторе смотрится осмысленно */
+      background: radial-gradient(ellipse at 50% 40%, #2a2013 0%, #140f0a 70%, #0b0806 100%);
+      font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+      touch-action: none;
+    }
+    #game {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #game canvas {
+      /* Мягкая тень по краю холста — отделяет игру от фона */
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
+    }
+    /* Экран загрузки до старта Phaser */
+    #preloader {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #c9a227;
+      font-size: 18px;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="preloader">Ядрён-Пустошь · разогреваем дробовик…</div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "yadryon-pustosh",
+  "version": "0.1.0",
+  "description": "Ядрён-Пустошь — пост-апок экшен-кликер с юмором (Phaser 3)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  }
+}
