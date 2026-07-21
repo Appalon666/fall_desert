@@ -12,6 +12,8 @@ import { getZone } from '../data/zones.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import { darken, addDust, addVignette, addFog, addGodRays, applyPostFX } from '../ui/scenery.js'
+import { Platform } from '../platform/yandex.js'
+import { Sfx } from '../audio/sfx.js'
 import { fmt } from '../util/format.js'
 
 const PANEL_W = 320
@@ -47,6 +49,20 @@ export default class BattleScene extends Phaser.Scene {
 
     this.applyZoneVisuals()
     this.spawnEnemy()
+    this.maybeTutorial()
+  }
+
+  // Разовая подсказка новичку.
+  maybeTutorial() {
+    let seen = false
+    try { seen = localStorage.getItem('yp_tut_shoot') === '1' } catch (e) { /* */ }
+    if (seen || State.totalKills > 0) return
+    try { localStorage.setItem('yp_tut_shoot', '1') } catch (e) { /* */ }
+    const t = this.add.text(this.arenaW / 2, GAME.HEIGHT / 2 + 60,
+      'Наведись на врага и КЛИКАЙ — стреляй!\nКрышки трать в «Мастерской», Space — ульта.',
+      { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.paper, align: 'center', lineSpacing: 6, stroke: '#120d09', strokeThickness: 4 })
+      .setOrigin(0.5).setDepth(70)
+    this.tweens.add({ targets: t, alpha: { from: 1, to: 0 }, delay: 4000, duration: 1400, onComplete: () => t.destroy() })
   }
 
   // ---------------- Арена и фон ----------------
@@ -141,7 +157,7 @@ export default class BattleScene extends Phaser.Scene {
     // Назад
     createButton(this, cx, GAME.HEIGHT - 50, {
       label: '⟵ В лагерь', width: PANEL_W - 60, height: 50, fontSize: 20,
-      onClick: () => { State.lastSeen = Date.now(); State.save(); this.scene.start(SCENES.HUB) },
+      onClick: () => { State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.bestScore); this.scene.start(SCENES.HUB) },
     })
   }
 
@@ -183,11 +199,13 @@ export default class BattleScene extends Phaser.Scene {
       this.cameras.main.flash(220, 60, 0, 0)
       this.cameras.main.shake(200, 0.006)
       this.showBossBanner(def.name)
+      Sfx.boss()
     }
   }
 
   // ---------------- Стрельба ----------------
   shoot(tx, ty) {
+    Sfx.resume(); Sfx.shoot()
     const b = this.add.image(this.muzzle.x, this.muzzle.y, TEX.BULLET).setScale(2.3).setBlendMode('ADD').setDepth(30)
     const ang = Phaser.Math.Angle.Between(this.muzzle.x, this.muzzle.y, tx, ty)
     b.setRotation(ang)
@@ -216,6 +234,7 @@ export default class BattleScene extends Phaser.Scene {
     this.lastHitTime = this.time.now
     State.ult = Math.min(BAL.ultMax, State.ult + BAL.ultChargePerHit)
 
+    crit ? Sfx.crit() : Sfx.hit()
     this.floatText(x, y, `${fmt(dmg)}${crit ? '!' : ''}`, crit ? '#ffd23c' : '#ffffff', crit ? 32 : 22)
     this.spawnHitSpark(x, y)
     this.punchEnemy()
@@ -245,8 +264,9 @@ export default class BattleScene extends Phaser.Scene {
     this.enemy = null
 
     State.addCaps(Math.ceil(e.reward * (1 + State.capsBonus())))
-    State.addXp(Math.ceil(e.reward * 0.6))
+    if (State.addXp(Math.ceil(e.reward * 0.6))) Sfx.levelup()
     State.ult = Math.min(BAL.ultMax, State.ult + BAL.ultChargePerKill)
+    Sfx.kill(); Sfx.cap()
     this.capsBurst(e.sprite.x, e.sprite.y, e.isBoss ? 14 : 6)
     this.explode(e.sprite.x, e.sprite.y, e.isBoss)
     if (e.isBoss) this.cameras.main.shake(260, 0.012)
@@ -266,7 +286,7 @@ export default class BattleScene extends Phaser.Scene {
     ;[e.sprite, e.bg, e.fill, e.nameLabel].forEach(o => o.destroy())
 
     const advanced = State.registerKill()
-    if (advanced) { this.applyZoneVisuals(); this.cameras.main.flash(300, 40, 60, 20) }
+    if (advanced) { this.applyZoneVisuals(); this.cameras.main.flash(300, 40, 60, 20); Platform.showInterstitial() }
 
     this.time.delayedCall(220, () => { if (!this.scene.isActive()) return; this.spawnEnemy() })
   }
@@ -278,6 +298,7 @@ export default class BattleScene extends Phaser.Scene {
       return
     }
     State.ult = 0
+    Sfx.ult()
     this.cameras.main.shake(400, 0.02)
     this.cameras.main.flash(300, 140, 220, 60)
     if (this.enemy) {
@@ -305,16 +326,35 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   heroDie() {
+    Sfx.death()
     this.cameras.main.flash(400, 120, 0, 0)
-    this.floatText(this.hero.x + 80, this.hero.y - 40, 'Ты пал! Откат зоны', '#ff4a4a', 26)
     if (this.enemy) {
       this.tweens.killTweensOf(this.enemy.sprite)
       ;[this.enemy.sprite, this.enemy.bg, this.enemy.fill, this.enemy.nameLabel].forEach(o => o.destroy())
       this.enemy = null
     }
-    State.onHeroDeath()
-    this.spawnCount = 0
-    this.time.delayedCall(700, () => { if (this.scene.isActive()) this.spawnEnemy() })
+    Platform.submitScore(State.bestScore)
+    this.showDeathModal()
+  }
+
+  showDeathModal() {
+    const cx = this.arenaW / 2, cy = GAME.HEIGHT / 2
+    const ov = this.add.rectangle(0, 0, this.arenaW, GAME.HEIGHT, COLORS.ink, 0.72).setOrigin(0).setDepth(85).setInteractive()
+    const t = this.add.text(cx, cy - 90, 'Ты пал на пустоши', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: '#ff5a5a', fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(86)
+    const revive = createButton(this, cx, cy - 6, {
+      label: '📺 Возродиться (реклама)', width: 340, height: 56, fontSize: 20,
+      color: COLORS.toxicDark, hover: COLORS.toxic,
+      onClick: () => { this.closeDeathModal(); Platform.showRewarded(() => { State.hp = State.heroMaxHp(); this.spawnEnemy() }) },
+    })
+    const give = createButton(this, cx, cy + 66, {
+      label: 'Смириться (откат зоны)', width: 340, height: 50, fontSize: 18,
+      onClick: () => { this.closeDeathModal(); State.onHeroDeath(); this.spawnCount = 0; this.spawnEnemy() },
+    })
+    revive.setDepth(86); give.setDepth(86)
+    this._deathModal = [ov, t, revive, give]
+  }
+  closeDeathModal() {
+    if (this._deathModal) { this._deathModal.forEach(o => o.destroy()); this._deathModal = null }
   }
 
   // ---------------- Эффекты ----------------

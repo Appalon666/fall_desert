@@ -5,6 +5,8 @@ import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, panel, applyPostFX } from '../ui/scenery.js'
+import { Platform } from '../platform/yandex.js'
+import { Sfx } from '../audio/sfx.js'
 import { fmt, fmtDuration } from '../util/format.js'
 
 export default class HubScene extends Phaser.Scene {
@@ -24,10 +26,17 @@ export default class HubScene extends Phaser.Scene {
     // Крышки (крупно, слева сверху)
     this.add.image(60, 44, TEX.CAP).setScale(1.6)
     this.add.text(86, 44, fmt(State.caps), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
+    if (State.cores > 0) {
+      this.add.text(60, 82, `☢ ${fmt(State.cores)} ядер`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: '#b6ff5a', fontStyle: 'bold' }).setOrigin(0, 0.5)
+    }
 
     // Рекорд
     this.add.text(GAME.WIDTH - 20, 30, `Рекорд: ${fmt(State.bestScore)} убийств`, { fontFamily: 'monospace', fontSize: '16px', color: CSS.sand }).setOrigin(1, 0.5)
     this.add.text(GAME.WIDTH - 20, 54, `Зона ${State.zoneIndex + 1} · ур. ${State.hero.level}`, { fontFamily: 'monospace', fontSize: '16px', color: '#9a8a68' }).setOrigin(1, 0.5)
+    createButton(this, GAME.WIDTH - 100, 92, { label: '🏆 Рекорды', width: 170, height: 38, fontSize: 15, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
+    // Переключатель звука
+    const muteTxt = this.add.text(GAME.WIDTH - 20, 128, Sfx.muted ? '🔇 Звук выкл' : '🔊 Звук вкл', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.sand }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
+    muteTxt.on('pointerup', () => { const m = Sfx.toggleMute(); muteTxt.setText(m ? '🔇 Звук выкл' : '🔊 Звук вкл') })
 
     // Герой + полоска опыта
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
@@ -55,6 +64,13 @@ export default class HubScene extends Phaser.Scene {
       label: State.hero.points > 0 ? `🦸  Герой (+${State.hero.points})` : '🦸  Герой',
       width: 340, height: 58, color: State.hero.points > 0 ? COLORS.rustLight : COLORS.rust,
       onClick: () => this.scene.start(SCENES.HERO),
+    })
+    by += gap
+    createButton(this, bx, by, {
+      label: State.canPrestige() ? `☢  Перерождение (+${State.coresFromRun()})` : '☢  Перерождение',
+      width: 340, height: 58,
+      color: State.canPrestige() ? COLORS.toxicDark : COLORS.rust, hover: COLORS.toxic,
+      onClick: () => this.scene.start(SCENES.PRESTIGE),
     })
 
     this.add.text(cx, GAME.HEIGHT - 20, 'v0.1.0 — Этапы 1-6', { fontFamily: 'monospace', fontSize: '13px', color: '#6b5f4a' }).setOrigin(0.5)
@@ -86,6 +102,11 @@ export default class HubScene extends Phaser.Scene {
     const cap = this.add.image(-40, 30, TEX.CAP).setScale(1.6)
     const t3 = this.add.text(-10, 30, `+${fmt(res.caps)}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
     box.add([bg, t1, t2, cap, t3])
-    const btn = createButton(this, cx, cy + 95, { label: 'Забрать', width: 200, height: 50, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { overlay.destroy(); box.destroy(); btn.destroy() } })
+    const close = () => { overlay.destroy(); box.destroy(); take.destroy(); dbl.destroy() }
+    const take = createButton(this, cx - 108, cy + 95, { label: 'Забрать', width: 180, height: 50, onClick: close })
+    const dbl = createButton(this, cx + 108, cy + 95, {
+      label: '📺 ×2', width: 180, height: 50, color: COLORS.toxicDark, hover: COLORS.toxic,
+      onClick: () => { Platform.showRewarded(() => State.addCaps(res.caps)); close() },
+    })
   }
 }

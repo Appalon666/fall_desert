@@ -8,6 +8,7 @@ import { UPGRADES, upgradeCost } from '../data/upgrades.js'
 import { ALLIES, allyCost } from '../data/allies.js'
 import { CLASS_BY_ID } from '../data/classes.js'
 import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID } from '../data/loot.js'
+import { Platform } from '../platform/yandex.js'
 
 const SAVE_KEY = 'wasteland_save_v1'
 const CAPS_PER_DPS = 0.12 // перевод idle-DPS в крышки/сек для офлайн-дохода
@@ -31,8 +32,34 @@ class GameState extends Phaser.Events.EventEmitter {
     this.zoneIndex = 0
     this.killsInZone = 0
     this.totalKills = 0
+    // престиж (сохраняется между перерождениями)
+    this.cores = 0
+    this.prestige = { legacy: 0, stash: 0, vitality: 0, quickstart: 0 }
+    this.prestigeCount = 0
     this.lastSeen = Date.now()
     // transient
+    this.hp = this.heroMaxHp()
+    this.combo = 0
+    this.ult = 0
+  }
+
+  // Сброс забега при перерождении: копит крышки/апгрейды/уровень/зоны,
+  // но сохраняет ядра, престиж-бонусы, экипировку, рекорд и класс.
+  resetRun() {
+    const cls = this.classDef()
+    this.caps = this.prestige.quickstart * 500
+    this.hero = { level: 1, xp: 0, points: 0, str: 0, vit: 0, luck: 0 }
+    this.upgrades = {}
+    this.allies = {}
+    if (cls) {
+      this.hero.str += cls.startStats.str || 0
+      this.hero.vit += cls.startStats.vit || 0
+      this.hero.luck += cls.startStats.luck || 0
+      for (const [aid, n] of Object.entries(cls.startAllies || {})) this.allies[aid] = (this.allies[aid] || 0) + n
+    }
+    this.zoneIndex = 0
+    this.killsInZone = 0
+    this.totalKills = 0
     this.hp = this.heroMaxHp()
     this.combo = 0
     this.ult = 0
@@ -75,9 +102,38 @@ class GameState extends Phaser.Events.EventEmitter {
     return s
   }
   // Бонус к получаемым крышкам (класс + обувь/аксессуары).
-  capsBonus() { return this.equipSum('capsMul') + this.classBonus('capsMul') }
+  capsBonus() { return this.equipSum('capsMul') + this.classBonus('capsMul') + this.prestigeCapsMul() }
   // Удача для дропа лута (характеристика + класс).
   lootLuck() { const c = this.classDef(); return this.hero.luck * 0.05 + (c ? c.lootLuck : 0) }
+
+  // ---------- престиж ----------
+  prestigeDamageMul() { return 1 + this.prestige.legacy * 0.10 }
+  prestigeHpMul() { return this.prestige.vitality * 0.08 }
+  prestigeCapsMul() { return this.prestige.stash * 0.10 }
+  coresFromRun() { return Math.floor(Math.pow(Math.max(0, this.totalKills) / 60, 0.8)) }
+  canPrestige() { return this.coresFromRun() >= 1 }
+  doPrestige() {
+    const gain = this.coresFromRun()
+    if (gain < 1) return 0
+    this.cores += gain
+    this.prestigeCount++
+    this.resetRun()
+    this.save()
+    return gain
+  }
+  prestigeCost(id) {
+    const bases = { legacy: 2, stash: 2, vitality: 2, quickstart: 3 }
+    return Math.floor(bases[id] * Math.pow(1.6, this.prestige[id] || 0))
+  }
+  buyPrestige(id) {
+    if (!(id in this.prestige)) return false
+    const cost = this.prestigeCost(id)
+    if (this.cores < cost) return false
+    this.cores -= cost
+    this.prestige[id]++
+    this.emit('prestige'); this.save()
+    return true
+  }
 
   comboMult() {
     const steps = Math.floor(this.combo / BAL.comboHitsPerStep)
@@ -86,7 +142,7 @@ class GameState extends Phaser.Events.EventEmitter {
   clickDamage(withCombo = true) {
     const flat = BAL.baseClickDamage + this.hero.str * BAL.perStrength
     const mul = 1 + this.upgAdd('clickMul') + this.equipSum('clickMul') + this.classBonus('clickMul')
-    let dmg = flat * mul * this.upgPow('clickPow')
+    let dmg = flat * mul * this.upgPow('clickPow') * this.prestigeDamageMul()
     if (withCombo) dmg *= this.comboMult()
     return dmg
   }
@@ -97,7 +153,7 @@ class GameState extends Phaser.Events.EventEmitter {
   }
   heroMaxHp() {
     const flat = BAL.baseHeroHp + this.hero.vit * BAL.perVitality
-    const mul = 1 + this.equipSum('hpMul') + this.classBonus('hpMul')
+    const mul = 1 + this.equipSum('hpMul') + this.classBonus('hpMul') + this.prestigeHpMul()
     return Math.floor(flat * mul * this.upgPow('hpPow'))
   }
   allyDps() {
@@ -236,35 +292,46 @@ class GameState extends Phaser.Events.EventEmitter {
       upgrades: this.upgrades, allies: this.allies,
       equipment: this.equipment, inventory: this.inventory,
       zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills,
+      cores: this.cores, prestige: this.prestige, prestigeCount: this.prestigeCount,
       bestScore: this.bestScore, lastSeen: Date.now(),
     }
   }
-  save() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.toJSON())) } catch (e) { /* приватный режим */ }
+  save(flushCloud = false) {
+    const data = this.toJSON()
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)) } catch (e) { /* приватный режим */ }
+    try { Platform.saveCloud(data, flushCloud) } catch (e) { /* нет SDK */ }
+  }
+  // Применить облачные данные (при старте, если есть).
+  applyCloud(d) {
+    if (!d || typeof d !== 'object' || !Object.keys(d).length) return
+    try { this._apply(d) } catch (e) { /* битые облачные данные */ }
   }
   load() {
     let raw
     try { raw = localStorage.getItem(SAVE_KEY) } catch (e) { return }
     if (!raw) return
-    try {
-      const d = JSON.parse(raw)
-      Object.assign(this, {
-        caps: d.caps ?? 0,
-        heroClass: d.heroClass || null,
-        hero: { level: 1, xp: 0, points: 0, str: 0, vit: 0, luck: 0, ...(d.hero || {}) },
-        upgrades: d.upgrades || {},
-        allies: d.allies || {},
-        equipment: { weapon: null, helmet: null, armor: null, boots: null, acc1: null, acc2: null, ...(d.equipment || {}) },
-        inventory: d.inventory || [],
-        zoneIndex: d.zoneIndex || 0,
-        killsInZone: d.killsInZone || 0,
-        totalKills: d.totalKills || 0,
-        bestScore: d.bestScore || 0,
-        lastSeen: d.lastSeen || Date.now(),
-      })
-      this.sanitizeItems()
-      this.hp = this.heroMaxHp()
-    } catch (e) { /* битый сейв — игнор */ }
+    try { this._apply(JSON.parse(raw)) } catch (e) { /* битый сейв — игнор */ }
+  }
+  _apply(d) {
+    Object.assign(this, {
+      caps: d.caps ?? 0,
+      heroClass: d.heroClass || null,
+      hero: { level: 1, xp: 0, points: 0, str: 0, vit: 0, luck: 0, ...(d.hero || {}) },
+      upgrades: d.upgrades || {},
+      allies: d.allies || {},
+      equipment: { weapon: null, helmet: null, armor: null, boots: null, acc1: null, acc2: null, ...(d.equipment || {}) },
+      inventory: d.inventory || [],
+      zoneIndex: d.zoneIndex || 0,
+      killsInZone: d.killsInZone || 0,
+      totalKills: d.totalKills || 0,
+      cores: d.cores || 0,
+      prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0, ...(d.prestige || {}) },
+      prestigeCount: d.prestigeCount || 0,
+      bestScore: d.bestScore || 0,
+      lastSeen: d.lastSeen || Date.now(),
+    })
+    this.sanitizeItems()
+    this.hp = this.heroMaxHp()
   }
 
   // Приводит инвентарь/экипировку к текущей схеме (миграция старых сейвов).

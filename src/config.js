@@ -45,6 +45,8 @@ export const SCENES = {
   SHOP: 'ShopScene',
   INVENTORY: 'InventoryScene',
   HERO: 'HeroScene',
+  PRESTIGE: 'PrestigeScene',
+  LEADERBOARD: 'LeaderboardScene',
 }
 
 // Ключи процедурно сгенерированных текстур.

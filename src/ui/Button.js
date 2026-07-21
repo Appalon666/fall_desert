@@ -7,6 +7,7 @@
 
 import Phaser from 'phaser'
 import { COLORS, CSS } from '../config.js'
+import { Sfx } from '../audio/sfx.js'
 
 export function createButton(scene, x, y, opts = {}) {
   const {
@@ -59,12 +60,12 @@ export function createButton(scene, x, y, opts = {}) {
 
     zone.on('pointerover', () => draw(hover))
     zone.on('pointerout', () => { draw(baseColor); lift() })
-    zone.on('pointerdown', () => { if (!pressed) { container.y += 2; pressed = true } })
+    zone.on('pointerdown', () => { Sfx.resume(); if (!pressed) { container.y += 2; pressed = true } })
     zone.on('pointerup', () => {
       const wasPressed = pressed
       lift()
       draw(hover) // курсор всё ещё над кнопкой
-      if (wasPressed) onClick()
+      if (wasPressed) { Sfx.click(); onClick() }
     })
   }
 
