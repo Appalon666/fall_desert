@@ -14,7 +14,7 @@ import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
 import { enemiesInWave, bossDue } from '../src/data/progression.js'
 
-const SESSION = 1200 // секунд активной игры за прогон (20 мин)
+const SESSION = process.env.SIM_SECONDS ? +process.env.SIM_SECONDS : 1200 // сек за прогон (env: SIM_SECONDS)
 const DT = 0.1
 const RUNS_PER_CLASS = 25
 
