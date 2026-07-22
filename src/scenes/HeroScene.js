@@ -1,7 +1,7 @@
 // Hero — характеристики и распределение очков за уровни (Сила / Живучесть / Удача).
 
 import Phaser from 'phaser'
-import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
+import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
@@ -22,7 +22,7 @@ export default class HeroScene extends Phaser.Scene {
     titleText(this, GAME.WIDTH / 2, 44, 'ГЕРОЙ', { size: 36 })
     const cls = State.classDef()
     const heroTex = (cls && cls.tex) || TEX.HERO
-    this.add.image(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2, heroTex).setScale(3.4)
+    this.add.image(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2, heroTex).setScale(3.4 / TEX_SS)
     if (cls) this.add.text(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2 + 150, `${cls.icon} ${cls.name}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: '⟵ В лагерь', width: 300, height: 52, onClick: () => this.scene.start(SCENES.HUB) })

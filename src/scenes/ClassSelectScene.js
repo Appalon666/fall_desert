@@ -1,7 +1,7 @@
 // ClassSelect — первый экран новой игры. Просторные карточки классов с ховером.
 
 import Phaser from 'phaser'
-import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
+import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
 import { State } from '../state/GameState.js'
 import { CLASSES } from '../data/classes.js'
 import { createButton } from '../ui/Button.js'
@@ -39,7 +39,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     const glow = this.add.image(0, top + 96, TEX.GLOW).setTint(tint).setAlpha(0.22).setScale(3.4, 3)
 
     const icon = this.add.text(0, top + 52, cls.icon, { fontSize: '60px' }).setOrigin(0.5)
-    const hero = this.add.image(0, top + 138, cls.tex).setScale(2)
+    const hero = this.add.image(0, top + 138, cls.tex).setScale(2 / TEX_SS)
     const name = this.add.text(0, top + 214, cls.name, {
       fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold',
       stroke: '#120d09', strokeThickness: 4,

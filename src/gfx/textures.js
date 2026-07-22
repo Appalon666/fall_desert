@@ -1,13 +1,36 @@
 // Процедурная генерация графики: спрайты через Phaser Graphics + мягкие
 // текстуры (свечение/виньетка/пыль) через Canvas. Без внешних ассетов.
 
-import { COLORS, TEX } from '../config.js'
+import { COLORS, TEX, TEX_SS } from '../config.js'
 import { ENEMY_IDS } from '../data/enemies.js'
 
-function make(scene, key, w, h, drawFn) {
+// Прокси над Graphics, масштабирующий ВСЕ координаты/размеры на s (стили — как есть).
+// Позволяет рисовать спрайт в тех же координатах, но в s× разрешении (суперсэмплинг).
+function scaled(g, s) {
+  return {
+    fillStyle: (c, a) => g.fillStyle(c, a),
+    lineStyle: (w, c, a) => g.lineStyle(w * s, c, a),
+    fillRect: (x, y, w, h) => g.fillRect(x * s, y * s, w * s, h * s),
+    strokeRect: (x, y, w, h) => g.strokeRect(x * s, y * s, w * s, h * s),
+    fillCircle: (x, y, r) => g.fillCircle(x * s, y * s, r * s),
+    fillEllipse: (x, y, w, h) => g.fillEllipse(x * s, y * s, w * s, h * s),
+    fillRoundedRect: (x, y, w, h, r) => g.fillRoundedRect(x * s, y * s, w * s, h * s, r * s),
+    strokeRoundedRect: (x, y, w, h, r) => g.strokeRoundedRect(x * s, y * s, w * s, h * s, r * s),
+    fillTriangle: (a, b, c, d, e, f) => g.fillTriangle(a * s, b * s, c * s, d * s, e * s, f * s),
+    beginPath: () => g.beginPath(),
+    moveTo: (x, y) => g.moveTo(x * s, y * s),
+    lineTo: (x, y) => g.lineTo(x * s, y * s),
+    closePath: () => g.closePath(),
+    strokePath: () => g.strokePath(),
+    fillPath: () => g.fillPath(),
+  }
+}
+
+// ss>1 — сгенерировать текстуру в ss× разрешении (спрайт крупнее, показываем /ss).
+function make(scene, key, w, h, drawFn, ss = 1) {
   const g = scene.make.graphics({ x: 0, y: 0, add: false })
-  drawFn(g)
-  g.generateTexture(key, w, h)
+  drawFn(ss === 1 ? g : scaled(g, ss))
+  g.generateTexture(key, w * ss, h * ss)
   g.destroy()
 }
 
@@ -353,16 +376,17 @@ const ENEMY_DRAW = {
 }
 
 export function generateTextures(scene) {
-  make(scene, TEX.HERO, 96, 124, drawHero)
-  make(scene, TEX.HERO_GUNNER, 96, 124, drawGunner)
-  make(scene, TEX.HERO_BRUTE, 96, 124, drawBrute)
-  make(scene, TEX.HERO_MECHANIC, 96, 124, drawMechanic)
-  make(scene, TEX.HERO_SCAVENGER, 96, 124, drawScavenger)
-  make(scene, TEX.ENEMY, 72, 72, drawEnemy)
-  make(scene, TEX.BOSS, 100, 100, drawBoss)
-  ENEMY_IDS.forEach(id => make(scene, `tex-e-${id}`, 72, 72, ENEMY_DRAW[id] || drawEnemy))
-  make(scene, TEX.ALLY, 52, 52, drawAlly)
-  make(scene, TEX.BULLET, 16, 10, drawBullet)
+  const S = TEX_SS
+  make(scene, TEX.HERO, 96, 124, drawHero, S)
+  make(scene, TEX.HERO_GUNNER, 96, 124, drawGunner, S)
+  make(scene, TEX.HERO_BRUTE, 96, 124, drawBrute, S)
+  make(scene, TEX.HERO_MECHANIC, 96, 124, drawMechanic, S)
+  make(scene, TEX.HERO_SCAVENGER, 96, 124, drawScavenger, S)
+  make(scene, TEX.ENEMY, 72, 72, drawEnemy, S)
+  make(scene, TEX.BOSS, 100, 100, drawBoss, S)
+  ENEMY_IDS.forEach(id => make(scene, `tex-e-${id}`, 72, 72, ENEMY_DRAW[id] || drawEnemy, S))
+  make(scene, TEX.ALLY, 52, 52, drawAlly, S)
+  make(scene, TEX.BULLET, 16, 10, drawBullet, S)
   make(scene, TEX.CAP, 26, 26, drawCap)
   make(scene, TEX.RUIN, 92, 80, drawRuin)
 

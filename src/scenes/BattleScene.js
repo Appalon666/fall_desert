@@ -4,7 +4,7 @@
 // смерть, союзники (idle), зоны и БОСС-ворота в конце зоны, дроп лута.
 
 import Phaser from 'phaser'
-import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
+import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
 import { State } from '../state/GameState.js'
 import { BAL } from '../data/balance.js'
 import { ENEMIES } from '../data/enemies.js'
@@ -40,7 +40,7 @@ export default class BattleScene extends Phaser.Scene {
 
     const heroScale = 2.1
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
-    this.hero = this.add.image(this.arenaW * 0.16, this.groundY - 124 * heroScale * 0.42, heroTex).setScale(heroScale)
+    this.hero = this.add.image(this.arenaW * 0.16, this.groundY - 124 * heroScale * 0.42, heroTex).setScale(heroScale / TEX_SS)
     addRim(this.hero, 0xffe0a8, 3, 0.08, 12) // тёплая контурная подсветка героя
     this.tweens.add({ targets: this.hero, y: this.hero.y - 5, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
     this.muzzle = { x: this.hero.x + 66, y: this.hero.y - 8 }
@@ -175,7 +175,7 @@ export default class BattleScene extends Phaser.Scene {
       const col = i % 3
       const x = this.hero.x - 34 + col * 36
       const y = this.groundY - 18 - Math.floor(i / 3) * 42 + (i % 2) * 6
-      const s = this.add.image(x, y, TEX.ALLY).setScale(0.95).setTint(a.color).setDepth(6)
+      const s = this.add.image(x, y, TEX.ALLY).setScale(0.95 / TEX_SS).setTint(a.color).setDepth(6)
       addRim(s, lighten(a.color, 0.3), 2, 0.08, 8)
       this.tweens.add({ targets: s, y: y - 4, duration: 1300 + i * 130, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
       const badge = this.add.text(x + 14, y + 14, `×${fmt(n)}`, {
@@ -254,7 +254,7 @@ export default class BattleScene extends Phaser.Scene {
       this.tweens.add({ targets: aura, alpha: { from: 0.5, to: 0.85 }, scale: scale * 1.95, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
     }
 
-    const sprite = this.add.image(spawnX, yPos, texKey).setScale(scale).setAlpha(0).setDepth(10 - (i % 2))
+    const sprite = this.add.image(spawnX, yPos, texKey).setScale(scale / TEX_SS).setAlpha(0).setDepth(10 - (i % 2))
     // контурная подсветка: босс — тревожно-красная, мобы — по своему цвету
     addRim(sprite, isBoss ? 0xff5a2a : lighten(def.tint, 0.28), isBoss ? 6 : 3, 0.08, isBoss ? 20 : 11)
     this.tweens.add({ targets: sprite, alpha: 1, duration: 200 })
@@ -270,7 +270,7 @@ export default class BattleScene extends Phaser.Scene {
 
     return {
       sprite, aura, bg, fill, nameLabel, barW, def, isBoss,
-      maxHp: hp, hp, reward, dmg, speed, scale, baseY: yPos,
+      maxHp: hp, hp, reward, dmg, speed, scale, dispScale: scale / TEX_SS, baseY: yPos,
       hitR: 30 * scale, attackTimer: 0,
     }
   }
@@ -303,7 +303,7 @@ export default class BattleScene extends Phaser.Scene {
   // ---------------- Стрельба ----------------
   shoot(tx, ty) {
     Sfx.resume(); Sfx.shoot()
-    const b = this.add.image(this.muzzle.x, this.muzzle.y, TEX.BULLET).setScale(2.3).setBlendMode('ADD').setDepth(30)
+    const b = this.add.image(this.muzzle.x, this.muzzle.y, TEX.BULLET).setScale(2.3 / TEX_SS).setBlendMode('ADD').setDepth(30)
     const ang = Phaser.Math.Angle.Between(this.muzzle.x, this.muzzle.y, tx, ty)
     b.setRotation(ang)
     const speed = 1500
@@ -352,7 +352,7 @@ export default class BattleScene extends Phaser.Scene {
     if (!e || !e.sprite.active) return
     e.sprite.setTintFill(0xffffff)
     this.time.delayedCall(45, () => { if (e.sprite.active) e.sprite.clearTint() })
-    this.tweens.add({ targets: e.sprite, scaleX: e.scale * 1.14, scaleY: e.scale * 0.86, duration: 55, yoyo: true, ease: 'Quad.out' })
+    this.tweens.add({ targets: e.sprite, scaleX: e.dispScale * 1.14, scaleY: e.dispScale * 0.86, duration: 55, yoyo: true, ease: 'Quad.out' })
   }
 
   impactRing(x, y, crit) {

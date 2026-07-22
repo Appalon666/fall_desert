@@ -1,7 +1,7 @@
 // Hub — стартовый лагерь: навигация, крышки, уровень героя, офлайн-доход.
 
 import Phaser from 'phaser'
-import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
+import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, panel, applyPostFX } from '../ui/scenery.js'
@@ -41,7 +41,7 @@ export default class HubScene extends Phaser.Scene {
 
     // Герой + полоска опыта
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
-    const hero = this.add.image(cx - 360, 456, heroTex).setScale(2.3)
+    const hero = this.add.image(cx - 360, 456, heroTex).setScale(2.3 / TEX_SS)
     this.tweens.add({ targets: hero, y: hero.y - 6, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
     const xpW = 300, xpX = cx - 510, xpY = 610
     this.add.text(xpX, xpY - 24, `Уровень ${State.hero.level}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0)
