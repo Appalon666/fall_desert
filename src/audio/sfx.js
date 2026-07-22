@@ -2,15 +2,22 @@
 // Контекст создаётся при первом звуке (внутри пользовательского жеста).
 
 const MUTE_KEY = 'yp_muted'
+const VOL_KEY = 'yp_sfxvol'
+const SFX_BASE = 0.32 // базовая громкость SFX при volume=1
 
 class SfxEngine {
   constructor() {
     this.ctx = null
     this.master = null
-    let m = false
+    let m = false, v = 1
     try { m = localStorage.getItem(MUTE_KEY) === '1' } catch (e) { /* */ }
+    try { const s = parseFloat(localStorage.getItem(VOL_KEY)); if (Number.isFinite(s)) v = Math.min(1, Math.max(0, s)) } catch (e) { /* */ }
     this.muted = m
+    this.volume = v // 0..1
   }
+
+  gain() { return this.muted ? 0 : SFX_BASE * this.volume }
+  applyGain() { if (this.master) this.master.gain.value = this.gain() }
 
   ensure() {
     if (this.ctx) return
@@ -19,7 +26,7 @@ class SfxEngine {
       if (!AC) return
       this.ctx = new AC()
       this.master = this.ctx.createGain()
-      this.master.gain.value = this.muted ? 0 : 0.28
+      this.master.gain.value = this.gain()
       this.master.connect(this.ctx.destination)
     } catch (e) { this.ctx = null }
   }
@@ -27,10 +34,15 @@ class SfxEngine {
 
   setMuted(m) {
     this.muted = m
-    if (this.master) this.master.gain.value = m ? 0 : 0.28
+    this.applyGain()
     try { localStorage.setItem(MUTE_KEY, m ? '1' : '0') } catch (e) { /* */ }
   }
   toggleMute() { this.setMuted(!this.muted); return this.muted }
+  setVolume(v) {
+    this.volume = Math.min(1, Math.max(0, v))
+    this.applyGain()
+    try { localStorage.setItem(VOL_KEY, String(this.volume)) } catch (e) { /* */ }
+  }
 
   _tone(freq, dur, type = 'square', vol = 0.3, slideTo = null, delay = 0) {
     this.ensure()

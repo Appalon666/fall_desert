@@ -38,9 +38,8 @@ export default class HubScene extends Phaser.Scene {
     this.add.text(GAME.WIDTH - 20, 54, t('Зона {z} · ур. {l}', { z: State.zoneIndex + 1, l: State.hero.level }), { fontFamily: 'monospace', fontSize: '16px', color: '#cbb98e' }).setOrigin(1, 0.5)
     createButton(this, GAME.WIDTH - 100, 92, { label: t('🏆 Рекорды'), width: 170, height: 38, fontSize: 15, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
     createButton(this, GAME.WIDTH - 100, 160, { label: t('❔ Как играть'), width: 170, height: 38, fontSize: 15, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.showHowTo() })
-    // Переключатель звука
-    const muteTxt = this.add.text(GAME.WIDTH - 20, 128, Sfx.muted ? t('🔇 Звук выкл') : t('🔊 Звук вкл'), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.sand }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
-    muteTxt.on('pointerup', () => { const m = Sfx.toggleMute(); Music.setMuted(m); muteTxt.setText(m ? t('🔇 Звук выкл') : t('🔊 Звук вкл')) })
+    // Настройки (громкость звука/музыки, мьют)
+    createButton(this, GAME.WIDTH - 100, 128, { label: t('⚙ Настройки'), width: 170, height: 38, fontSize: 15, onClick: () => this.showSettings() })
 
     // Герой + полоска опыта
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
@@ -123,6 +122,44 @@ export default class HubScene extends Phaser.Scene {
     }).setOrigin(0, 0).setDepth(92)
     const close = createButton(this, cx, cy + h / 2 - 34, { label: t('Понятно!'), width: 220, height: 46, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { ov.destroy(); g.destroy(); title.destroy(); body.destroy(); close.destroy() } })
     close.setDepth(92)
+  }
+
+  // Настройки: мьют + громкость звука и музыки (шаг 10%, сохраняется).
+  showSettings() {
+    const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
+    const w = 560, h = 340
+    const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.8).setOrigin(0).setDepth(90).setInteractive()
+    const g = panel(this, cx - w / 2, cy - h / 2, w, h, { fill: COLORS.steelDark, border: COLORS.cap, borderAlpha: 0.8 }).setDepth(91)
+    const title = this.add.text(cx, cy - h / 2 + 30, t('НАСТРОЙКИ'), { fontFamily: 'Rubik, sans-serif', fontSize: '28px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(92)
+    const base = [ov, g, title]
+    let dyn = []
+    const clear = () => { dyn.forEach(o => o.destroy()); dyn = [] }
+    const draw = () => {
+      clear()
+      const mute = createButton(this, cx, cy - 78, {
+        label: Sfx.muted ? t('🔇 Звук выключен') : t('🔊 Звук включён'), width: 380, height: 44, fontSize: 18,
+        color: Sfx.muted ? COLORS.blood : COLORS.toxicDark, hover: COLORS.toxic,
+        onClick: () => { const m = Sfx.toggleMute(); Music.setMuted(m); draw() },
+      }).setDepth(92)
+      dyn.push(mute)
+      dyn.push(...this.volumeRow(cx, cy - 10, t('Звук'), Math.round(Sfx.volume * 100), (d) => { Sfx.setVolume(Sfx.volume + d); Sfx.resume(); Sfx.hit(); draw() }))
+      dyn.push(...this.volumeRow(cx, cy + 60, t('Музыка'), Math.round(Music.userVolume * 100), (d) => { Music.setUserVolume(Music.userVolume + d); draw() }))
+    }
+    draw()
+    const close = createButton(this, cx, cy + h / 2 - 32, { label: t('Закрыть'), width: 200, height: 44, fontSize: 18, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { base.forEach(o => o.destroy()); clear(); close.destroy() } }).setDepth(92)
+  }
+
+  // Строка регулятора громкости: label, [–] полоска [+], NN%.
+  volumeRow(cx, y, label, pct, onDelta) {
+    const objs = []
+    objs.push(this.add.text(cx - 240, y, label, { fontFamily: 'Rubik, sans-serif', fontSize: '19px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(92))
+    const minus = createButton(this, cx - 30, y, { label: '–', width: 42, height: 40, fontSize: 24, onClick: () => onDelta(-0.1) }).setDepth(92)
+    const plus = createButton(this, cx + 150, y, { label: '+', width: 42, height: 40, fontSize: 24, onClick: () => onDelta(0.1) }).setDepth(92)
+    const barBg = this.add.rectangle(cx + 6, y, 108, 16, COLORS.ink).setOrigin(0, 0.5).setDepth(92)
+    const barFill = this.add.rectangle(cx + 8, y, (108 - 4) * (pct / 100), 12, COLORS.toxic).setOrigin(0, 0.5).setDepth(92)
+    const txt = this.add.text(cx + 200, y, `${pct}%`, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(92)
+    objs.push(minus, plus, barBg, barFill, txt)
+    return objs
   }
 
   showOfflineReward() {
