@@ -11,4 +11,10 @@ export default defineConfig({
     target: 'es2019',
     assetsInlineLimit: 0,
   },
+  // Vitest: логика (data/state/util) не зависит от Phaser → быстрый node-раннер.
+  test: {
+    environment: 'node',
+    include: ['tests/**/*.test.js'],
+    setupFiles: ['./tests/setup.js'],
+  },
 })

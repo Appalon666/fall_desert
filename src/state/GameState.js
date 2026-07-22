@@ -2,7 +2,7 @@
 // Единый источник правды для всех сцен. Наследует EventEmitter — сцены могут
 // слушать изменения ('caps','stats','level',...), но чаще просто перечитывают.
 
-import Phaser from 'phaser'
+import { Emitter } from '../util/emitter.js'
 import { BAL } from '../data/balance.js'
 import { UPGRADES, upgradeCost } from '../data/upgrades.js'
 import { ALLIES, allyCost } from '../data/allies.js'
@@ -13,7 +13,7 @@ import { Platform } from '../platform/yandex.js'
 const SAVE_KEY = 'wasteland_save_v1'
 const CAPS_PER_DPS = 0.12 // перевод idle-DPS в крышки/сек для офлайн-дохода
 
-class GameState extends Phaser.Events.EventEmitter {
+export class GameState extends Emitter {
   constructor() {
     super()
     this.bestScore = 0
