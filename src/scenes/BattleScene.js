@@ -257,27 +257,37 @@ export default class BattleScene extends Phaser.Scene {
     const reward = Math.min(MAX, Math.ceil(base.reward * af.rew))
     const dmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave)
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd
-    const scale = isBoss ? BAL.bossScale : def.scale
-    // строй: боссы выходят вплотную; обычные — колонной у правого края арены
-    // (в пределах видимой зоны), в две «глубины», и наступают влево на героя.
+    const baseScale = isBoss ? BAL.bossScale : def.scale
+    // Новый арт = спрайтшит (18 кадров: idle/walk/death). Иначе процедурный fallback.
+    const newKey = `enemy-${defId}`
+    const useNew = this.textures.exists(newKey) && this.textures.get(newKey).frameTotal > 1
+    const texH = useNew ? 186 : TEX_H
+    const dispScale = useNew ? baseScale * 0.62 : baseScale / TEX_SS
+    const onScreenH = texH * dispScale
+    // строй: боссы выходят вплотную; обычные — колонной у правого края арены.
     const spawnX = isBoss ? (this.hero.x + BAL.enemyAttackRange + 60) : (this.arenaW - 70 - i * 56)
     const rowLift = isBoss ? 0 : (i % 2) * 46
-    const yPos = this.groundY - TEX_H * scale * 0.42 - rowLift
-    const texKey = `tex-e-${defId}`
+    const yPos = this.groundY - onScreenH * 0.42 - rowLift
 
     let aura = null
     if (isBoss) {
-      aura = this.add.image(spawnX, yPos, TEX.GLOW).setTint(0xff3a1a).setScale(scale * 1.7).setAlpha(0.5).setBlendMode('ADD').setDepth(-1)
-      this.tweens.add({ targets: aura, alpha: { from: 0.5, to: 0.85 }, scale: scale * 1.95, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
+      aura = this.add.image(spawnX, yPos, TEX.GLOW).setTint(0xff3a1a).setScale(baseScale * 1.7).setAlpha(0.5).setBlendMode('ADD').setDepth(-1)
+      this.tweens.add({ targets: aura, alpha: { from: 0.5, to: 0.85 }, scale: baseScale * 1.95, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
     }
 
-    const sprite = this.add.image(spawnX, yPos, texKey).setScale(scale / TEX_SS).setAlpha(0).setDepth(10 - (i % 2))
-    // контурная подсветка: босс — тревожно-красная, мобы — по своему цвету
-    addRim(sprite, isBoss ? 0xff5a2a : lighten(def.tint, 0.28), isBoss ? 6 : 3, 0.08, isBoss ? 20 : 11)
+    let sprite
+    if (useNew) {
+      sprite = this.add.sprite(spawnX, yPos, newKey, 0).setScale(dispScale).setAlpha(0).setDepth(10 - (i % 2))
+      if (def.flip) sprite.setFlipX(true) // смотрящих вправо зеркалим на героя (влево)
+      if (this.anims.exists(`${defId}-walk`)) sprite.play(`${defId}-walk`)
+    } else {
+      sprite = this.add.image(spawnX, yPos, `tex-e-${defId}`).setScale(dispScale).setAlpha(0).setDepth(10 - (i % 2))
+      addRim(sprite, isBoss ? 0xff5a2a : lighten(def.tint, 0.28), isBoss ? 6 : 3, 0.08, isBoss ? 20 : 11)
+    }
     this.tweens.add({ targets: sprite, alpha: 1, duration: 200 })
     this.tweens.add({ targets: sprite, y: yPos - 10, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: i * 60 })
 
-    const barW = (isBoss ? 30 : 40) * scale
+    const barW = (isBoss ? 34 : 44) * baseScale * (useNew ? 0.66 : 1)
     const bg = this.add.rectangle(spawnX, 0, barW + 4, isBoss ? 12 : 8, COLORS.ink).setOrigin(0.5).setDepth(40)
     const fill = this.add.rectangle(spawnX, 0, barW, isBoss ? 8 : 5, COLORS.toxic).setOrigin(0.5).setDepth(41)
     const nameLabel = this.add.text(spawnX, 0, isBoss ? `☠ ${t(def.name)}` : t(def.name), {
@@ -286,9 +296,27 @@ export default class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(41)
 
     return {
-      sprite, aura, bg, fill, nameLabel, barW, def, isBoss,
-      maxHp: hp, hp, reward, dmg, speed, scale, dispScale: scale / TEX_SS, baseY: yPos,
-      hitR: 30 * scale, attackTimer: 0,
+      sprite, aura, bg, fill, nameLabel, barW, def, defId, isBoss, useNew, flip: !!def.flip,
+      maxHp: hp, hp, reward, dmg, speed, scale: baseScale, dispScale, texH, onScreenH, baseY: yPos,
+      hitR: onScreenH * 0.32, attackTimer: 0,
+    }
+  }
+
+  // Смерть врага: анимация death (новый арт) или взрыв (процедурный).
+  deathFx(e) {
+    this.tweens.killTweensOf(e.sprite)
+    if (e.aura) { this.tweens.killTweensOf(e.aura); e.aura.destroy() }
+    ;[e.bg, e.fill, e.nameLabel].forEach(o => o && o.destroy())
+    if (e.useNew && this.anims.exists(`${e.defId}-death`)) {
+      e.sprite.setDepth(9)
+      e.sprite.play(`${e.defId}-death`)
+      e.sprite.once('animationcomplete', () => {
+        if (e.sprite && e.sprite.active) this.tweens.add({ targets: e.sprite, alpha: 0, duration: 280, onComplete: () => e.sprite.destroy() })
+      })
+      this.time.delayedCall(2200, () => { if (e.sprite && e.sprite.active) e.sprite.destroy() }) // подстраховка
+    } else {
+      this.explode(e.sprite.x, e.sprite.y, e.isBoss)
+      e.sprite.destroy()
     }
   }
 
@@ -396,7 +424,6 @@ export default class BattleScene extends Phaser.Scene {
     State.ult = Math.min(BAL.ultMax, State.ult + BAL.ultChargePerKill)
     Sfx.kill(); Sfx.cap()
     this.capsBurst(e.sprite.x, e.sprite.y, e.isBoss ? 14 : 6)
-    this.explode(e.sprite.x, e.sprite.y, e.isBoss)
     if (e.isBoss) this.cameras.main.shake(260, 0.012)
 
     const chance = e.isBoss ? BAL.bossDropChance : BAL.dropChance
@@ -407,7 +434,7 @@ export default class BattleScene extends Phaser.Scene {
       this.floatText(e.sprite.x, e.sprite.y - 40, `🎁 ${item.name}`, rar.css, 18)
     }
 
-    this.destroyEnemy(e)
+    this.deathFx(e)
 
     // Продвижение: босс-ворота → зона; обычный → счётчик.
     if (e.isBoss) {
@@ -603,7 +630,7 @@ export default class BattleScene extends Phaser.Scene {
       }
       if (e.aura) { e.aura.x = e.sprite.x; e.aura.y = e.sprite.y }
       e.bg.x = e.sprite.x; e.fill.x = e.sprite.x
-      const topY = e.sprite.y - TEX_H * e.scale * 0.5 - 12
+      const topY = e.sprite.y - e.onScreenH * 0.5 - 12
       e.bg.y = topY; e.fill.y = topY
       e.nameLabel.x = e.sprite.x; e.nameLabel.y = topY - 16
       e.fill.width = Math.max(0, e.barW * (e.hp / e.maxHp))

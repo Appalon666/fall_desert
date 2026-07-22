@@ -4,6 +4,7 @@
 import Phaser from 'phaser'
 import { SCENES } from '../config.js'
 import { generateTextures } from '../gfx/textures.js'
+import { ENEMY_IDS } from '../data/enemies.js'
 import { State } from '../state/GameState.js'
 import { Platform } from '../platform/yandex.js'
 import { Music } from '../audio/music.js'
@@ -23,10 +24,15 @@ export default class BootScene extends Phaser.Scene {
     for (const c of ['gunner', 'brute', 'mechanic', 'scavenger']) {
       this.load.spritesheet(`hero-${c}`, `sprites/hero-${c}.png`, { frameWidth: 341, frameHeight: 279 })
     }
+    // Спрайтшиты врагов (18 кадров 6×3: idle/walk/death, кадр 170×186).
+    for (const id of ENEMY_IDS) {
+      this.load.spritesheet(`enemy-${id}`, `sprites/enemy-${id}.png`, { frameWidth: 170, frameHeight: 186 })
+    }
   }
 
   create() {
     generateTextures(this)
+    this.buildEnemyAnims()
 
     // Прячем HTML-прелоадер — движок готов.
     const pre = document.getElementById('preloader')
@@ -45,6 +51,17 @@ export default class BootScene extends Phaser.Scene {
       const timeout = new Promise(res => setTimeout(res, 2500))
       return Promise.race([Promise.all(loads).catch(() => {}), timeout])
     } catch (e) { return Promise.resolve() }
+  }
+
+  // Анимации врагов из спрайтшитов (если загрузились): idle/walk/death.
+  buildEnemyAnims() {
+    for (const id of ENEMY_IDS) {
+      const key = `enemy-${id}`
+      if (!this.textures.exists(key) || this.textures.get(key).frameTotal <= 1) continue
+      if (!this.anims.exists(`${id}-idle`)) this.anims.create({ key: `${id}-idle`, frames: this.anims.generateFrameNumbers(key, { start: 0, end: 5 }), frameRate: 7, repeat: -1 })
+      if (!this.anims.exists(`${id}-walk`)) this.anims.create({ key: `${id}-walk`, frames: this.anims.generateFrameNumbers(key, { start: 6, end: 11 }), frameRate: 11, repeat: -1 })
+      if (!this.anims.exists(`${id}-death`)) this.anims.create({ key: `${id}-death`, frames: this.anims.generateFrameNumbers(key, { start: 12, end: 17 }), frameRate: 11, repeat: 0 })
+    }
   }
 
   // Инициализация платформы (Яндекс), загрузка облачного сейва, старт игры.
