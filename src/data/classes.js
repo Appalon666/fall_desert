@@ -16,7 +16,7 @@ export const CLASSES = [
     pierce: 2,
     startStats: { str: 2, vit: 0, luck: 1 },
     startAllies: {}, lootLuck: 0,
-    tex: 'tex-hero-gunner', color: 0xd88a3a,
+    tex: 'hero-gunner', color: 0xd88a3a,
   },
   {
     id: 'brute', name: 'Бугай', icon: '🛡️',
@@ -26,7 +26,7 @@ export const CLASSES = [
     lifesteal: 0.045,
     startStats: { str: 1, vit: 3, luck: 0 },
     startAllies: {}, lootLuck: 0,
-    tex: 'tex-hero-brute', color: 0xc23b3b,
+    tex: 'hero-brute', color: 0xc23b3b,
   },
   {
     id: 'mechanic', name: 'Механик', icon: '🤖',
@@ -36,7 +36,7 @@ export const CLASSES = [
     offlineBonus: 0.6,
     startStats: { str: 0, vit: 1, luck: 1 },
     startAllies: { dog: 1 }, lootLuck: 0,
-    tex: 'tex-hero-mechanic', color: 0x8fa2b8,
+    tex: 'hero-mechanic', color: 0x8fa2b8,
   },
   {
     id: 'scavenger', name: 'Мародёр', icon: '🍀',
@@ -45,7 +45,7 @@ export const CLASSES = [
     bonus: { capsMul: 0.18, critChance: 0.02 },
     startStats: { str: 0, vit: 0, luck: 3 },
     startAllies: {}, lootLuck: 0.7,
-    tex: 'tex-hero-scavenger', color: 0x8fbf3f,
+    tex: 'hero-scavenger', color: 0x8fbf3f,
   },
 ]
 

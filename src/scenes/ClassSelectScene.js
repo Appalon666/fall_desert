@@ -40,7 +40,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     const glow = this.add.image(0, top + 96, TEX.GLOW).setTint(tint).setAlpha(0.22).setScale(3.4, 3)
 
     const icon = this.add.text(0, top + 52, cls.icon, { fontSize: '60px' }).setOrigin(0.5)
-    const hero = this.add.image(0, top + 138, cls.tex).setScale(2 / TEX_SS)
+    const hero = this.add.image(0, top + 150, cls.tex, 0).setScale(0.52)
     const name = this.add.text(0, top + 214, t(cls.name), {
       fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold',
       stroke: '#120d09', strokeThickness: 4,

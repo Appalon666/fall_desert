@@ -16,8 +16,13 @@ export default class BootScene extends Phaser.Scene {
 
   preload() {
     // Опциональная фоновая музыка (public/music/*). Нет файлов — тихо пропускаем.
-    this.load.on('loaderror', () => { /* нет трека — не страшно */ })
+    this.load.on('loaderror', () => { /* нет ассета — не страшно, есть фолбэк */ })
     Music.queue(this.load)
+    // Спрайтшиты героев (6 кадров 3×2, кадр 341×279). Есть — используются вместо
+    // процедурных; нет — остаётся процедурный fallback (tex-hero-*).
+    for (const c of ['gunner', 'brute', 'mechanic', 'scavenger']) {
+      this.load.spritesheet(`hero-${c}`, `sprites/hero-${c}.png`, { frameWidth: 341, frameHeight: 279 })
+    }
   }
 
   create() {

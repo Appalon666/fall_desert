@@ -23,7 +23,7 @@ export default class HeroScene extends Phaser.Scene {
     titleText(this, GAME.WIDTH / 2, 44, t('ГЕРОЙ'), { size: 36 })
     const cls = State.classDef()
     const heroTex = (cls && cls.tex) || TEX.HERO
-    this.add.image(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2, heroTex).setScale(3.4 / TEX_SS)
+    this.add.image(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2, heroTex, 0).setScale(0.92)
     if (cls) this.add.text(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2 + 150, `${cls.icon} ${t(cls.name)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: t('⟵ В лагерь'), width: 300, height: 52, onClick: () => this.scene.start(SCENES.HUB) })

@@ -41,12 +41,23 @@ export default class BattleScene extends Phaser.Scene {
     applyPostFX(this, true, 0.65)
     Music.play(this, 'bgm_battle')
 
-    const heroScale = 2.1
-    const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
-    this.hero = this.add.image(this.arenaW * 0.16, this.groundY - 124 * heroScale * 0.42, heroTex).setScale(heroScale / TEX_SS)
-    addRim(this.hero, 0xffe0a8, 3, 0.08, 12) // тёплая контурная подсветка героя
-    this.tweens.add({ targets: this.hero, y: this.hero.y - 5, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
-    this.muzzle = { x: this.hero.x + 66, y: this.hero.y - 8 }
+    const cls = State.classDef()
+    const heroKey = (cls && cls.tex) || TEX.HERO
+    const hx = this.arenaW * 0.16
+    // Новый арт = спрайтшит (6 кадров). Если не загрузился — процедурный fallback.
+    this.heroNew = this.textures.exists(heroKey) && this.textures.get(heroKey).frameTotal > 1
+    if (this.heroNew) {
+      const HS = 0.95 // ← масштаб героя (кадр 341×279); подстрой при желании
+      this.hero = this.add.sprite(hx, this.groundY + 18, heroKey, 0).setOrigin(0.5, 1).setScale(HS)
+      this.muzzle = { x: hx + 138 * HS, y: this.hero.y - 160 * HS }
+    } else {
+      const fk = (cls && `tex-${cls.tex}`) || TEX.HERO
+      const HS = 2.1
+      this.hero = this.add.image(hx, this.groundY - 124 * HS * 0.42, this.textures.exists(fk) ? fk : TEX.HERO).setScale(HS / TEX_SS)
+      addRim(this.hero, 0xffe0a8, 3, 0.08, 12)
+      this.muzzle = { x: hx + 66, y: this.hero.y - 8 }
+    }
+    this.tweens.add({ targets: this.hero, y: this.hero.y - 6, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
 
     this.input.on('pointerdown', (p) => { if (p.x < this.arenaW) this.shoot(p.x, p.y) })
     this.input.keyboard.on('keydown-SPACE', () => this.tryUlt())
@@ -325,6 +336,11 @@ export default class BattleScene extends Phaser.Scene {
     const flash = this.add.image(this.muzzle.x, this.muzzle.y, TEX.GLOW).setTint(ws.tint).setScale(0.85).setDepth(20).setBlendMode('ADD')
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 130, onComplete: () => flash.destroy() })
     this.tweens.add({ targets: this.hero, x: this.hero.x - 5, duration: 45, yoyo: true })
+    if (this.heroNew) {
+      this.hero.setFrame(1) // кадр выстрела
+      if (this._fireReset) this._fireReset.remove()
+      this._fireReset = this.time.delayedCall(120, () => { if (this.hero && this.hero.active) this.hero.setFrame(0) })
+    }
   }
 
   hitEnemy(e, x, y) {
