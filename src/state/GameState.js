@@ -33,6 +33,7 @@ class GameState extends Phaser.Events.EventEmitter {
     this.zoneIndex = 0
     this.killsInZone = 0
     this.totalKills = 0
+    this.bossActive = false // идёт бой с боссом-воротами зоны
     // престиж (сохраняется между перерождениями)
     this.cores = 0
     this.prestige = { legacy: 0, stash: 0, vitality: 0, quickstart: 0 }
@@ -50,9 +51,11 @@ class GameState extends Phaser.Events.EventEmitter {
   // но сохраняет ядра, престиж-бонусы, экипировку, рекорд и класс.
   resetRun() {
     const cls = this.classDef()
-    this.caps = this.prestige.quickstart * 500
+    this.caps = this.prestige.quickstart * 300
     this.hero = { level: 1, xp: 0, points: 0, str: 0, vit: 0, luck: 0 }
-    this.upgrades = {}
+    // «Быстрый старт» даёт бесплатные уровни Калибра — мультипликативный разгон
+    // следующего забега (компаунд меты, а не бесполезные стартовые крышки).
+    this.upgrades = this.prestige.quickstart > 0 ? { damage: this.prestige.quickstart } : {}
     this.allies = {}
     if (cls) {
       this.hero.str += cls.startStats.str || 0
@@ -63,6 +66,7 @@ class GameState extends Phaser.Events.EventEmitter {
     this.zoneIndex = 0
     this.killsInZone = 0
     this.totalKills = 0
+    this.bossActive = false
     this.hp = this.heroMaxHp()
     this.combo = 0
     this.ult = 0
@@ -110,10 +114,15 @@ class GameState extends Phaser.Events.EventEmitter {
   lootLuck() { const c = this.classDef(); return this.hero.luck * 0.05 + (c ? c.lootLuck : 0) }
 
   // ---------- престиж ----------
-  prestigeDamageMul() { return 1 + this.prestige.legacy * 0.10 }
-  prestigeHpMul() { return this.prestige.vitality * 0.08 }
-  prestigeCapsMul() { return this.prestige.stash * 0.10 }
-  coresFromRun() { return Math.floor(Math.pow(Math.max(0, this.totalKills) / 60, 0.8)) }
+  prestigeDamageMul() { return 1 + this.prestige.legacy * 0.12 }
+  prestigeHpMul() { return this.prestige.vitality * 0.10 }
+  prestigeCapsMul() { return this.prestige.stash * 0.12 }
+  // Ядра растут от ГЛУБИНЫ забега (зона), а не линейно от киллов → каждый
+  // следующий (более глубокий) забег даёт заметно больше → мета компаундится.
+  coresFromRun() {
+    const depth = this.zoneIndex + this.killsInZone / BAL.zoneKills
+    return Math.floor(Math.pow(Math.max(0, depth), 1.6))
+  }
   canPrestige() { return this.coresFromRun() >= 1 }
   doPrestige() {
     const gain = this.coresFromRun()
@@ -125,8 +134,8 @@ class GameState extends Phaser.Events.EventEmitter {
     return gain
   }
   prestigeCost(id) {
-    const bases = { legacy: 2, stash: 2, vitality: 2, quickstart: 3 }
-    return Math.floor(bases[id] * Math.pow(1.6, this.prestige[id] || 0))
+    const bases = { legacy: 3, stash: 3, vitality: 3, quickstart: 5 }
+    return Math.floor(bases[id] * Math.pow(1.5, this.prestige[id] || 0))
   }
   buyPrestige(id) {
     if (!(id in this.prestige)) return false
@@ -282,24 +291,32 @@ class GameState extends Phaser.Events.EventEmitter {
   }
 
   // ---------- зоны / убийства ----------
-  enemyLevel() { return 1 + this.totalKills * 0.5 + this.zoneIndex * 8 }
+  // Стадия масштабирования = всего убито (само-балансирует TTK). Для лута — та же.
+  scaleStage() { return this.totalKills }
+  enemyLevel() { return 1 + this.totalKills * 0.5 + this.zoneIndex * 6 }
+  // Регистрация убийства обычного врага: счётчики/рекорд. Босс-ворота не считаются
+  // сюда (у него отдельный registerBossKill → продвижение зоны).
   registerKill() {
     this.totalKills++
     this.killsInZone++
-    let advanced = false
-    if (this.killsInZone >= BAL.zoneKills) {
-      this.zoneIndex++
-      this.killsInZone = 0
-      advanced = true
-    }
     if (this.totalKills > this.bestScore) this.bestScore = this.totalKills
     this.save()
-    if (advanced) this.emit('zone')
-    return advanced
+  }
+  // Убит босс-ворота → зона пройдена.
+  registerBossKill() {
+    this.totalKills++
+    this.bossActive = false
+    this.zoneIndex++
+    this.killsInZone = 0
+    if (this.totalKills > this.bestScore) this.bestScore = this.totalKills
+    this.save()
+    this.emit('zone')
+    return true
   }
   // Откат при смерти героя — теряем прогресс текущей зоны.
   onHeroDeath() {
     this.killsInZone = 0
+    this.bossActive = false
     this.hp = this.heroMaxHp()
     this.combo = 0
     this.save()

@@ -1,6 +1,7 @@
 // Headless-симуляция баланса. Моделирует активную игру по тем же формулам,
-// что и GameState (без Phaser). Гоняет 100 прогонов (по 25 на класс),
-// собирает метрики темпа/выживания/экономики и печатает анализ.
+// что и GameState (без Phaser), НО в волновой модели: волна из нескольких
+// врагов, зона из wavesPerZone волн (последняя — боссовая).
+// Гоняет прогоны по классам, собирает метрики темпа/выживания/экономики.
 //
 // Запуск: node sim/balance-sim.mjs
 
@@ -11,6 +12,7 @@ import { getZone } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
+import { enemiesInWave, bossDue } from '../src/data/progression.js'
 
 const SESSION = 1200 // секунд активной игры за прогон (20 мин)
 const DT = 0.1
@@ -31,7 +33,7 @@ function runOne(classId, rng) {
     caps: 0,
     hero: { level: 1, xp: 0, points: 0, str: cls.startStats.str, vit: cls.startStats.vit, luck: cls.startStats.luck },
     upgrades: {}, allies: { ...cls.startAllies },
-    zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, deaths: 0,
+    zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, deaths: 0, ult: 0, bossActive: false,
   }
   const upgLevel = id => st.upgrades[id] || 0
   const upgAdd = stat => UPGRADES.reduce((s, u) => (u.kind === 'add' && u.stat === stat) ? s + upgLevel(u.id) * u.perLevel : s, 0)
@@ -54,7 +56,6 @@ function runOne(classId, rng) {
     let bought = true
     while (bought) {
       bought = false
-      // Разумный игрок: держит броню (hp) вблизи уровня урона, чтобы не спиралить в смерти.
       const wantHp = upgLevel('hp') < upgLevel('damage') - 1
       let hpCand = null, cheapest = null
       for (const u of UPGRADES) {
@@ -66,63 +67,73 @@ function runOne(classId, rng) {
       }
       for (const a of ALLIES) { const c = allyCost(a, st.allies[a.id] || 0); if (c <= st.caps && (!cheapest || c < cheapest.cost)) cheapest = { type: 'a', ref: a, cost: c } }
       const pick = (wantHp && hpCand) ? hpCand : cheapest
-      if (pick) {
-        st.caps -= pick.cost
-        if (pick.type === 'u') st.upgrades[pick.ref.id] = upgLevel(pick.ref.id) + 1
-        else st.allies[pick.ref.id] = (st.allies[pick.ref.id] || 0) + 1
-        bought = true
-      }
+      if (pick) { st.caps -= pick.cost; if (pick.type === 'u') st.upgrades[pick.ref.id] = upgLevel(pick.ref.id) + 1; else st.allies[pick.ref.id] = (st.allies[pick.ref.id] || 0) + 1; bought = true }
     }
   }
   function allocate() { while (st.hero.points > 0) { const pick = st.hero.str <= st.hero.vit * 2 ? 'str' : 'vit'; st.hero[pick]++; st.hero.points-- } }
 
-  let spawnCount = 0, enemy = null
-  const durations = []
-  let curStart = 0
-  function spawn(t) {
-    spawnCount++
-    const isBoss = spawnCount % BAL.bossEvery === 0
+  // ---- волна из нескольких врагов / босс-ворота ----
+  let wave = []          // живые враги текущей волны
+  function spawnWave() {
+    const boss = !st.bossActive && bossDue(st.killsInZone)
+    if (boss) st.bossActive = true
+    const count = boss ? 1 : enemiesInWave(st.zoneIndex)
     const pool = getZone(st.zoneIndex).enemies
-    const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
-    const { hp, reward, dmg } = enemyStats(def, st.totalKills, isBoss)
-    const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1)
-    // боссы появляются вплотную и сразу бьют; обычные враги подходят
-    const approachTime = isBoss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed)
-    enemy = { hp, maxHp: hp, reward, dmg, approachTime, attackAccum: 0, isBoss }
-    curStart = t
+    wave = []
+    for (let i = 0; i < count; i++) {
+      const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
+      const { hp, reward, dmg } = enemyStats(def, st.totalKills, boss)
+      const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1)
+      const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed) + i * 0.6
+      wave.push({ hp, maxHp: hp, reward, dmg, approach, attackAccum: 0, boss })
+    }
   }
-  function kill(t) {
-    st.caps += Math.ceil(enemy.reward * (1 + capsBonus()))
-    st.hero.xp += Math.ceil(enemy.reward * 0.6)
+  function killFront(front) {
+    st.caps += Math.ceil(front.reward * (1 + capsBonus()))
+    st.hero.xp += Math.ceil(front.reward * 0.55)
     while (st.hero.xp >= xpNeed()) { st.hero.xp -= xpNeed(); st.hero.level++; st.hero.points += BAL.pointsPerLevel }
-    st.totalKills++; st.killsInZone++
-    if (st.killsInZone >= BAL.zoneKills) { st.zoneIndex++; st.killsInZone = 0 }
-    durations.push(t - curStart)
-    enemy = null
+    st.ult = Math.min(BAL.ultMax, st.ult + BAL.ultChargePerKill)
+    if (front.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0 }
+    else { st.totalKills++; st.killsInZone++ }
   }
-  function heroDie() { st.deaths++; st.killsInZone = 0; st.hp = heroMaxHp(); st.combo = 0; spawnCount = 0; enemy = null }
+  function heroDie() { st.deaths++; st.killsInZone = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
 
   const cps = 3 + rng() * 2, acc = 0.9
   let clickAccum = 0, sinceSpend = 0
-  const checkpoints = {} // t -> totalKills
-  spawn(0)
+  const durations = []; let curStart = 0
+  const checkpoints = {}
+  spawnWave(); curStart = 0
 
   for (let t = 0; t < SESSION; t += DT) {
-    if (!enemy) spawn(t)
+    if (wave.length === 0) { spawnWave(); curStart = t }
+    // фокус-огонь по переднему живому
+    const front = wave[0]
     clickAccum += cps * acc * DT
-    while (clickAccum >= 1 && enemy) {
+    while (clickAccum >= 1 && wave.length) {
       clickAccum -= 1; st.combo++
-      enemy.hp -= clickHit()
-      if (enemy.hp <= 0) kill(t)
+      st.ult = Math.min(BAL.ultMax, st.ult + BAL.ultChargePerHit)
+      wave[0].hp -= clickHit()
+      if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() }
     }
-    if (enemy) { enemy.hp -= allyDps() * DT; if (enemy.hp <= 0) kill(t) }
-    if (enemy) {
-      enemy.approachTime -= DT
-      if (enemy.approachTime <= 0) {
-        enemy.attackAccum += DT
+    // союзники — тоже по переднему
+    if (wave.length) { wave[0].hp -= allyDps() * DT; if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() } }
+    // ульта — AoE по всем, когда заряжена (разумный игрок жмёт сразу)
+    if (st.ult >= BAL.ultMax && wave.length) {
+      st.ult = 0
+      const dmg = clickHit() / comboMult() * BAL.ultDamageMul
+      for (const e of wave) e.hp -= dmg
+      for (let i = wave.length - 1; i >= 0; i--) if (wave[i].hp <= 0) { killFront(wave[i]); wave.splice(i, 1) }
+    }
+    if (wave.length === 0) { durations.push(t - curStart); continue }
+    // угроза: каждый подошедший враг бьёт
+    for (const e of wave) {
+      e.approach -= DT
+      if (e.approach <= 0) {
+        e.attackAccum += DT
         const rate = BAL.enemyAttackRate / 1000
-        while (enemy.attackAccum >= rate) { enemy.attackAccum -= rate; st.hp -= enemy.dmg; if (st.hp <= 0) { heroDie(); break } }
+        while (e.attackAccum >= rate) { e.attackAccum -= rate; st.hp -= e.dmg; if (st.hp <= 0) { heroDie(); break } }
       }
+      if (st.hp <= 0) break
     }
     sinceSpend += DT
     if (sinceSpend >= 1) { sinceSpend = 0; allocate(); spend() }
@@ -137,19 +148,17 @@ function runOne(classId, rng) {
   const bossTtkEnd = enemyStats(avgDef, st.totalKills, true).hp / effDps
   const earlyRate = (checkpoints[120] || st.totalKills) / 120
   const lateRate = (st.totalKills - (checkpoints[1080] || st.totalKills)) / 120
-  const lateDur = durations.slice(-30)
-  const avgLateDur = lateDur.reduce((s, d) => s + d, 0) / (lateDur.length || 1)
 
   return {
     classId, kills: st.totalKills, zone: st.zoneIndex, deaths: st.deaths, level: st.hero.level,
-    caps: st.caps, clickDmg: clickHit(), allyDps: allyDps(),
-    effDps, ttkEnd, bossTtkEnd, earlyRate, lateRate, avgLateDur,
+    caps: st.caps, clickDmg: clickHit(), allyDps: allyDps(), effDps, ttkEnd, bossTtkEnd, earlyRate, lateRate,
   }
 }
 
 function median(arr) { const s = [...arr].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2 }
 const SUF = ['', 'K', 'M', 'B', 'T', 'aa', 'ab', 'ac', 'ad', 'ae', 'af', 'ag']
 function fmt(n) {
+  if (!Number.isFinite(n)) return '∞'
   if (n < 1000) return n.toFixed(n < 10 ? 1 : 0)
   let t = 0; let v = n
   while (v >= 1000 && t < SUF.length - 1) { v /= 1000; t++ }
@@ -162,7 +171,7 @@ for (const cls of CLASSES) {
   for (let i = 0; i < RUNS_PER_CLASS; i++) all.push(runOne(cls.id, mulberry32(seed++)))
 }
 
-console.log(`\n=== БАЛАНС: ${all.length} прогонов по ${SESSION / 60} мин активной игры ===\n`)
+console.log(`\n=== БАЛАНС: ${all.length} прогонов по ${SESSION / 60} мин активной игры (волновая модель) ===\n`)
 console.log('Класс      | Убийства | Зона | Смертей | Ур. | Крышки | ЛКМ-урон | Idle/с | TTK  | TTKбосс | ранн/поздн kps')
 console.log('-'.repeat(108))
 for (const cls of CLASSES) {
@@ -180,11 +189,10 @@ const gbttk = median(all.map(r => r.bossTtkEnd))
 const early = median(all.map(r => r.earlyRate))
 const late = median(all.map(r => r.lateRate))
 console.log('\n--- Диагностика ---')
-console.log(`Медиана зон достигнуто: ${gz}   (цель: 3-6)`)
-console.log(`Медиана смертей: ${gd}   (цель: 1-4, риск есть, но не спираль)`)
-console.log(`TTK обычного врага в конце: ${gttk.toFixed(1)}s   (цель: 0.5-3s)`)
-console.log(`TTK босса в конце: ${gbttk.toFixed(1)}s   (цель: 3-12s)`)
-console.log(`Темп ранний/поздний (kills/сек): ${early.toFixed(2)} / ${late.toFixed(2)}   (поздний не должен рушиться)`)
-const stall = late < early * 0.4
-console.log(`Стагнация прогресса: ${stall ? '⚠️  ДА (поздний темп < 40% раннего)' : 'нет'}`)
-console.log(`Разброс классов по убийствам: ${fmt(Math.min(...CLASSES.map(c => median(all.filter(r => r.classId === c.id).map(r => r.kills)))))} … ${fmt(Math.max(...CLASSES.map(c => median(all.filter(r => r.classId === c.id).map(r => r.kills)))))}`)
+console.log(`Медиана зон достигнуто за 20 мин: ${gz}   (цель: 5-10, контент не должен кончаться за 2 мин)`)
+console.log(`Медиана смертей: ${gd}   (цель: 1-5, риск есть, но не спираль)`)
+console.log(`TTK обычного врага в конце: ${gttk.toFixed(1)}s   (цель: 0.6-3s)`)
+console.log(`TTK босса зоны в конце: ${gbttk.toFixed(1)}s   (цель: 4-15s)`)
+console.log(`Темп ранний/поздний (kills/сек): ${early.toFixed(2)} / ${late.toFixed(2)}`)
+console.log(`Стагнация: ${late < early * 0.4 ? '⚠️ ДА' : 'нет'}`)
+console.log(`Макс. крышки (читаемость чисел): ${fmt(Math.max(...all.map(r => r.caps)))}   (не должно быть ∞/e+30)`)
