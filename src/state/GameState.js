@@ -42,6 +42,8 @@ class GameState extends Phaser.Events.EventEmitter {
     this.hp = this.heroMaxHp()
     this.combo = 0
     this.ult = 0
+    this._lastLocalSave = 0 // троттлинг записи в localStorage
+    this._started = false   // началась ли игровая сессия (защита от позднего облака)
   }
 
   // Сброс забега при перерождении: копит крышки/апгрейды/уровень/зоны,
@@ -332,13 +334,25 @@ class GameState extends Phaser.Events.EventEmitter {
   }
   save(flushCloud = false) {
     const data = this.toJSON()
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)) } catch (e) { /* приватный режим */ }
+    const now = Date.now()
+    // Локальную запись троттлим (registerKill зовёт save каждый килл) — кроме форса.
+    if (flushCloud || now - this._lastLocalSave > 3000) {
+      this._lastLocalSave = now
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)) } catch (e) { /* приватный режим */ }
+    }
     try { Platform.saveCloud(data, flushCloud) } catch (e) { /* нет SDK */ }
   }
-  // Применить облачные данные (при старте, если есть).
+  // Свежесть прогресса для разрешения конфликта локальный↔облачный сейв.
+  // Лексикографически: престижи → рекорд → всего убито → крышки.
+  _progress(s) { return [s.prestigeCount || 0, s.bestScore || 0, s.totalKills || 0, s.caps || 0] }
+  // Применить облачные данные только если облако прогрессивнее локального и
+  // игровая сессия ещё не началась (иначе позднее облако затрёт активную игру).
   applyCloud(d) {
-    if (!d || typeof d !== 'object' || !Object.keys(d).length) return
-    try { this._apply(d) } catch (e) { /* битые облачные данные */ }
+    if (!d || typeof d !== 'object' || !Object.keys(d).length || this._started) return
+    try {
+      const a = this._progress(d), b = this._progress(this)
+      for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) { if (a[i] > b[i]) this._apply(d); return } }
+    } catch (e) { /* битые облачные данные */ }
   }
   load() {
     let raw
@@ -347,22 +361,25 @@ class GameState extends Phaser.Events.EventEmitter {
     try { this._apply(JSON.parse(raw)) } catch (e) { /* битый сейв — игнор */ }
   }
   _apply(d) {
+    // Гвардия от не-конечных чисел (Infinity/NaN из старых переполненных сейвов):
+    // без неё «битое» число протекло бы обратно в игру.
+    const fin = (n, def = 0) => (Number.isFinite(n) ? n : def)
     Object.assign(this, {
-      caps: d.caps ?? 0,
+      caps: fin(d.caps),
       heroClass: d.heroClass || null,
       hero: { level: 1, xp: 0, points: 0, str: 0, vit: 0, luck: 0, ...(d.hero || {}) },
       upgrades: d.upgrades || {},
       allies: d.allies || {},
       equipment: { weapon: null, helmet: null, armor: null, boots: null, acc1: null, acc2: null, ...(d.equipment || {}) },
       inventory: d.inventory || [],
-      scrap: d.scrap || 0,
-      zoneIndex: d.zoneIndex || 0,
-      killsInZone: d.killsInZone || 0,
-      totalKills: d.totalKills || 0,
-      cores: d.cores || 0,
+      scrap: fin(d.scrap),
+      zoneIndex: fin(d.zoneIndex),
+      killsInZone: fin(d.killsInZone),
+      totalKills: fin(d.totalKills),
+      cores: fin(d.cores),
       prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0, ...(d.prestige || {}) },
-      prestigeCount: d.prestigeCount || 0,
-      bestScore: d.bestScore || 0,
+      prestigeCount: fin(d.prestigeCount),
+      bestScore: fin(d.bestScore),
       lastSeen: d.lastSeen || Date.now(),
     })
     this.sanitizeItems()

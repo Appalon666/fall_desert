@@ -307,6 +307,7 @@ export default class BattleScene extends Phaser.Scene {
       this.floatText(this.arenaW / 2, 120, 'Ульта не заряжена', '#ff6a6a', 22)
       return
     }
+    if (!this.enemy) return // нет цели — не палим заряд впустую (окно между спавнами)
     State.ult = 0
     Sfx.ult()
     this.cameras.main.shake(400, 0.02)
@@ -355,7 +356,12 @@ export default class BattleScene extends Phaser.Scene {
     const revive = createButton(this, cx, cy - 6, {
       label: '📺 Возродиться (реклама)', width: 340, height: 56, fontSize: 20,
       color: COLORS.toxicDark, hover: COLORS.toxic,
-      onClick: () => { this.closeDeathModal(); Platform.showRewarded(() => { State.hp = State.heroMaxHp(); this.spawnEnemy() }) },
+      // Модалку закрываем ТОЛЬКО внутри гарантированного колбэка — без софт-лока,
+      // даже если игрок закроет ролик недосмотренным (награда всё равно выдаётся).
+      onClick: () => Platform.showRewarded(() => {
+        if (!this._deathModal) return
+        this.closeDeathModal(); State.hp = State.heroMaxHp(); this.spawnEnemy()
+      }),
     })
     const give = createButton(this, cx, cy + 66, {
       label: 'Смириться (откат зоны)', width: 340, height: 50, fontSize: 18,

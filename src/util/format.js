@@ -2,6 +2,7 @@
 const SUF = ['', 'K', 'M', 'B', 'T', 'aa', 'ab', 'ac', 'ad']
 
 export function fmt(n) {
+  if (!Number.isFinite(n)) return '∞'
   n = Math.floor(n)
   if (n < 1000) return `${n}`
   let tier = 0

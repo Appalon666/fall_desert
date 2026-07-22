@@ -61,24 +61,37 @@ class YandexPlatform {
     try { return await this.player.getData() } catch (e) { return null }
   }
 
-  // Реклама за награду. Локально — сразу выдаём награду (для теста).
-  showRewarded(onReward) {
-    if (!this.available || !this.ya?.adv) { onReward && onReward(); return }
-    let granted = false
+  // Реклама за награду. Гарантирует РОВНО один вызов onReward (успех/ошибка),
+  // ставит геймплей на паузу на время ролика и всегда снимает её в onClose.
+  // Локально (без SDK) — сразу выдаём награду.
+  showRewarded(onReward, onClose) {
+    let settled = false
+    const reward = () => { if (settled) return; settled = true; try { onReward && onReward() } catch (e) { /* */ } }
+    const closed = () => { try { onClose && onClose() } catch (e) { /* */ } }
+    if (!this.available || !this.ya?.adv) { reward(); closed(); return }
+    this.gameplayStop()
     try {
       this.ya.adv.showRewardedVideo({
         callbacks: {
-          onRewarded: () => { granted = true; onReward && onReward() },
-          onError: () => { if (!granted) { onReward && onReward() } },
+          onRewarded: () => reward(),
+          // Досмотрели/закрыли: не наказываем игрока — если награды не было, выдаём.
+          onClose: () => { this.gameplayStart(); reward(); closed() },
+          onError: () => { this.gameplayStart(); reward(); closed() },
         },
       })
-    } catch (e) { onReward && onReward() }
+    } catch (e) { this.gameplayStart(); reward(); closed() }
   }
 
   // Межстраничная реклама (Яндекс сам соблюдает мин. интервал).
+  // Пауза геймплея на время показа, снятие — в onClose/onError.
   showInterstitial() {
     if (!this.available || !this.ya?.adv) return
-    try { this.ya.adv.showFullscreenAdv() } catch (e) { /* */ }
+    this.gameplayStop()
+    try {
+      this.ya.adv.showFullscreenAdv({
+        callbacks: { onClose: () => this.gameplayStart(), onError: () => this.gameplayStart() },
+      })
+    } catch (e) { this.gameplayStart() }
   }
 
   // Лидерборды.

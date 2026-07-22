@@ -28,6 +28,7 @@ export default class BootScene extends Phaser.Scene {
     const proceed = () => {
       if (done) return
       done = true
+      State._started = true // с этого момента позднее облако не затирает сессию
       Platform.ready()
       // Первый вход без класса — на экран выбора класса, иначе в лагерь.
       this.scene.start(State.heroClass ? SCENES.HUB : SCENES.CLASS_SELECT)

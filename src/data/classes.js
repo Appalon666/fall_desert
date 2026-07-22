@@ -41,10 +41,4 @@ export const CLASSES = [
   },
 ]
 
-// Ключ спрайта героя по классу (с запасным вариантом).
-export function heroTexFor(classId) {
-  const c = CLASS_BY_ID[classId]
-  return (c && c.tex) || 'tex-hero'
-}
-
 export const CLASS_BY_ID = Object.fromEntries(CLASSES.map(c => [c.id, c]))
