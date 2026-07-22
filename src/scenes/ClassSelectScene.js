@@ -6,6 +6,7 @@ import { State } from '../state/GameState.js'
 import { CLASSES } from '../data/classes.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, panel, applyPostFX } from '../ui/scenery.js'
+import { t } from '../i18n.js'
 
 export default class ClassSelectScene extends Phaser.Scene {
   constructor() { super(SCENES.CLASS_SELECT) }
@@ -14,8 +15,8 @@ export default class ClassSelectScene extends Phaser.Scene {
     buildBackground(this, { sky: 0x2c2416, ground: 0x3a2a18, accent: 0xc9a76a }, { groundY: GAME.HEIGHT * 0.86 })
     applyPostFX(this, true, 0.45)
 
-    titleText(this, GAME.WIDTH / 2, 58, 'КТО ТЫ НА ПУСТОШИ?', { size: 46 })
-    this.add.text(GAME.WIDTH / 2, 104, 'Класс определяет твой стиль. Выбор — навсегда.', {
+    titleText(this, GAME.WIDTH / 2, 58, t('КТО ТЫ НА ПУСТОШИ?'), { size: 46 })
+    this.add.text(GAME.WIDTH / 2, 104, t('Класс определяет твой стиль. Выбор — навсегда.'), {
       fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.sand, fontStyle: 'italic',
     }).setOrigin(0.5)
 
@@ -40,16 +41,16 @@ export default class ClassSelectScene extends Phaser.Scene {
 
     const icon = this.add.text(0, top + 52, cls.icon, { fontSize: '60px' }).setOrigin(0.5)
     const hero = this.add.image(0, top + 138, cls.tex).setScale(2 / TEX_SS)
-    const name = this.add.text(0, top + 214, cls.name, {
+    const name = this.add.text(0, top + 214, t(cls.name), {
       fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold',
       stroke: '#120d09', strokeThickness: 4,
     }).setOrigin(0.5)
     const line = this.add.rectangle(0, top + 244, w - 60, 2, tint, 0.6).setOrigin(0.5)
-    const desc = this.add.text(0, top + 258, cls.desc, {
+    const desc = this.add.text(0, top + 258, t(cls.desc), {
       fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.paper,
       align: 'center', wordWrap: { width: w - 44 }, lineSpacing: 3,
     }).setOrigin(0.5, 0)
-    const perks = this.add.text(0, top + 336, cls.perks.map(p => `✦ ${p}`).join('\n'), {
+    const perks = this.add.text(0, top + 336, cls.perks.map(p => `✦ ${t(p)}`).join('\n'), {
       fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic,
       align: 'center', lineSpacing: 6, fontStyle: 'bold',
     }).setOrigin(0.5, 0)
@@ -57,7 +58,7 @@ export default class ClassSelectScene extends Phaser.Scene {
     c.add([bg, bar, glow, icon, hero, name, line, desc, perks])
 
     const btn = createButton(this, 0, h / 2 - 38, {
-      label: 'Выбрать', width: w - 56, height: 46, fontSize: 20,
+      label: t('Выбрать'), width: w - 56, height: 46, fontSize: 20,
       color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => this.pick(cls),
     })
     c.add(btn)

@@ -269,7 +269,7 @@ export default class BattleScene extends Phaser.Scene {
     const barW = (isBoss ? 30 : 40) * scale
     const bg = this.add.rectangle(spawnX, 0, barW + 4, isBoss ? 12 : 8, COLORS.ink).setOrigin(0.5).setDepth(40)
     const fill = this.add.rectangle(spawnX, 0, barW, isBoss ? 8 : 5, COLORS.toxic).setOrigin(0.5).setDepth(41)
-    const nameLabel = this.add.text(spawnX, 0, isBoss ? `☠ ${def.name}` : def.name, {
+    const nameLabel = this.add.text(spawnX, 0, isBoss ? `☠ ${t(def.name)}` : t(def.name), {
       fontFamily: 'Rubik, sans-serif', fontSize: isBoss ? '18px' : '13px',
       color: isBoss ? '#ff8a6a' : CSS.paper, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(41)
@@ -526,7 +526,7 @@ export default class BattleScene extends Phaser.Scene {
     bg.fillStyle(COLORS.ink, 0.75); bg.fillRoundedRect(-220, -34, 440, 68, 10)
     bg.lineStyle(3, 0xff5a3c, 0.9); bg.strokeRoundedRect(-220, -34, 440, 68, 10)
     const t1 = this.add.text(0, -12, t('☠  БОСС-ВОРОТА'), { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#ff6a4a', fontStyle: 'bold' }).setOrigin(0.5)
-    const t2 = this.add.text(0, 16, name, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0.5)
+    const t2 = this.add.text(0, 16, t(name), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0.5)
     c.add([bg, t1, t2])
     c.setScale(0.7)
     this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.out' })
@@ -618,7 +618,7 @@ export default class BattleScene extends Phaser.Scene {
     this.ultFill.setFillStyle(full ? COLORS.toxic : COLORS.toxicDark)
     this.ultFill.setAlpha(full ? 0.55 + 0.45 * Math.abs(Math.sin(this.time.now / 180)) : 1)
 
-    this.zoneLabel.setText(t('ЗОНА {z} · {name}', { z: State.zoneIndex + 1, name: this.zone.name.toUpperCase() }))
+    this.zoneLabel.setText(t('ЗОНА {z} · {name}', { z: State.zoneIndex + 1, name: t(this.zone.name).toUpperCase() }))
     const prog = State.bossActive ? t('БОСС-ВОРОТА!') : t('Зачистка: {a}/{b}', { a: State.killsInZone, b: BAL.zoneKills })
     this.progressLabel.setText(t('{prog}   ·   Всего убито: {t}', { prog, t: State.totalKills }))
 

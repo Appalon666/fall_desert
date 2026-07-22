@@ -102,6 +102,122 @@ const EN = {
   // — общее —
   'Отмена': 'Cancel',
   'В лагерь': 'To camp',
+  '⟵ В лагерь': '⟵ To camp',
+
+  // — классы —
+  'Стрелок': 'Gunner',
+  'Бугай': 'Brute',
+  'Механик': 'Mechanic',
+  'Мародёр': 'Scavenger',
+  'Мастер точного выстрела. Пули ПРОБИВАЮТ строй врагов насквозь.':
+    'A precise shooter. Bullets PIERCE straight through the enemy line.',
+  'Ходячий шкаф. Лечится от нанесённого урона и держит удар босса.':
+    'A walking wall. Heals from damage dealt and tanks boss hits.',
+  'Командир железа. Отряд бьёт сильнее, а офлайн-доход заметно жирнее.':
+    'Iron commander. Allies hit harder and offline income is much fatter.',
+  'Нюх на добро. Больше крышек, лучше лут — экономика на первом месте.':
+    'A nose for loot. More caps, better drops — economy first.',
+  '🎯 пуля бьёт до 2 врагов': '🎯 bullet hits up to 2 enemies',
+  '+30% урон клика, +6% крит, +35% HP': '+30% click damage, +6% crit, +35% HP',
+  '🩸 +4.5% урона возвращается в HP': '🩸 +4.5% of damage returned as HP',
+  '+50% макс. HP, старт +3 живучести': '+50% max HP, start +3 vitality',
+  '⚙️ +35% урон союзников': '⚙️ +35% ally damage',
+  '📦 +60% офлайн-дохода, старт с псом': '📦 +60% offline income, start with a dog',
+  '🍾 +18% крышек': '🍾 +18% caps',
+  '🎁 заметно лучший лут, +2% крит': '🎁 much better loot, +2% crit',
+  // — враги —
+  'Радкрыса': 'Radrat', 'Ползун': 'Crawler', 'Радоса': 'Radwasp', 'Гуль': 'Ghoul',
+  'Рейдер': 'Raider', 'Пёс-мутант': 'Mutt', 'Тень': 'Lurker', 'Плевун': 'Spitter',
+  'Пузырь': 'Bloat', 'Громила': 'Brute',
+  // — союзники —
+  'Верный пёс': 'Loyal Dog', 'Турель': 'Turret', 'Снайпер': 'Sniper', 'Боевой мех': 'Battle Mech',
+  // — апгрейды —
+  'Калибр': 'Caliber', 'Броня': 'Armor', 'Выучка отряда': 'Squad Training',
+  'Картечь': 'Buckshot', 'Меткий глаз': 'Keen Eye',
+  'Урон клика ×1.15 за уровень': 'Click damage ×1.15 per level',
+  'Макс. HP ×1.13 за уровень': 'Max HP ×1.13 per level',
+  '+25% к урону союзников за уровень': '+25% ally damage per level',
+  '+8% к урону клика за уровень': '+8% click damage per level',
+  '+1% шанс крита за уровень': '+1% crit chance per level',
+  // — лут: редкости/слоты/статы/крафт —
+  'Хлам': 'Junk', 'Годное': 'Decent', 'Редкое': 'Rare', 'Легенда': 'Legend', 'Реликвия': 'Relic',
+  'Оружие': 'Weapon', 'Шлем': 'Helmet', 'Обувь': 'Boots', 'Аксессуар': 'Accessory',
+  'урон клика': 'click damage', 'макс. HP': 'max HP', 'шанс крита': 'crit chance',
+  'урон союзников': 'ally damage', 'крышек': 'caps',
+  'На коленке': 'Rough Job', 'Годная сборка': 'Decent Build',
+  'Точная работа': 'Fine Work', 'Мастерская ковка': 'Master Forge',
+  // — зоны / аффиксы —
+  'Ржавый Пустырь': 'Rusty Wastes', 'Руины Города': 'City Ruins',
+  'Токсичный Бункер': 'Toxic Bunker', 'Логово Босса': 'Boss Lair',
+  'Богатая': 'Rich', 'Бронированная': 'Armored', 'Шустрая': 'Swift', 'Ядрёная': 'Nuclear',
+  // — характеристики героя —
+  'Сила': 'Strength', 'Живучесть': 'Vitality', 'Удача': 'Luck',
+  '+2 к урону клика': '+2 click damage', '+25 к макс. HP': '+25 max HP',
+  '+1% крит и лучше лут': '+1% crit and better loot',
+  // — престиж-бонусы —
+  'Наследие бойца': 'Fighter’s Legacy', 'Схрон': 'Stash',
+  'Крепкий род': 'Hardy Bloodline', 'Быстрый старт': 'Quick Start',
+  '+10% урон клика за уровень': '+10% click damage per level',
+  '+10% крышек за уровень': '+10% caps per level',
+  '+8% макс. HP за уровень': '+8% max HP per level',
+  '+300 крышек и +1 ур. «Калибра» на старте за уровень':
+    '+300 caps and +1 Caliber level at start, per level',
+
+  // — общие ярлыки —
+  'ур.': 'lvl', 'ур. {l}': 'lvl {l}', '+{n} урона/сек': '+{n} dmg/sec',
+  '{n} убийств': '{n} kills',
+  // — ShopScene —
+  'МАСТЕРСКАЯ': 'WORKSHOP', 'АПГРЕЙДЫ': 'UPGRADES', 'СОЮЗНИКИ (idle)': 'ALLIES (idle)',
+  'Покупать:': 'Buy:',
+  // — ClassSelect —
+  'КТО ТЫ НА ПУСТОШИ?': 'WHO ARE YOU IN THE WASTELAND?',
+  'Класс определяет твой стиль. Выбор — навсегда.': 'Your class defines your style. The choice is permanent.',
+  'Выбрать': 'Choose',
+  // — Prestige —
+  'ПЕРЕРОЖДЕНИЕ': 'PRESTIGE',
+  'Потеряешь крышки, апгрейды, уровень и зоны — но Ядра и их бонусы останутся навсегда.\nЭкипировка и рекорд сохраняются.':
+    'You lose caps, upgrades, level and zones — but Cores and their bonuses stay forever.\nGear and record are kept.',
+  'ВЕЧНЫЕ БОНУСЫ (за Ядра)': 'PERMANENT BONUSES (for Cores)',
+  'За этот забег получишь: +{g} ☢   (убито {k})': 'This run grants: +{g} ☢   ({k} kills)',
+  'Нужно больше убийств за забег (сейчас {k}). Копи прогресс и возвращайся.':
+    'Need more kills this run (now {k}). Build progress and come back.',
+  '☢ Переродиться (+{g})': '☢ Prestige (+{g})', '☢ Пока рано': '☢ Not yet',
+  'Переродиться за +{g} ☢ ?\nПрогресс забега сбросится.': 'Prestige for +{g} ☢ ?\nRun progress resets.',
+  'Переродиться': 'Prestige',
+  // — Leaderboard —
+  '🏆 РЕКОРДЫ': '🏆 SCORES',
+  'Твой рекорд: {n} убийств': 'Your best: {n} kills',
+  'Загрузка таблицы…': 'Loading leaderboard…',
+  'Онлайн-таблица доступна в версии на Яндекс.Играх.\nЗдесь — твой личный рекорд.':
+    'Online leaderboard is available in the Yandex Games version.\nHere — your personal best.',
+  'Аноним': 'Anonymous',
+  // — Hero —
+  'ГЕРОЙ': 'HERO',
+  'Уровень {l}    Опыт {a}/{b}': 'Level {l}    XP {a}/{b}',
+  'Свободных очков: {n}': 'Free points: {n}', 'Нет свободных очков': 'No free points',
+  '⟲ Сброс': '⟲ Reset', '⟲ Сброс (debug)': '⟲ Reset (debug)',
+  'Стереть весь прогресс?\nЭто нельзя отменить.': 'Erase all progress?\nThis cannot be undone.',
+  'Стереть': 'Erase',
+  'Урон клика: {n}': 'Click dmg: {n}', 'Макс. HP: {n}': 'Max HP: {n}',
+  'Крит: {n}%': 'Crit: {n}%', 'Урон союзников: {n}/сек': 'Ally dmg: {n}/sec',
+  // — Inventory / Forge —
+  'ИНВЕНТАРЬ': 'INVENTORY', 'ВЕРСТАК': 'WORKBENCH',
+  'Экипировка': 'Equipment', 'Рюкзак': 'Backpack', 'Пусто': 'Empty',
+  'Снять': 'Unequip', 'Надеть': 'Equip', 'Продать': 'Sell', 'В лом': 'Scrap',
+  'Металлолом: {n}': 'Scrap: {n}',
+  'Разобрать хлам': 'Scrap junk', 'Скрафтить': 'Craft',
+  'Инвентарь пуст — иди на пустошь за лутом!': 'Inventory is empty — go loot the wasteland!',
+  'ДОБЫЧА': 'LOOT', '🔩 Разобрать хлам': '🔩 Scrap junk',
+  '— пусто —': '— empty —',
+  'От экипировки:  {parts}': 'From gear:  {parts}', 'Экипировка пуста': 'No gear equipped',
+  'Пусто. Иди в поход за лутом!': 'Empty. Go raid for loot!',
+  '…и ещё {n} предметов': '…and {n} more items',
+  'Не удалось открыть инвентарь.\nВернись в лагерь.': 'Couldn’t open inventory.\nReturn to camp.',
+  '🔨 ВЕРСТАК': '🔨 WORKBENCH',
+  'Разбирай лишнее в инвентаре → металлолом. Здесь куй снаряжение.\nДороже сборка — выше шанс редкого.':
+    'Break down spare gear in the inventory → scrap. Forge equipment here.\nPricier builds — higher rare chance.',
+  '{n} металлолома': '{n} scrap', 'редкое+: ~{n}%': 'rare+: ~{n}%',
+  'Ковать': 'Forge', 'Мало 🔩': 'Low 🔩', 'скован!': 'forged!',
 }
 
 export function t(ru, params) {

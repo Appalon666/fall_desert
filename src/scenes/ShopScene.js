@@ -8,6 +8,7 @@ import { UPGRADES } from '../data/upgrades.js'
 import { ALLIES } from '../data/allies.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
+import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
 
 const MODES = [{ id: 1, label: '×1' }, { id: 10, label: '×10' }, { id: 'max', label: 'MAX' }]
@@ -18,15 +19,15 @@ export default class ShopScene extends Phaser.Scene {
   create() {
     buildBackground(this, { sky: 0x241d15, ground: 0x322516, accent: 0x8a6a3a }, { groundY: GAME.HEIGHT * 0.88, dust: false })
     applyPostFX(this, true, 0.4)
-    titleText(this, GAME.WIDTH / 2, 40, 'МАСТЕРСКАЯ', { size: 34 })
+    titleText(this, GAME.WIDTH / 2, 40, t('МАСТЕРСКАЯ'), { size: 34 })
 
     this.add.image(40, 40, TEX.CAP).setScale(1.4)
     this.capsText = this.add.text(62, 40, '', { fontFamily: 'Rubik, sans-serif', fontSize: '26px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
 
-    this.add.text(GAME.WIDTH * 0.27, 108, 'АПГРЕЙДЫ', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
-    this.add.text(GAME.WIDTH * 0.73, 108, 'СОЮЗНИКИ (idle)', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    this.add.text(GAME.WIDTH * 0.27, 108, t('АПГРЕЙДЫ'), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    this.add.text(GAME.WIDTH * 0.73, 108, t('СОЮЗНИКИ (idle)'), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
 
-    createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: '⟵ В лагерь', width: 300, height: 52, onClick: () => this.scene.start(SCENES.HUB) })
+    createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: t('⟵ В лагерь'), width: 300, height: 52, onClick: () => this.scene.start(SCENES.HUB) })
 
     this.buyMode = 1
     this.rowObjs = []
@@ -36,7 +37,7 @@ export default class ShopScene extends Phaser.Scene {
   // Тумблер количества покупки за клик.
   renderModeToggle() {
     const cx = GAME.WIDTH / 2, y = 78
-    this.add.text(cx - 138, y, 'Покупать:', { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper }).setOrigin(1, 0.5)
+    this.add.text(cx - 138, y, t('Покупать:'), { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper }).setOrigin(1, 0.5)
     MODES.forEach((m, i) => {
       const active = this.buyMode === m.id
       const btn = createButton(this, cx - 60 + i * 66, y, {
@@ -63,7 +64,7 @@ export default class ShopScene extends Phaser.Scene {
       const level = State.upgLevel(u.id)
       const q = State.upgradeQuote(u.id, this.buyMode)
       this.makeRow(leftX, y + i * 88, w, {
-        icon: u.icon, title: `${u.name}  (ур. ${level})`, desc: u.desc,
+        icon: u.icon, title: `${t(u.name)}  (${t('ур.')} ${level})`, desc: t(u.desc),
         cost: q.cost, count: q.count,
         onBuy: () => { if (State.buyUpgradeMulti(u.id, this.buyMode)) this.render() },
       })
@@ -73,7 +74,7 @@ export default class ShopScene extends Phaser.Scene {
       const owned = State.allies[a.id] || 0
       const q = State.allyQuote(a.id, this.buyMode)
       this.makeRow(rightX, y + i * 88, w, {
-        icon: a.icon, title: `${a.name}  ×${owned}`, desc: `+${fmt(a.dps)} урона/сек`,
+        icon: a.icon, title: `${t(a.name)}  ×${owned}`, desc: t('+{n} урона/сек', { n: fmt(a.dps) }),
         cost: q.cost, count: q.count,
         onBuy: () => { if (State.hireAllyMulti(a.id, this.buyMode)) this.render() },
       })
