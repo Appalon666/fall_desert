@@ -249,6 +249,50 @@ export class GameState extends Emitter {
     return true
   }
 
+  // ---------- мультипокупка (x1 / x10 / max) ----------
+  // Возвращает {count, cost}: для числового mode — ровно mode уровней; для 'max'
+  // — сколько влезает в текущие крышки.
+  upgradeQuote(id, mode) {
+    const def = UPGRADES.find(u => u.id === id)
+    const lvl = this.upgLevel(id)
+    if (mode === 'max') {
+      let n = 0, cost = 0
+      for (; n < 100000;) { const c = upgradeCost(def, lvl + n); if (cost + c > this.caps) break; cost += c; n++ }
+      return { count: n, cost }
+    }
+    let cost = 0
+    for (let i = 0; i < mode; i++) cost += upgradeCost(def, lvl + i)
+    return { count: mode, cost }
+  }
+  buyUpgradeMulti(id, mode) {
+    const q = this.upgradeQuote(id, mode)
+    if (q.count <= 0 || this.caps < q.cost) return 0
+    this.caps -= q.cost
+    this.upgrades[id] = this.upgLevel(id) + q.count
+    this.emit('caps'); this.emit('upgrade'); this.save()
+    return q.count
+  }
+  allyQuote(id, mode) {
+    const def = ALLIES.find(a => a.id === id)
+    const owned = this.allies[id] || 0
+    if (mode === 'max') {
+      let n = 0, cost = 0
+      for (; n < 100000;) { const c = allyCost(def, owned + n); if (cost + c > this.caps) break; cost += c; n++ }
+      return { count: n, cost }
+    }
+    let cost = 0
+    for (let i = 0; i < mode; i++) cost += allyCost(def, owned + i)
+    return { count: mode, cost }
+  }
+  hireAllyMulti(id, mode) {
+    const q = this.allyQuote(id, mode)
+    if (q.count <= 0 || this.caps < q.cost) return 0
+    this.caps -= q.cost
+    this.allies[id] = (this.allies[id] || 0) + q.count
+    this.emit('ally'); this.save()
+    return q.count
+  }
+
   // ---------- лут ----------
   addItem(it) { this.inventory.push(it); this.emit('inventory') }
   // В какое гнездо пойдёт предмет данного слота.

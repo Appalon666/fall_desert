@@ -1,14 +1,16 @@
 // Shop — апгрейды (слева) и союзники (справа). Клик по строке = покупка.
-// Строки перерисовываются после каждой покупки (цены/уровни/доступность).
+// Тумблер ×1 / ×10 / MAX задаёт, сколько уровней покупать за клик.
 
 import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
-import { UPGRADES, upgradeCost } from '../data/upgrades.js'
-import { ALLIES, allyCost } from '../data/allies.js'
+import { UPGRADES } from '../data/upgrades.js'
+import { ALLIES } from '../data/allies.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
 import { fmt } from '../util/format.js'
+
+const MODES = [{ id: 1, label: '×1' }, { id: 10, label: '×10' }, { id: 'max', label: 'MAX' }]
 
 export default class ShopScene extends Phaser.Scene {
   constructor() { super(SCENES.SHOP) }
@@ -21,69 +23,97 @@ export default class ShopScene extends Phaser.Scene {
     this.add.image(40, 40, TEX.CAP).setScale(1.4)
     this.capsText = this.add.text(62, 40, '', { fontFamily: 'Rubik, sans-serif', fontSize: '26px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
 
-    this.add.text(GAME.WIDTH * 0.27, 90, 'АПГРЕЙДЫ', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
-    this.add.text(GAME.WIDTH * 0.73, 90, 'СОЮЗНИКИ (idle)', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    this.add.text(GAME.WIDTH * 0.27, 108, 'АПГРЕЙДЫ', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    this.add.text(GAME.WIDTH * 0.73, 108, 'СОЮЗНИКИ (idle)', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: '⟵ В лагерь', width: 300, height: 52, onClick: () => this.scene.start(SCENES.HUB) })
 
+    this.buyMode = 1
     this.rowObjs = []
     this.render()
+  }
+
+  // Тумблер количества покупки за клик.
+  renderModeToggle() {
+    const cx = GAME.WIDTH / 2, y = 78
+    this.add.text(cx - 138, y, 'Покупать:', { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper }).setOrigin(1, 0.5)
+    MODES.forEach((m, i) => {
+      const active = this.buyMode === m.id
+      const btn = createButton(this, cx - 60 + i * 66, y, {
+        label: m.label, width: 60, height: 34, fontSize: 16,
+        color: active ? COLORS.toxicDark : COLORS.steelDark, hover: COLORS.toxic,
+        onClick: () => { this.buyMode = m.id; this.render() },
+      })
+      this.rowObjs.push(btn)
+    })
   }
 
   render() {
     this.rowObjs.forEach(o => o.destroy())
     this.rowObjs = []
     this.capsText.setText(fmt(State.caps))
+    this.renderModeToggle()
 
     const leftX = GAME.WIDTH * 0.27 - 260
     const rightX = GAME.WIDTH * 0.73 - 260
     const w = 520
-    let y = 130
+    const y = 140
 
     UPGRADES.forEach((u, i) => {
       const level = State.upgLevel(u.id)
-      const cost = upgradeCost(u, level)
+      const q = State.upgradeQuote(u.id, this.buyMode)
       this.makeRow(leftX, y + i * 88, w, {
-        icon: u.icon, title: `${u.name}  (ур. ${level})`, desc: u.desc, cost,
-        onBuy: () => { if (State.buyUpgrade(u.id)) this.render() },
+        icon: u.icon, title: `${u.name}  (ур. ${level})`, desc: u.desc,
+        cost: q.cost, count: q.count,
+        onBuy: () => { if (State.buyUpgradeMulti(u.id, this.buyMode)) this.render() },
       })
     })
 
     ALLIES.forEach((a, i) => {
       const owned = State.allies[a.id] || 0
-      const cost = allyCost(a, owned)
+      const q = State.allyQuote(a.id, this.buyMode)
       this.makeRow(rightX, y + i * 88, w, {
-        icon: a.icon, title: `${a.name}  ×${owned}`, desc: `+${fmt(a.dps)} урона/сек`, cost,
-        onBuy: () => { if (State.hireAlly(a.id)) this.render() },
+        icon: a.icon, title: `${a.name}  ×${owned}`, desc: `+${fmt(a.dps)} урона/сек`,
+        cost: q.cost, count: q.count,
+        onBuy: () => { if (State.hireAllyMulti(a.id, this.buyMode)) this.render() },
       })
     })
   }
 
   makeRow(x, y, w, opts) {
     const h = 78
-    const afford = State.caps >= opts.cost
+    // покупка возможна, если хватает крышек и есть что купить (count>0)
+    const afford = opts.count > 0 && State.caps >= opts.cost
     const c = this.add.container(x, y)
     const bg = this.add.graphics()
-    bg.fillStyle(afford ? COLORS.steelDark : 0x2a2a2e, 1)
-    bg.fillRoundedRect(0, 0, w, h, 10)
-    bg.lineStyle(2, afford ? COLORS.toxicDark : COLORS.ink, 0.9)
-    bg.strokeRoundedRect(0, 0, w, h, 10)
+    const paint = (hover) => {
+      bg.clear()
+      bg.fillStyle(hover && afford ? COLORS.rust : (afford ? COLORS.steelDark : 0x2a2a2e), 1)
+      bg.fillRoundedRect(0, 0, w, h, 10)
+      bg.lineStyle(2, afford ? (hover ? COLORS.toxic : COLORS.toxicDark) : COLORS.ink, hover ? 1 : 0.9)
+      bg.strokeRoundedRect(0, 0, w, h, 10)
+    }
+    paint(false)
 
     const icon = this.add.text(16, h / 2, opts.icon, { fontSize: '34px' }).setOrigin(0, 0.5)
     const title = this.add.text(64, 18, opts.title, { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
     const desc = this.add.text(64, 46, opts.desc, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0)
+    // бейдж «сколько купим» при режиме ≠ ×1
+    const objs = [bg, icon, title, desc]
+    if (this.buyMode !== 1) {
+      const badge = this.add.text(w - 150, 16, `+${opts.count}`, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: afford ? CSS.toxic : '#8a8a92', fontStyle: 'bold' }).setOrigin(1, 0)
+      objs.push(badge)
+    }
     const cap = this.add.image(w - 118, h / 2, TEX.CAP).setScale(1.1)
     const cost = this.add.text(w - 100, h / 2, fmt(opts.cost), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: afford ? CSS.cap : '#ab9e80', fontStyle: 'bold' }).setOrigin(0, 0.5)
-    c.add([bg, icon, title, desc, cap, cost])
+    objs.push(cap, cost)
+    c.add(objs)
 
     const zone = this.add.zone(0, 0, w, h).setOrigin(0)
     zone.setInteractive({ useHandCursor: afford })
-    zone.on('pointerover', () => { bg.clear(); bg.fillStyle(afford ? COLORS.rust : 0x33333a, 1); bg.fillRoundedRect(0, 0, w, h, 10); bg.lineStyle(2, afford ? COLORS.toxic : COLORS.ink, 1); bg.strokeRoundedRect(0, 0, w, h, 10) })
-    zone.on('pointerout', () => { bg.clear(); bg.fillStyle(afford ? COLORS.steelDark : 0x2a2a2e, 1); bg.fillRoundedRect(0, 0, w, h, 10); bg.lineStyle(2, afford ? COLORS.toxicDark : COLORS.ink, 0.9); bg.strokeRoundedRect(0, 0, w, h, 10) })
-    zone.on('pointerup', () => {
-      if (afford) opts.onBuy()
-      else this.flash(cost)
-    })
+    zone.on('pointerover', () => paint(true))
+    zone.on('pointerout', () => paint(false))
+    zone.on('pointerup', () => { if (afford) opts.onBuy(); else this.flash(cost) })
     c.add(zone)
     this.rowObjs.push(c)
   }
