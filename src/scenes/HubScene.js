@@ -34,6 +34,7 @@ export default class HubScene extends Phaser.Scene {
     this.add.text(GAME.WIDTH - 20, 30, `Рекорд: ${fmt(State.bestScore)} убийств`, { fontFamily: 'monospace', fontSize: '16px', color: CSS.sand }).setOrigin(1, 0.5)
     this.add.text(GAME.WIDTH - 20, 54, `Зона ${State.zoneIndex + 1} · ур. ${State.hero.level}`, { fontFamily: 'monospace', fontSize: '16px', color: '#cbb98e' }).setOrigin(1, 0.5)
     createButton(this, GAME.WIDTH - 100, 92, { label: '🏆 Рекорды', width: 170, height: 38, fontSize: 15, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
+    createButton(this, GAME.WIDTH - 100, 160, { label: '❔ Как играть', width: 170, height: 38, fontSize: 15, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.showHowTo() })
     // Переключатель звука
     const muteTxt = this.add.text(GAME.WIDTH - 20, 128, Sfx.muted ? '🔇 Звук выкл' : '🔊 Звук вкл', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.sand }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
     muteTxt.on('pointerup', () => { const m = Sfx.toggleMute(); muteTxt.setText(m ? '🔇 Звук выкл' : '🔊 Звук вкл') })
@@ -88,6 +89,36 @@ export default class HubScene extends Phaser.Scene {
 
     // Офлайн-доход
     this.showOfflineReward()
+
+    // Новичку показываем «Как играть» один раз.
+    let seenHow = false
+    try { seenHow = localStorage.getItem('yp_howto') === '1' } catch (e) { /* */ }
+    if (!seenHow) { try { localStorage.setItem('yp_howto', '1') } catch (e) { /* */ } this.showHowTo() }
+  }
+
+  showHowTo() {
+    const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
+    const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.8).setOrigin(0).setDepth(90).setInteractive()
+    const w = 760, h = 470
+    const g = panel(this, cx - w / 2, cy - h / 2, w, h, { fill: COLORS.steelDark, border: COLORS.cap, borderAlpha: 0.8 })
+    g.setDepth(91)
+    const title = this.add.text(cx, cy - h / 2 + 34, '❔  КАК ИГРАТЬ', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(92)
+    const lines = [
+      '🖱  КЛИК / ТАП по врагу — выстрел. Пуля бьёт БЛИЖАЙШЕГО — целься в опасных.',
+      '☢  SPACE или кнопка УЛЬТА — залп по ВСЕЙ волне (копится от попаданий).',
+      '🍾  Крышки за убийства → «Апгрейды»: урон, броня, союзники.',
+      '🤖  Союзники бьют сами (и приносят доход, пока игра закрыта).',
+      '💥  В конце каждой зоны — БОСС-ВОРОТА: пробей, чтобы идти дальше.',
+      '🦸  За уровни — очки в Силу / Живучесть / Удачу (раздел «Герой»).',
+      '🎁  С врагов падает лут → «Инвентарь» и «Верстак» (крафт за металлолом).',
+      '☢  «Перерождение» — сброс забега ради вечных бонусов (Ядра). Мета-цель.',
+      '⚠️  Враги крепнут по мере твоего роста — качайся и не зевай удары!',
+    ]
+    const body = this.add.text(cx - w / 2 + 40, cy - h / 2 + 76, lines.join('\n\n'), {
+      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '17px', color: CSS.paper, lineSpacing: 2, wordWrap: { width: w - 80 },
+    }).setOrigin(0, 0).setDepth(92)
+    const close = createButton(this, cx, cy + h / 2 - 34, { label: 'Понятно!', width: 220, height: 46, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { ov.destroy(); g.destroy(); title.destroy(); body.destroy(); close.destroy() } })
+    close.setDepth(92)
   }
 
   showOfflineReward() {

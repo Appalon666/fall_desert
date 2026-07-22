@@ -59,6 +59,7 @@ export const TEX = {
   HERO_SCAVENGER: 'tex-hero-scavenger',
   ENEMY: 'tex-enemy',
   BOSS: 'tex-boss',
+  ALLY: 'tex-ally',
   BULLET: 'tex-bullet',
   CAP: 'tex-cap',
   GLOW: 'tex-glow',

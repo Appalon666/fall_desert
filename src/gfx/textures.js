@@ -146,6 +146,19 @@ function drawScavenger(g) {
   g.fillStyle(0xb5652f, 1); g.fillRect(58, 52, 5, 26); g.fillRect(58, 74, 12, 5) // монтировка
 }
 
+// --- Компаньон: маленькая турель-дрон на опоре (база для тинта по типу) ---
+function drawAlly(g) {
+  g.fillStyle(COLORS.ink, 0.3); g.fillEllipse(24, 44, 30, 7)   // тень
+  g.fillStyle(0x2a2a30, 1); g.fillRect(20, 30, 8, 14)          // опора
+  g.fillStyle(0x3c3c42, 1); g.fillRoundedRect(10, 30, 28, 6, 3) // основание
+  g.fillStyle(0xffffff, 1); g.fillCircle(24, 22, 12)           // корпус (тинт покрасит)
+  g.fillStyle(0xdfe6ee, 1); g.fillCircle(20, 18, 5)            // блик
+  g.fillStyle(0x1c1c22, 1); g.fillCircle(24, 22, 4)            // «глаз»/сенсор
+  g.fillStyle(0xff5a3c, 1); g.fillCircle(24, 22, 1.8)
+  g.fillStyle(0x2a2a30, 1); g.fillRect(34, 20, 14, 5)          // ствол
+  g.fillStyle(0x55555f, 1); g.fillRect(34, 20, 14, 2)
+}
+
 // --- Враг: токсичный блоб (база для тинта) ---
 function drawEnemy(g) {
   g.fillStyle(COLORS.ink, 0.3); g.fillEllipse(36, 66, 44, 9) // тень
@@ -348,6 +361,7 @@ export function generateTextures(scene) {
   make(scene, TEX.ENEMY, 72, 72, drawEnemy)
   make(scene, TEX.BOSS, 100, 100, drawBoss)
   ENEMY_IDS.forEach(id => make(scene, `tex-e-${id}`, 72, 72, ENEMY_DRAW[id] || drawEnemy))
+  make(scene, TEX.ALLY, 52, 52, drawAlly)
   make(scene, TEX.BULLET, 16, 10, drawBullet)
   make(scene, TEX.CAP, 26, 26, drawCap)
   make(scene, TEX.RUIN, 92, 80, drawRuin)

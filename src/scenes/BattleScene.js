@@ -8,6 +8,7 @@ import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
 import { BAL } from '../data/balance.js'
 import { ENEMIES } from '../data/enemies.js'
+import { ALLIES } from '../data/allies.js'
 import { enemyStats } from '../data/scaling.js'
 import { getZone } from '../data/zones.js'
 import { enemiesInWave, bossDue } from '../data/progression.js'
@@ -47,6 +48,7 @@ export default class BattleScene extends Phaser.Scene {
     this.input.on('pointerdown', (p) => { if (p.x < this.arenaW) this.shoot(p.x, p.y) })
     this.input.keyboard.on('keydown-SPACE', () => this.tryUlt())
 
+    this.buildAllies()
     this.applyZoneVisuals()
     this.spawnWave()
     this.maybeTutorial()
@@ -162,6 +164,42 @@ export default class BattleScene extends Phaser.Scene {
       label: '⟵ В лагерь', width: PANEL_W - 60, height: 50, fontSize: 20,
       onClick: () => { State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.bestScore); this.scene.start(SCENES.HUB) },
     })
+  }
+
+  // ---------------- Компаньоны (видимые союзники) ----------------
+  buildAllies() {
+    this.allySprites = []
+    const owned = ALLIES.filter(a => (State.allies[a.id] || 0) > 0)
+    owned.forEach((a, i) => {
+      const n = State.allies[a.id] || 0
+      const col = i % 3
+      const x = this.hero.x - 34 + col * 36
+      const y = this.groundY - 18 - Math.floor(i / 3) * 42 + (i % 2) * 6
+      const s = this.add.image(x, y, TEX.ALLY).setScale(0.95).setTint(a.color).setDepth(6)
+      addRim(s, lighten(a.color, 0.3), 2, 0.08, 8)
+      this.tweens.add({ targets: s, y: y - 4, duration: 1300 + i * 130, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
+      const badge = this.add.text(x + 14, y + 14, `×${fmt(n)}`, {
+        fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: CSS.paper, fontStyle: 'bold',
+        stroke: '#120d09', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(7)
+      this.allySprites.push({ sprite: s, badge, def: a })
+    })
+    // Периодические трассеры компаньонов по переднему врагу (визуал idle-урона).
+    if (owned.length) {
+      this.allyFireEvt = this.time.addEvent({ delay: 620, loop: true, callback: () => this.allyFire() })
+    }
+  }
+
+  allyFire() {
+    if (!this.allySprites || !this.allySprites.length) return
+    const front = this.frontEnemy()
+    if (!front) return
+    const a = this.allySprites[Math.floor(Math.random() * this.allySprites.length)]
+    const sx = a.sprite.x + 16, sy = a.sprite.y - 2
+    const flash = this.add.image(sx, sy, TEX.GLOW).setTint(a.def.color).setScale(0.4).setDepth(20).setBlendMode('ADD')
+    this.tweens.add({ targets: flash, scale: 0.1, alpha: 0, duration: 120, onComplete: () => flash.destroy() })
+    const b = this.add.image(sx, sy, TEX.DOT).setTint(lighten(a.def.color, 0.3)).setScale(0.6).setDepth(28).setBlendMode('ADD')
+    this.tweens.add({ targets: b, x: front.sprite.x, y: front.sprite.y, duration: 170, ease: 'Quad.in', onComplete: () => b.destroy() })
   }
 
   // ---------------- Спавн волны ----------------
