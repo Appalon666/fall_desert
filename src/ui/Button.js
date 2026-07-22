@@ -40,7 +40,7 @@ export function createButton(scene, x, y, opts = {}) {
   draw(baseColor)
 
   const text = scene.add.text(0, 0, label, {
-    fontFamily: 'Trebuchet MS, sans-serif',
+    fontFamily: 'Rubik, sans-serif',
     fontSize: `${fontSize}px`,
     color: enabled ? CSS.paper : '#a89e90',
     fontStyle: 'bold',

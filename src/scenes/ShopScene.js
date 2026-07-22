@@ -19,10 +19,10 @@ export default class ShopScene extends Phaser.Scene {
     titleText(this, GAME.WIDTH / 2, 40, 'МАСТЕРСКАЯ', { size: 34 })
 
     this.add.image(40, 40, TEX.CAP).setScale(1.4)
-    this.capsText = this.add.text(62, 40, '', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '26px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
+    this.capsText = this.add.text(62, 40, '', { fontFamily: 'Rubik, sans-serif', fontSize: '26px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
 
-    this.add.text(GAME.WIDTH * 0.27, 90, 'АПГРЕЙДЫ', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
-    this.add.text(GAME.WIDTH * 0.73, 90, 'СОЮЗНИКИ (idle)', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    this.add.text(GAME.WIDTH * 0.27, 90, 'АПГРЕЙДЫ', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    this.add.text(GAME.WIDTH * 0.73, 90, 'СОЮЗНИКИ (idle)', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: '⟵ В лагерь', width: 300, height: 52, onClick: () => this.scene.start(SCENES.HUB) })
 
@@ -70,10 +70,10 @@ export default class ShopScene extends Phaser.Scene {
     bg.strokeRoundedRect(0, 0, w, h, 10)
 
     const icon = this.add.text(16, h / 2, opts.icon, { fontSize: '34px' }).setOrigin(0, 0.5)
-    const title = this.add.text(64, 18, opts.title, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
-    const desc = this.add.text(64, 46, opts.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0)
+    const title = this.add.text(64, 18, opts.title, { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
+    const desc = this.add.text(64, 46, opts.desc, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0)
     const cap = this.add.image(w - 118, h / 2, TEX.CAP).setScale(1.1)
-    const cost = this.add.text(w - 100, h / 2, fmt(opts.cost), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: afford ? CSS.cap : '#ab9e80', fontStyle: 'bold' }).setOrigin(0, 0.5)
+    const cost = this.add.text(w - 100, h / 2, fmt(opts.cost), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: afford ? CSS.cap : '#ab9e80', fontStyle: 'bold' }).setOrigin(0, 0.5)
     c.add([bg, icon, title, desc, cap, cost])
 
     const zone = this.add.zone(0, 0, w, h).setOrigin(0)

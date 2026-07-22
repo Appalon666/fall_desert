@@ -24,11 +24,11 @@ export default class PrestigeScene extends Phaser.Scene {
     titleText(this, GAME.WIDTH / 2, 44, 'ПЕРЕРОЖДЕНИЕ', { size: 34, color: '#b6ff5a', glow: COLORS.toxic })
 
     this.add.text(40, 40, '☢', { fontSize: '30px', color: CSS.toxic }).setOrigin(0.5)
-    this.coresText = this.add.text(62, 40, '', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: '#b6ff5a', fontStyle: 'bold' }).setOrigin(0, 0.5)
+    this.coresText = this.add.text(62, 40, '', { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#b6ff5a', fontStyle: 'bold' }).setOrigin(0, 0.5)
 
     this.add.text(GAME.WIDTH / 2, 88,
       'Потеряешь крышки, апгрейды, уровень и зоны — но Ядра и их бонусы останутся навсегда.\nЭкипировка и рекорд сохраняются.',
-      { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '16px', color: CSS.paper, align: 'center', lineSpacing: 4 }).setOrigin(0.5)
+      { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper, align: 'center', lineSpacing: 4 }).setOrigin(0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 42, { label: '⟵ В лагерь', width: 300, height: 50, onClick: () => this.scene.start(SCENES.HUB) })
 
@@ -47,7 +47,7 @@ export default class PrestigeScene extends Phaser.Scene {
     const info = this.add.text(GAME.WIDTH / 2, 148, can
       ? `За этот забег получишь: +${gain} ☢   (убито ${fmt(State.totalKills)})`
       : `Нужно больше убийств за забег (сейчас ${fmt(State.totalKills)}). Копи прогресс и возвращайся.`,
-      { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: can ? '#b6ff5a' : '#b8ad9a', fontStyle: 'bold' }).setOrigin(0.5)
+      { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: can ? '#b6ff5a' : '#b8ad9a', fontStyle: 'bold' }).setOrigin(0.5)
     const pb = createButton(this, GAME.WIDTH / 2, 196, {
       label: can ? `☢ Переродиться (+${gain})` : '☢ Пока рано',
       width: 360, height: 54, fontSize: 22, enabled: can,
@@ -57,7 +57,7 @@ export default class PrestigeScene extends Phaser.Scene {
     this.uiObjs.push(info, pb)
 
     // Престиж-апгрейды
-    this.add.text(GAME.WIDTH / 2, 250, 'ВЕЧНЫЕ БОНУСЫ (за Ядра)', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
+    this.add.text(GAME.WIDTH / 2, 250, 'ВЕЧНЫЕ БОНУСЫ (за Ядра)', { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
     PRESTIGE.forEach((p, i) => {
       const x = i % 2 === 0 ? GAME.WIDTH / 2 - 300 : GAME.WIDTH / 2 + 20
       const y = 290 + Math.floor(i / 2) * 96
@@ -79,9 +79,9 @@ export default class PrestigeScene extends Phaser.Scene {
     }
     paint(false)
     const icon = this.add.text(16, h / 2, p.icon, { fontSize: '30px' }).setOrigin(0, 0.5)
-    const title = this.add.text(58, 16, `${p.name}  ур.${level}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '17px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
-    const desc = this.add.text(58, 40, p.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: '#ddd2b4', wordWrap: { width: w - 66 } }).setOrigin(0)
-    const cost1 = this.add.text(w - 14, h / 2, `${fmt(cost)} ☢`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: afford ? '#b6ff5a' : '#ab9e80', fontStyle: 'bold' }).setOrigin(1, 0.5)
+    const title = this.add.text(58, 16, `${p.name}  ур.${level}`, { fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
+    const desc = this.add.text(58, 40, p.desc, { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#ddd2b4', wordWrap: { width: w - 66 } }).setOrigin(0)
+    const cost1 = this.add.text(w - 14, h / 2, `${fmt(cost)} ☢`, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: afford ? '#b6ff5a' : '#ab9e80', fontStyle: 'bold' }).setOrigin(1, 0.5)
     c.add([bg, icon, title, desc, cost1])
     const z = this.add.zone(0, 0, w, h).setOrigin(0).setInteractive({ useHandCursor: afford })
     z.on('pointerover', () => paint(true))
@@ -94,7 +94,7 @@ export default class PrestigeScene extends Phaser.Scene {
   confirmPrestige(gain) {
     const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
     const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.72).setOrigin(0).setInteractive().setDepth(80)
-    const t = this.add.text(cx, cy - 70, `Переродиться за +${gain} ☢ ?\nПрогресс забега сбросится.`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: '#fff', align: 'center' }).setOrigin(0.5).setDepth(81)
+    const t = this.add.text(cx, cy - 70, `Переродиться за +${gain} ☢ ?\nПрогресс забега сбросится.`, { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#fff', align: 'center' }).setOrigin(0.5).setDepth(81)
     const yes = createButton(this, cx - 110, cy + 20, {
       label: 'Переродиться', width: 200, height: 54, color: COLORS.toxicDark, hover: COLORS.toxic,
       onClick: () => { Sfx.prestige(); State.doPrestige(); this.scene.start(SCENES.HUB) },

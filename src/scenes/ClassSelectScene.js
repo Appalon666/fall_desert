@@ -16,7 +16,7 @@ export default class ClassSelectScene extends Phaser.Scene {
 
     titleText(this, GAME.WIDTH / 2, 58, 'КТО ТЫ НА ПУСТОШИ?', { size: 46 })
     this.add.text(GAME.WIDTH / 2, 104, 'Класс определяет твой стиль. Выбор — навсегда.', {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: CSS.sand, fontStyle: 'italic',
+      fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.sand, fontStyle: 'italic',
     }).setOrigin(0.5)
 
     const n = CLASSES.length
@@ -41,16 +41,16 @@ export default class ClassSelectScene extends Phaser.Scene {
     const icon = this.add.text(0, top + 52, cls.icon, { fontSize: '60px' }).setOrigin(0.5)
     const hero = this.add.image(0, top + 138, cls.tex).setScale(2 / TEX_SS)
     const name = this.add.text(0, top + 214, cls.name, {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold',
+      fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold',
       stroke: '#120d09', strokeThickness: 4,
     }).setOrigin(0.5)
     const line = this.add.rectangle(0, top + 244, w - 60, 2, tint, 0.6).setOrigin(0.5)
     const desc = this.add.text(0, top + 258, cls.desc, {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.paper,
+      fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.paper,
       align: 'center', wordWrap: { width: w - 44 }, lineSpacing: 3,
     }).setOrigin(0.5, 0)
     const perks = this.add.text(0, top + 336, cls.perks.map(p => `✦ ${p}`).join('\n'), {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.toxic,
+      fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic,
       align: 'center', lineSpacing: 6, fontStyle: 'bold',
     }).setOrigin(0.5, 0)
 

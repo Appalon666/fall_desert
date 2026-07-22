@@ -27,7 +27,19 @@ export default class BootScene extends Phaser.Scene {
     const pre = document.getElementById('preloader')
     if (pre) pre.style.display = 'none'
 
-    this.boot()
+    // Ждём шрифт Rubik ДО старта сцен, иначе Phaser отрисует текст запасным
+    // шрифтом и не обновит его после загрузки. Локальный woff2 грузится быстро.
+    this.ensureFonts().then(() => this.boot())
+  }
+
+  ensureFonts() {
+    try {
+      if (!document || !document.fonts) return Promise.resolve()
+      const loads = ['400 20px Rubik', '500 20px Rubik', '700 20px Rubik'].map(f => document.fonts.load(f))
+      // подстраховка таймаутом, чтобы не зависнуть, если шрифт не загрузился
+      const timeout = new Promise(res => setTimeout(res, 2500))
+      return Promise.race([Promise.all(loads).catch(() => {}), timeout])
+    } catch (e) { return Promise.resolve() }
   }
 
   // Инициализация платформы (Яндекс), загрузка облачного сейва, старт игры.

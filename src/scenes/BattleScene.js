@@ -68,7 +68,7 @@ export default class BattleScene extends Phaser.Scene {
     try { localStorage.setItem('yp_tut_shoot', '1') } catch (e) { /* */ }
     const tip = this.add.text(this.arenaW / 2, GAME.HEIGHT / 2 + 60,
       t('Целься по врагам и КЛИКАЙ — пуля бьёт ближайшего.\nВыбивай опасных первыми! Крышки трать в «Мастерской», Space — ульта (по всем).'),
-      { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '19px', color: CSS.paper, align: 'center', lineSpacing: 6, stroke: '#120d09', strokeThickness: 4 })
+      { fontFamily: 'Rubik, sans-serif', fontSize: '19px', color: CSS.paper, align: 'center', lineSpacing: 6, stroke: '#120d09', strokeThickness: 4 })
       .setOrigin(0.5).setDepth(70)
     this.tweens.add({ targets: tip, alpha: { from: 1, to: 0 }, delay: 4500, duration: 1400, onComplete: () => tip.destroy() })
   }
@@ -103,7 +103,7 @@ export default class BattleScene extends Phaser.Scene {
     addVignette(this)
 
     this.zoneLabel = this.add.text(W / 2, 34, '', {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.sand, fontStyle: 'bold',
+      fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.sand, fontStyle: 'bold',
       stroke: '#120d09', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(60)
     this.progressLabel = this.add.text(W / 2, 62, '', {
@@ -138,20 +138,20 @@ export default class BattleScene extends Phaser.Scene {
     this.add.image(px + 34, 40, TEX.GLOW).setTint(COLORS.cap).setScale(1.2).setAlpha(0.5).setBlendMode('ADD')
     this.add.image(px + 34, 40, TEX.CAP).setScale(1.3)
     this.capsText = this.add.text(px + 54, 40, '0', {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: CSS.cap, fontStyle: 'bold',
+      fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: CSS.cap, fontStyle: 'bold',
     }).setOrigin(0, 0.5)
 
     this.comboText = this.add.text(cx, 78, '', {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.toxic, fontStyle: 'bold',
+      fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.toxic, fontStyle: 'bold',
     }).setOrigin(0.5)
 
-    this.add.text(px + 22, 108, t('HP героя'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
+    this.add.text(px + 22, 108, t('HP героя'), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
     this.hpBarW = PANEL_W - 48
     this.add.rectangle(px + 24, 130, this.hpBarW, 22, COLORS.ink).setOrigin(0)
     this.hpFill = this.add.rectangle(px + 26, 132, this.hpBarW - 4, 18, COLORS.blood).setOrigin(0)
     this.hpText = this.add.text(cx, 141, '', { fontFamily: 'monospace', fontSize: '13px', color: '#fff' }).setOrigin(0.5)
 
-    this.add.text(px + 22, 172, t('Заряд ульты'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
+    this.add.text(px + 22, 172, t('Заряд ульты'), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
     this.add.rectangle(px + 24, 194, this.hpBarW, 22, COLORS.ink).setOrigin(0)
     this.ultFill = this.add.rectangle(px + 26, 196, 1, 18, COLORS.toxicDark).setOrigin(0)
     createButton(this, cx, 250, {
@@ -182,7 +182,7 @@ export default class BattleScene extends Phaser.Scene {
       addRim(s, lighten(a.color, 0.3), 2, 0.08, 8)
       this.tweens.add({ targets: s, y: y - 4, duration: 1300 + i * 130, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
       const badge = this.add.text(x + 14, y + 14, `×${fmt(n)}`, {
-        fontFamily: 'Trebuchet MS, sans-serif', fontSize: '13px', color: CSS.paper, fontStyle: 'bold',
+        fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: CSS.paper, fontStyle: 'bold',
         stroke: '#120d09', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(7)
       this.allySprites.push({ sprite: s, badge, def: a })
@@ -267,7 +267,7 @@ export default class BattleScene extends Phaser.Scene {
     const bg = this.add.rectangle(spawnX, 0, barW + 4, isBoss ? 12 : 8, COLORS.ink).setOrigin(0.5).setDepth(40)
     const fill = this.add.rectangle(spawnX, 0, barW, isBoss ? 8 : 5, COLORS.toxic).setOrigin(0.5).setDepth(41)
     const nameLabel = this.add.text(spawnX, 0, isBoss ? `☠ ${def.name}` : def.name, {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: isBoss ? '18px' : '13px',
+      fontFamily: 'Rubik, sans-serif', fontSize: isBoss ? '18px' : '13px',
       color: isBoss ? '#ff8a6a' : CSS.paper, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(41)
 
@@ -454,7 +454,7 @@ export default class BattleScene extends Phaser.Scene {
   showDeathModal() {
     const cx = this.arenaW / 2, cy = GAME.HEIGHT / 2
     const ov = this.add.rectangle(0, 0, this.arenaW, GAME.HEIGHT, COLORS.ink, 0.72).setOrigin(0).setDepth(85).setInteractive()
-    const title = this.add.text(cx, cy - 90, t('Ты пал на пустоши'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: '#ff5a5a', fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(86)
+    const title = this.add.text(cx, cy - 90, t('Ты пал на пустоши'), { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: '#ff5a5a', fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(86)
     const revive = createButton(this, cx, cy - 6, {
       label: t('📺 Возродиться (реклама)'), width: 340, height: 56, fontSize: 20,
       color: COLORS.toxicDark, hover: COLORS.toxic,
@@ -477,7 +477,7 @@ export default class BattleScene extends Phaser.Scene {
   // ---------------- Эффекты ----------------
   floatText(x, y, text, color, size = 22) {
     const t = this.add.text(x, y, text, {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: `${size}px`, color, fontStyle: 'bold',
+      fontFamily: 'Rubik, sans-serif', fontSize: `${size}px`, color, fontStyle: 'bold',
       stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5)
     this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 800, ease: 'Cubic.out', onComplete: () => t.destroy() })
@@ -519,8 +519,8 @@ export default class BattleScene extends Phaser.Scene {
     const bg = this.add.graphics()
     bg.fillStyle(COLORS.ink, 0.75); bg.fillRoundedRect(-220, -34, 440, 68, 10)
     bg.lineStyle(3, 0xff5a3c, 0.9); bg.strokeRoundedRect(-220, -34, 440, 68, 10)
-    const t1 = this.add.text(0, -12, t('☠  БОСС-ВОРОТА'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: '#ff6a4a', fontStyle: 'bold' }).setOrigin(0.5)
-    const t2 = this.add.text(0, 16, name, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0.5)
+    const t1 = this.add.text(0, -12, t('☠  БОСС-ВОРОТА'), { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#ff6a4a', fontStyle: 'bold' }).setOrigin(0.5)
+    const t2 = this.add.text(0, 16, name, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0.5)
     c.add([bg, t1, t2])
     c.setScale(0.7)
     this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.out' })

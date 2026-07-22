@@ -136,7 +136,7 @@ export function titleText(scene, x, y, text, opts = {}) {
   const { size = 48, color = CSS.cap, glow = COLORS.cap } = opts
   scene.add.image(x, y, TEX.GLOW).setTint(glow).setAlpha(0.25).setScale(size / 18, size / 34).setDepth(0)
   return scene.add.text(x, y, text, {
-    fontFamily: 'Trebuchet MS, sans-serif', fontSize: `${size}px`, color, fontStyle: 'bold',
+    fontFamily: 'Rubik, sans-serif', fontSize: `${size}px`, color, fontStyle: 'bold',
     stroke: '#120d09', strokeThickness: Math.max(3, size / 8),
     shadow: { offsetX: 0, offsetY: 3, color: '#000', blur: 6, fill: true },
   }).setOrigin(0.5)

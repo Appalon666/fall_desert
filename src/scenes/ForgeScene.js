@@ -30,11 +30,11 @@ export default class ForgeScene extends Phaser.Scene {
     titleText(this, GAME.WIDTH / 2, 46, '🔨 ВЕРСТАК', { size: 34, color: '#ffb46a', glow: 0xff8a2a })
 
     this.add.text(GAME.WIDTH / 2, 92, 'Разбирай лишнее в инвентаре → металлолом. Здесь куй снаряжение.\nДороже сборка — выше шанс редкого.', {
-      fontFamily: 'Trebuchet MS, sans-serif', fontSize: '16px', color: CSS.paper, align: 'center', lineSpacing: 4,
+      fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper, align: 'center', lineSpacing: 4,
     }).setOrigin(0.5)
 
     this.add.text(40, 40, '🔩', { fontSize: '28px' }).setOrigin(0.5)
-    this.scrapText = this.add.text(64, 40, '', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: '#d8d8e0', fontStyle: 'bold' }).setOrigin(0, 0.5)
+    this.scrapText = this.add.text(64, 40, '', { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#d8d8e0', fontStyle: 'bold' }).setOrigin(0, 0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 42, { label: '⟵ В лагерь', width: 300, height: 50, onClick: () => this.scene.start(SCENES.HUB) })
 
@@ -69,9 +69,9 @@ export default class ForgeScene extends Phaser.Scene {
       bg.lineStyle(3, afford ? border : COLORS.ink, 0.9); bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 12)
     }
     paint2(false)
-    const name = this.add.text(0, -h / 2 + 24, t.name, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: t.css, fontStyle: 'bold' }).setOrigin(0.5)
-    const cost = this.add.text(0, -h / 2 + 58, `🔩 ${fmt(t.cost)}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: afford ? '#e8e8f0' : '#7a7a82', fontStyle: 'bold' }).setOrigin(0.5)
-    const odds = this.add.text(0, -h / 2 + 88, `редкое+: ~${topPct(t.luck)}%`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.toxic }).setOrigin(0.5)
+    const name = this.add.text(0, -h / 2 + 24, t.name, { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: t.css, fontStyle: 'bold' }).setOrigin(0.5)
+    const cost = this.add.text(0, -h / 2 + 58, `🔩 ${fmt(t.cost)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: afford ? '#e8e8f0' : '#7a7a82', fontStyle: 'bold' }).setOrigin(0.5)
+    const odds = this.add.text(0, -h / 2 + 88, `редкое+: ~${topPct(t.luck)}%`, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic }).setOrigin(0.5)
     c.add([bg, name, cost, odds])
 
     const btn = createButton(this, 0, h / 2 - 26, {
@@ -104,9 +104,9 @@ export default class ForgeScene extends Phaser.Scene {
     panel(this, -w / 2, -h / 2, w, h, { radius: 10, fill: 0x241d15, border: rar.color, borderW: 3 })
     const glow = this.add.image(0, 0, 'tex-glow').setTint(rar.color).setAlpha(0.35).setScale(4, 2).setBlendMode('ADD')
     const icon = this.add.text(-w / 2 + 30, 0, slot.icon, { fontSize: '38px' }).setOrigin(0.5)
-    const name = this.add.text(-w / 2 + 62, -16, item.name, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: rar.css, fontStyle: 'bold' }).setOrigin(0, 0.5)
-    const sub = this.add.text(-w / 2 + 62, 12, `${slot.name} · ${rar.name} · ${statText(item)}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '14px', color: '#ddd2b4' }).setOrigin(0, 0.5)
-    const tag = this.add.text(w / 2 - 20, 0, 'скован!', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.toxic }).setOrigin(1, 0.5)
+    const name = this.add.text(-w / 2 + 62, -16, item.name, { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: rar.css, fontStyle: 'bold' }).setOrigin(0, 0.5)
+    const sub = this.add.text(-w / 2 + 62, 12, `${slot.name} · ${rar.name} · ${statText(item)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '14px', color: '#ddd2b4' }).setOrigin(0, 0.5)
+    const tag = this.add.text(w / 2 - 20, 0, 'скован!', { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic }).setOrigin(1, 0.5)
     this.resultBox.add([glow, icon, name, sub, tag])
     this.resultBox.setScale(0.8).setAlpha(0)
     this.tweens.add({ targets: this.resultBox, scale: 1, alpha: 1, duration: 220, ease: 'Back.out' })

@@ -23,7 +23,7 @@ export default class HeroScene extends Phaser.Scene {
     const cls = State.classDef()
     const heroTex = (cls && cls.tex) || TEX.HERO
     this.add.image(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2, heroTex).setScale(3.4 / TEX_SS)
-    if (cls) this.add.text(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2 + 150, `${cls.icon} ${cls.name}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
+    if (cls) this.add.text(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2 + 150, `${cls.icon} ${cls.name}`, { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: '⟵ В лагерь', width: 300, height: 52, onClick: () => this.scene.start(SCENES.HUB) })
 
@@ -43,16 +43,16 @@ export default class HeroScene extends Phaser.Scene {
     this.uiObjs = []
 
     const cx = GAME.WIDTH / 2 + 80
-    const info = this.add.text(cx, 110, `Уровень ${State.hero.level}    Опыт ${fmt(State.hero.xp)}/${fmt(State.xpToNext())}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.paper }).setOrigin(0.5)
-    const pts = this.add.text(cx, 144, State.hero.points > 0 ? `Свободных очков: ${State.hero.points}` : 'Нет свободных очков', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: State.hero.points > 0 ? CSS.cap : '#b8ad9a', fontStyle: 'bold' }).setOrigin(0.5)
+    const info = this.add.text(cx, 110, `Уровень ${State.hero.level}    Опыт ${fmt(State.hero.xp)}/${fmt(State.xpToNext())}`, { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.paper }).setOrigin(0.5)
+    const pts = this.add.text(cx, 144, State.hero.points > 0 ? `Свободных очков: ${State.hero.points}` : 'Нет свободных очков', { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: State.hero.points > 0 ? CSS.cap : '#b8ad9a', fontStyle: 'bold' }).setOrigin(0.5)
     this.uiObjs.push(info, pts)
 
     let y = 210
     STATS.forEach(s => {
       const row = this.add.container(cx - 300, y)
       const icon = this.add.text(0, 0, s.icon, { fontSize: '32px' }).setOrigin(0, 0.5)
-      const label = this.add.text(50, -12, `${s.name}: ${State.hero[s.id]}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0, 0.5)
-      const desc = this.add.text(50, 14, s.desc, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0, 0.5)
+      const label = this.add.text(50, -12, `${s.name}: ${State.hero[s.id]}`, { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0, 0.5)
+      const desc = this.add.text(50, 14, s.desc, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0, 0.5)
       row.add([icon, label, desc])
       this.uiObjs.push(row)
 
@@ -73,7 +73,7 @@ export default class HeroScene extends Phaser.Scene {
   confirmWipe() {
     const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
     const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.7).setOrigin(0).setInteractive()
-    const t = this.add.text(cx, cy - 70, 'Стереть весь прогресс?\nЭто нельзя отменить.', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: '#fff', align: 'center' }).setOrigin(0.5)
+    const t = this.add.text(cx, cy - 70, 'Стереть весь прогресс?\nЭто нельзя отменить.', { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#fff', align: 'center' }).setOrigin(0.5)
     const yes = createButton(this, cx - 110, cy + 20, { label: 'Стереть', width: 190, height: 54, color: COLORS.blood, hover: 0xc23b3b, onClick: () => { State.wipe(); this.scene.start(SCENES.CLASS_SELECT) } })
     const no = createButton(this, cx + 110, cy + 20, { label: 'Отмена', width: 190, height: 54, onClick: () => { ov.destroy(); t.destroy(); yes.destroy(); no.destroy() } })
   }
