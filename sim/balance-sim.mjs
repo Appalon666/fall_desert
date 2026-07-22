@@ -33,7 +33,7 @@ function runOne(classId, rng) {
     caps: 0,
     hero: { level: 1, xp: 0, points: 0, str: cls.startStats.str, vit: cls.startStats.vit, luck: cls.startStats.luck },
     upgrades: {}, allies: { ...cls.startAllies },
-    zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, deaths: 0, ult: 0, bossActive: false,
+    zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, deaths: 0, ult: 0, bossActive: false, waveCount: 0,
   }
   const upgLevel = id => st.upgrades[id] || 0
   const upgAdd = stat => UPGRADES.reduce((s, u) => (u.kind === 'add' && u.stat === stat) ? s + upgLevel(u.id) * u.perLevel : s, 0)
@@ -84,6 +84,7 @@ function runOne(classId, rng) {
   // ---- волна из нескольких врагов / босс-ворота ----
   let wave = []          // живые враги текущей волны
   function spawnWave() {
+    st.waveCount++ // +1% к врагам за волну
     const boss = !st.bossActive && bossDue(st.killsInZone)
     if (boss) st.bossActive = true
     const count = boss ? 1 : enemiesInWave(st.zoneIndex)
@@ -93,7 +94,8 @@ function runOne(classId, rng) {
       const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
       const b = enemyStats(def, st.totalKills, boss)
       const prog = boss ? Math.pow(progMul(), 0.6) : progMul()
-      const hp = b.hp * af.hp * prog, reward = b.reward * af.rew, dmg = b.dmg * af.dmg
+      const wv = Math.pow(BAL.enemyWaveRamp, st.waveCount)
+      const hp = b.hp * af.hp * prog * wv, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * wv
       const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
       const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed) + i * 0.6
       wave.push({ hp, maxHp: hp, reward, dmg, approach, attackAccum: 0, boss })
@@ -104,10 +106,10 @@ function runOne(classId, rng) {
     st.hero.xp += Math.ceil(front.reward * 0.55)
     while (st.hero.xp >= xpNeed()) { st.hero.xp -= xpNeed(); st.hero.level++; st.hero.points += BAL.pointsPerLevel }
     st.ult = Math.min(BAL.ultMax, st.ult + BAL.ultChargePerKill)
-    if (front.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0 }
+    if (front.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
     else { st.totalKills++; st.killsInZone++ }
   }
-  function heroDie() { st.deaths++; st.killsInZone = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
+  function heroDie() { st.deaths++; st.killsInZone = 0; st.waveCount = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
 
   const pierce = cls.pierce || 1
   const lifesteal = cls.lifesteal || 0
@@ -159,9 +161,10 @@ function runOne(classId, rng) {
 
   const effDps = cps * acc * clickHit() + allyDps()
   const avgDef = { hpMul: 1, rewardMul: 1, dmgMul: 1, speedMul: 1 }
-  const typicalHp = enemyStats(avgDef, st.totalKills, false).hp * progMul()
+  const wvEnd = Math.pow(BAL.enemyWaveRamp, st.waveCount)
+  const typicalHp = enemyStats(avgDef, st.totalKills, false).hp * progMul() * wvEnd
   const ttkEnd = typicalHp / effDps
-  const bossTtkEnd = enemyStats(avgDef, st.totalKills, true).hp * Math.pow(progMul(), 0.6) / effDps
+  const bossTtkEnd = enemyStats(avgDef, st.totalKills, true).hp * Math.pow(progMul(), 0.6) * wvEnd / effDps
   const earlyRate = (checkpoints[120] || st.totalKills) / 120
   const lateRate = (st.totalKills - (checkpoints[1080] || st.totalKills)) / 120
 

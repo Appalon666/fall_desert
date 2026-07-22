@@ -33,6 +33,7 @@ export class GameState extends Emitter {
     this.zoneIndex = 0
     this.killsInZone = 0
     this.totalKills = 0
+    this.waveCount = 0      // сколько волн выпущено за забег (+1% к врагам за волну)
     this.bossActive = false // идёт бой с боссом-воротами зоны
     // престиж (сохраняется между перерождениями)
     this.cores = 0
@@ -66,6 +67,7 @@ export class GameState extends Emitter {
     this.zoneIndex = 0
     this.killsInZone = 0
     this.totalKills = 0
+    this.waveCount = 0
     this.bossActive = false
     this.hp = this.heroMaxHp()
     this.combo = 0
@@ -146,6 +148,11 @@ export class GameState extends Emitter {
     const tail = Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap))
     return ramp * tail * Math.pow(BAL.enemyZoneRamp, this.zoneIndex)
   }
+  // Нарастание за волну ВНУТРИ зоны: каждая волна +1% (к боссу ~+35%),
+  // новая зона обнуляет счётчик (но базовая сложность зоны выше). Так «каждая
+  // волна сильнее» ощущается, но не компаундится в абсурд за сотни волн.
+  waveScaleMul() { return Math.pow(BAL.enemyWaveRamp, this.waveCount) }
+  bumpWave() { this.waveCount++ }
   canPrestige() { return this.coresFromRun() >= 1 }
   doPrestige() {
     const gain = this.coresFromRun()
@@ -331,6 +338,7 @@ export class GameState extends Emitter {
     this.bossActive = false
     this.zoneIndex++
     this.killsInZone = 0
+    this.waveCount = 0 // новая зона — ваве-рамп с нуля
     if (this.totalKills > this.bestScore) this.bestScore = this.totalKills
     this.save()
     this.emit('zone')
@@ -339,6 +347,7 @@ export class GameState extends Emitter {
   // Откат при смерти героя — теряем прогресс текущей зоны.
   onHeroDeath() {
     this.killsInZone = 0
+    this.waveCount = 0 // зона перезапускается — ваве-рамп с нуля
     this.bossActive = false
     this.hp = this.heroMaxHp()
     this.combo = 0
@@ -368,7 +377,7 @@ export class GameState extends Emitter {
       caps: this.caps, heroClass: this.heroClass, hero: this.hero,
       upgrades: this.upgrades, allies: this.allies,
       equipment: this.equipment, inventory: this.inventory, scrap: this.scrap,
-      zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills,
+      zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills, waveCount: this.waveCount,
       cores: this.cores, prestige: this.prestige, prestigeCount: this.prestigeCount,
       bestScore: this.bestScore, lastSeen: Date.now(),
     }
@@ -417,6 +426,7 @@ export class GameState extends Emitter {
       zoneIndex: fin(d.zoneIndex),
       killsInZone: fin(d.killsInZone),
       totalKills: fin(d.totalKills),
+      waveCount: fin(d.waveCount),
       cores: fin(d.cores),
       prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0, ...(d.prestige || {}) },
       prestigeCount: fin(d.prestigeCount),

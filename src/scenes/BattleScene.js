@@ -205,6 +205,7 @@ export default class BattleScene extends Phaser.Scene {
   // ---------------- Спавн волны ----------------
   spawnWave() {
     this.wavePending = false
+    State.bumpWave() // +1% к врагам за каждую выпущенную волну
     // Босс-ворота: набрали норму убийств в зоне → один жирный босс.
     const isBoss = !State.bossActive && bossDue(State.killsInZone)
     if (isBoss) {
@@ -232,11 +233,12 @@ export default class BattleScene extends Phaser.Scene {
     const af = this.zone.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
     const base = enemyStats(def, State.totalKills, isBoss)
     const mHp = State.enemyMetaHpMul(), mDmg = State.enemyMetaDmgMul()
+    const wave = State.waveScaleMul() // +1% за волну (HP и урон)
     // боссам прогрессию даём мягче (^0.6), иначе бой с воротами затягивается
     const prog = isBoss ? Math.pow(State.enemyProgMul(), 0.6) : State.enemyProgMul()
-    const hp = Math.ceil(base.hp * af.hp * mHp * prog)
+    const hp = Math.ceil(base.hp * af.hp * mHp * prog * wave)
     const reward = Math.ceil(base.reward * af.rew)
-    const dmg = base.dmg * af.dmg * mDmg
+    const dmg = base.dmg * af.dmg * mDmg * wave
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd
     const scale = isBoss ? BAL.bossScale : def.scale
     // строй: боссы выходят вплотную; обычные — колонной у правого края арены

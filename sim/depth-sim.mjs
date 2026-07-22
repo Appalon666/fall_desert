@@ -42,7 +42,7 @@ function runOne(classId, rng) {
       hero: { level: 1, xp: 0, points: 0, str: cls.startStats.str, vit: cls.startStats.vit, luck: cls.startStats.luck },
       upgrades: meta.prestige.quickstart > 0 ? { damage: meta.prestige.quickstart } : {},
       allies: { ...cls.startAllies },
-      zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, bossActive: false,
+      zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, bossActive: false, waveCount: 0,
     }
     st.hp = heroMaxHp()
   }
@@ -81,6 +81,7 @@ function runOne(classId, rng) {
 
   let wave = []
   function spawnWave() {
+    st.waveCount++
     const boss = !st.bossActive && bossDue(st.killsInZone)
     if (boss) st.bossActive = true
     const count = boss ? 1 : enemiesInWave(st.zoneIndex)
@@ -93,8 +94,9 @@ function runOne(classId, rng) {
       const lv = st.hero.level - 1
       const progFull = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyZoneRamp, st.zoneIndex)
       const prog = boss ? Math.pow(progFull, 0.6) : progFull
+      const wv = Math.pow(BAL.enemyWaveRamp, st.waveCount)
       const b = enemyStats(def, st.totalKills, boss)
-      const hp = b.hp * af.hp * mHp * prog, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg
+      const hp = b.hp * af.hp * mHp * prog * wv, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg * wv
       const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
       const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed) + i * 0.6
       wave.push({ hp, reward, dmg, approach, attackAccum: 0, boss })
@@ -104,10 +106,10 @@ function runOne(classId, rng) {
     st.caps += Math.ceil(e.reward * (1 + capsBonus()))
     st.hero.xp += Math.ceil(e.reward * 0.55)
     while (st.hero.xp >= xpNeed()) { st.hero.xp -= xpNeed(); st.hero.level++; st.hero.points += BAL.pointsPerLevel }
-    if (e.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0 }
+    if (e.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
     else { st.totalKills++; st.killsInZone++ }
   }
-  function heroDie() { st.killsInZone = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
+  function heroDie() { st.killsInZone = 0; st.waveCount = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
 
   freshRun()
   const cps = 4, acc = 0.9
