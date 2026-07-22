@@ -53,8 +53,10 @@ const EN = {
     '🦸  Levels grant points into Strength / Vitality / Luck (“Hero” screen).',
   '🎁  С врагов падает лут → «Инвентарь» и «Верстак» (крафт за металлолом).':
     '🎁  Enemies drop loot → “Inventory” and “Workbench” (craft from scrap).',
-  '☢  «Перерождение» — сброс забега ради вечных бонусов (Ядра). Мета-цель.':
-    '☢  “Prestige” — reset the run for permanent bonuses (Cores). The meta goal.',
+  '☢  «Перерождение» — сброс забега ради ЯДЕР и вечных бонусов (урон/HP/крышки).':
+    '☢  “Prestige” — reset the run for CORES and permanent bonuses (damage/HP/caps).',
+  '💠  Ядра даёт ТОЛЬКО перерождение: чем дальше прошёл (выше зона) — тем больше Ядер.':
+    '💠  Cores come ONLY from prestige: the deeper you got (higher zone), the more Cores.',
   '⚠️  Враги крепнут по мере твоего роста — качайся и не зевай удары!':
     '⚠️  Enemies grow stronger as you do — level up and don’t take hits!',
   // — Оффлайн —

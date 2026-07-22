@@ -102,7 +102,7 @@ export default class HubScene extends Phaser.Scene {
   showHowTo() {
     const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
     const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.8).setOrigin(0).setDepth(90).setInteractive()
-    const w = 760, h = 470
+    const w = 760, h = 524
     const g = panel(this, cx - w / 2, cy - h / 2, w, h, { fill: COLORS.steelDark, border: COLORS.cap, borderAlpha: 0.8 })
     g.setDepth(91)
     const title = this.add.text(cx, cy - h / 2 + 34, t('❔  КАК ИГРАТЬ'), { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(92)
@@ -114,7 +114,8 @@ export default class HubScene extends Phaser.Scene {
       '💥  В конце каждой зоны — БОСС-ВОРОТА: пробей, чтобы идти дальше.',
       '🦸  За уровни — очки в Силу / Живучесть / Удачу (раздел «Герой»).',
       '🎁  С врагов падает лут → «Инвентарь» и «Верстак» (крафт за металлолом).',
-      '☢  «Перерождение» — сброс забега ради вечных бонусов (Ядра). Мета-цель.',
+      '☢  «Перерождение» — сброс забега ради ЯДЕР и вечных бонусов (урон/HP/крышки).',
+      '💠  Ядра даёт ТОЛЬКО перерождение: чем дальше прошёл (выше зона) — тем больше Ядер.',
       '⚠️  Враги крепнут по мере твоего роста — качайся и не зевай удары!',
     ].map(l => t(l))
     const body = this.add.text(cx - w / 2 + 40, cy - h / 2 + 76, lines.join('\n\n'), {
