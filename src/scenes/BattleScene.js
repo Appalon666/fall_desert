@@ -188,8 +188,12 @@ export default class BattleScene extends Phaser.Scene {
   // Создать один враг-объект (спрайт, полоска HP, имя, стат).
   makeEnemy(defId, isBoss, i, n) {
     const def = ENEMIES[defId]
-    const { hp, reward, dmg } = enemyStats(def, State.totalKills, isBoss)
-    const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1)
+    const af = this.zone.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
+    const base = enemyStats(def, State.totalKills, isBoss)
+    const hp = Math.ceil(base.hp * af.hp)
+    const reward = Math.ceil(base.reward * af.rew)
+    const dmg = base.dmg * af.dmg
+    const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd
     const scale = isBoss ? BAL.bossScale : def.scale
     // строй: боссы выходят вплотную; обычные — колонной справа, в две «глубины».
     const spawnX = isBoss ? (this.hero.x + BAL.enemyAttackRange + 60) : (this.arenaW - 50 + i * 66)

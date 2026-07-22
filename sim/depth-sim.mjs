@@ -84,12 +84,13 @@ function runOne(classId, rng) {
     const boss = !st.bossActive && bossDue(st.killsInZone)
     if (boss) st.bossActive = true
     const count = boss ? 1 : enemiesInWave(st.zoneIndex)
-    const pool = getZone(st.zoneIndex).enemies
+    const z = getZone(st.zoneIndex); const pool = z.enemies; const af = z.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
     wave = []
     for (let i = 0; i < count; i++) {
       const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
-      const { hp, reward, dmg } = enemyStats(def, st.totalKills, boss)
-      const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1)
+      const b = enemyStats(def, st.totalKills, boss)
+      const hp = b.hp * af.hp, reward = b.reward * af.rew, dmg = b.dmg * af.dmg
+      const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
       const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed) + i * 0.6
       wave.push({ hp, reward, dmg, approach, attackAccum: 0, boss })
     }

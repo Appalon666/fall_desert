@@ -28,10 +28,28 @@ export const ZONES = [
   },
 ]
 
-// Зона по индексу; за пределами списка — бесконечное повторение последних с усложнением.
+// Аффиксы бесконечного режима — модификаторы зоны, циклятся по петлям,
+// чтобы endless-повторы ощущались по-разному (риск/награда варьируются).
+// Множители накладываются поверх статов врага (hp/dmg/reward) и скорости.
+export const AFFIXES = [
+  { id: 'calm', name: '', tag: '', hp: 1, dmg: 1, rew: 1, spd: 1 },
+  { id: 'rich', name: 'Богатая', tag: '🍾×2', hp: 1, dmg: 1, rew: 2.2, spd: 1 },
+  { id: 'armored', name: 'Бронированная', tag: '🛡', hp: 1.5, dmg: 1, rew: 1.5, spd: 0.9 },
+  { id: 'swift', name: 'Шустрая', tag: '💨', hp: 0.9, dmg: 1.2, rew: 1.2, spd: 1.5 },
+  { id: 'toxic', name: 'Ядрёная', tag: '☢', hp: 1.1, dmg: 1.4, rew: 1.3, spd: 1 },
+]
+
+// Аффикс для номера петли (1..) endless-режима.
+export function affixForLoop(loop) {
+  return AFFIXES[(loop - 1) % AFFIXES.length]
+}
+
+// Зона по индексу; за пределами списка — бесконечный режим с аффиксами.
 export function getZone(index) {
-  if (index < ZONES.length) return { ...ZONES[index], endless: false, loop: 0 }
+  if (index < ZONES.length) return { ...ZONES[index], endless: false, loop: 0, affix: AFFIXES[0] }
   const loop = index - ZONES.length + 1
   const base = ZONES[ZONES.length - 1]
-  return { ...base, name: `${base.name} +${loop}`, endless: true, loop }
+  const affix = affixForLoop(loop)
+  const suffix = affix.name ? ` +${loop} · ${affix.name}` : ` +${loop}`
+  return { ...base, name: `${base.name}${suffix}`, endless: true, loop, affix }
 }
