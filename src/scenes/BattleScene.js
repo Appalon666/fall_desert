@@ -17,6 +17,7 @@ import { createButton } from '../ui/Button.js'
 import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX } from '../ui/scenery.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
+import { Music } from '../audio/music.js'
 import { fmt } from '../util/format.js'
 
 const PANEL_W = 320
@@ -37,6 +38,7 @@ export default class BattleScene extends Phaser.Scene {
     this.buildArena()
     this.buildPanel()
     applyPostFX(this, true, 0.65)
+    Music.play(this, 'bgm_battle')
 
     const heroScale = 2.1
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO

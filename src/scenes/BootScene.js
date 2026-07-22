@@ -6,10 +6,17 @@ import { SCENES } from '../config.js'
 import { generateTextures } from '../gfx/textures.js'
 import { State } from '../state/GameState.js'
 import { Platform } from '../platform/yandex.js'
+import { Music } from '../audio/music.js'
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
     super(SCENES.BOOT)
+  }
+
+  preload() {
+    // Опциональная фоновая музыка (public/music/*). Нет файлов — тихо пропускаем.
+    this.load.on('loaderror', () => { /* нет трека — не страшно */ })
+    Music.queue(this.load)
   }
 
   create() {

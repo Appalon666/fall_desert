@@ -7,6 +7,7 @@ import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, panel, applyPostFX } from '../ui/scenery.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
+import { Music } from '../audio/music.js'
 import { fmt, fmtDuration } from '../util/format.js'
 
 export default class HubScene extends Phaser.Scene {
@@ -18,6 +19,7 @@ export default class HubScene extends Phaser.Scene {
     // Атмосферный фон
     buildBackground(this, { sky: 0x2c2416, ground: 0x3a2a18, accent: 0xc9a76a }, { groundY: GAME.HEIGHT * 0.82 })
     applyPostFX(this, true, 0.45)
+    Music.play(this, 'bgm_menu')
 
     // Заголовок
     titleText(this, cx, 76, 'ЯДРЁН-ПУСТОШЬ', { size: 54 })
@@ -37,7 +39,7 @@ export default class HubScene extends Phaser.Scene {
     createButton(this, GAME.WIDTH - 100, 160, { label: '❔ Как играть', width: 170, height: 38, fontSize: 15, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.showHowTo() })
     // Переключатель звука
     const muteTxt = this.add.text(GAME.WIDTH - 20, 128, Sfx.muted ? '🔇 Звук выкл' : '🔊 Звук вкл', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.sand }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
-    muteTxt.on('pointerup', () => { const m = Sfx.toggleMute(); muteTxt.setText(m ? '🔇 Звук выкл' : '🔊 Звук вкл') })
+    muteTxt.on('pointerup', () => { const m = Sfx.toggleMute(); Music.setMuted(m); muteTxt.setText(m ? '🔇 Звук выкл' : '🔊 Звук вкл') })
 
     // Герой + полоска опыта
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
