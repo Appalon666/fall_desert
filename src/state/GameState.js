@@ -75,6 +75,10 @@ class GameState extends Phaser.Events.EventEmitter {
   // ---------- классы ----------
   classDef() { return this.heroClass ? CLASS_BY_ID[this.heroClass] : null }
   classBonus(stat) { const c = this.classDef(); return (c && c.bonus[stat]) || 0 }
+  // Сигнатурные механики классов (с безопасными дефолтами).
+  classPierce() { const c = this.classDef(); return (c && c.pierce) || 1 }
+  classLifesteal() { const c = this.classDef(); return (c && c.lifesteal) || 0 }
+  classOfflineBonus() { const c = this.classDef(); return (c && c.offlineBonus) || 0 }
   chooseClass(id) {
     const c = CLASS_BY_ID[id]
     if (!c) return false
@@ -327,7 +331,8 @@ class GameState extends Phaser.Events.EventEmitter {
     const now = Date.now()
     const away = Math.max(0, (now - this.lastSeen) / 1000)
     const capped = Math.min(away, BAL.offlineCapSeconds)
-    const caps = Math.floor(this.allyDps() * CAPS_PER_DPS * BAL.offlineFactor * capped)
+    const factor = BAL.offlineFactor * (1 + this.classOfflineBonus())
+    const caps = Math.floor(this.allyDps() * CAPS_PER_DPS * factor * capped)
     return { seconds: away, caps }
   }
   claimOffline() {

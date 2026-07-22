@@ -222,9 +222,11 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // Ближайший к точке живой враг в радиусе r (для попадания пули).
-  nearestEnemy(x, y, r) {
+  // skip — Set уже пробитых этой пулей врагов (не бьём дважды).
+  nearestEnemy(x, y, r, skip) {
     let best = null, bd = r * r
     for (const e of this.enemies) {
+      if (skip && skip.has(e)) continue
       const dx = e.sprite.x - x, dy = e.sprite.y - y
       const d = dx * dx + dy * dy
       if (d < bd) { bd = d; best = e }
@@ -247,6 +249,8 @@ export default class BattleScene extends Phaser.Scene {
     const speed = 1500
     b.vx = Math.cos(ang) * speed
     b.vy = Math.sin(ang) * speed
+    b.pierceLeft = State.classPierce() // сколько врагов пробьёт (Стрелок > 1)
+    b.hitSet = new Set()               // кого уже задела эта пуля
     this.bullets.push(b)
 
     const flash = this.add.image(this.muzzle.x, this.muzzle.y, TEX.GLOW).setTint(0xffe08a).setScale(0.85).setDepth(20).setBlendMode('ADD')
@@ -260,6 +264,16 @@ export default class BattleScene extends Phaser.Scene {
     if (crit) dmg *= BAL.critMultiplier
     dmg = Math.max(1, Math.round(dmg))
     e.hp -= dmg
+
+    // Вампиризм (Бугай): часть урона возвращается в HP.
+    const ls = State.classLifesteal()
+    if (ls > 0) {
+      const maxHp = State.heroMaxHp()
+      if (State.hp < maxHp) {
+        const heal = Math.min(maxHp - State.hp, dmg * ls)
+        if (heal >= 1) { State.hp += heal; this.floatText(this.hero.x + 20, this.hero.y - 70, `+${fmt(Math.round(heal))}`, '#6fe36f', 16) }
+      }
+    }
 
     State.combo++
     this.lastHitTime = this.time.now
@@ -463,10 +477,15 @@ export default class BattleScene extends Phaser.Scene {
         const t = this.add.image(b.x, b.y, TEX.DOT).setTint(0xffe08a).setScale(0.55).setDepth(29).setBlendMode('ADD').setAlpha(0.5)
         this.tweens.add({ targets: t, alpha: 0, scale: 0.1, duration: 150, onComplete: () => t.destroy() })
       }
-      let hit = false
-      const target = this.nearestEnemy(b.x, b.y, 46)
-      if (target) { this.hitEnemy(target, b.x, b.y); hit = true }
-      if (hit || b.x < 0 || b.x > this.arenaW || b.y < 0 || b.y > GAME.HEIGHT) {
+      const target = this.nearestEnemy(b.x, b.y, 46, b.hitSet)
+      let spent = false
+      if (target) {
+        b.hitSet.add(target)
+        this.hitEnemy(target, b.x, b.y)
+        b.pierceLeft--
+        if (b.pierceLeft <= 0) spent = true // пробитие кончилось — пуля гаснет
+      }
+      if (spent || b.x < 0 || b.x > this.arenaW || b.y < 0 || b.y > GAME.HEIGHT) {
         b.destroy(); this.bullets.splice(i, 1)
       }
     }

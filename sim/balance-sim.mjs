@@ -98,6 +98,8 @@ function runOne(classId, rng) {
   }
   function heroDie() { st.deaths++; st.killsInZone = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
 
+  const pierce = cls.pierce || 1
+  const lifesteal = cls.lifesteal || 0
   const cps = 3 + rng() * 2, acc = 0.9
   let clickAccum = 0, sinceSpend = 0
   const durations = []; let curStart = 0
@@ -112,8 +114,11 @@ function runOne(classId, rng) {
     while (clickAccum >= 1 && wave.length) {
       clickAccum -= 1; st.combo++
       st.ult = Math.min(BAL.ultMax, st.ult + BAL.ultChargePerHit)
-      wave[0].hp -= clickHit()
-      if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() }
+      const dmg = clickHit()
+      if (lifesteal > 0 && st.hp < heroMaxHp()) st.hp = Math.min(heroMaxHp(), st.hp + dmg * lifesteal)
+      // пробитие: урон по нескольким передним врагам
+      for (let p = 0; p < pierce && p < wave.length; p++) wave[p].hp -= dmg
+      for (let k = 0; k < wave.length;) { if (wave[k].hp <= 0) { killFront(wave[k]); wave.splice(k, 1) } else k++ }
     }
     // союзники — тоже по переднему
     if (wave.length) { wave[0].hp -= allyDps() * DT; if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() } }
