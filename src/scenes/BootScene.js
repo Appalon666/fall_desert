@@ -7,6 +7,7 @@ import { generateTextures } from '../gfx/textures.js'
 import { State } from '../state/GameState.js'
 import { Platform } from '../platform/yandex.js'
 import { Music } from '../audio/music.js'
+import { setLang } from '../i18n.js'
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -35,6 +36,7 @@ export default class BootScene extends Phaser.Scene {
     const proceed = () => {
       if (done) return
       done = true
+      setLang(Platform.lang()) // язык из Яндекс SDK (или браузера) до старта сцен
       State._started = true // с этого момента позднее облако не затирает сессию
       Platform.ready()
       // Первый вход без класса — на экран выбора класса, иначе в лагерь.

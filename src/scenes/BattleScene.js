@@ -18,6 +18,7 @@ import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, appl
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
+import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
 
 const PANEL_W = 320
@@ -65,11 +66,11 @@ export default class BattleScene extends Phaser.Scene {
     try { seen = localStorage.getItem('yp_tut_shoot') === '1' } catch (e) { /* */ }
     if (seen || State.totalKills > 0) return
     try { localStorage.setItem('yp_tut_shoot', '1') } catch (e) { /* */ }
-    const t = this.add.text(this.arenaW / 2, GAME.HEIGHT / 2 + 60,
-      'Целься по врагам и КЛИКАЙ — пуля бьёт ближайшего.\nВыбивай опасных первыми! Крышки трать в «Мастерской», Space — ульта (по всем).',
+    const tip = this.add.text(this.arenaW / 2, GAME.HEIGHT / 2 + 60,
+      t('Целься по врагам и КЛИКАЙ — пуля бьёт ближайшего.\nВыбивай опасных первыми! Крышки трать в «Мастерской», Space — ульта (по всем).'),
       { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '19px', color: CSS.paper, align: 'center', lineSpacing: 6, stroke: '#120d09', strokeThickness: 4 })
       .setOrigin(0.5).setDepth(70)
-    this.tweens.add({ targets: t, alpha: { from: 1, to: 0 }, delay: 4500, duration: 1400, onComplete: () => t.destroy() })
+    this.tweens.add({ targets: tip, alpha: { from: 1, to: 0 }, delay: 4500, duration: 1400, onComplete: () => tip.destroy() })
   }
 
   // ---------------- Арена и фон ----------------
@@ -144,17 +145,17 @@ export default class BattleScene extends Phaser.Scene {
       fontFamily: 'Trebuchet MS, sans-serif', fontSize: '20px', color: CSS.toxic, fontStyle: 'bold',
     }).setOrigin(0.5)
 
-    this.add.text(px + 22, 108, 'HP героя', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
+    this.add.text(px + 22, 108, t('HP героя'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
     this.hpBarW = PANEL_W - 48
     this.add.rectangle(px + 24, 130, this.hpBarW, 22, COLORS.ink).setOrigin(0)
     this.hpFill = this.add.rectangle(px + 26, 132, this.hpBarW - 4, 18, COLORS.blood).setOrigin(0)
     this.hpText = this.add.text(cx, 141, '', { fontFamily: 'monospace', fontSize: '13px', color: '#fff' }).setOrigin(0.5)
 
-    this.add.text(px + 22, 172, 'Заряд ульты', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
+    this.add.text(px + 22, 172, t('Заряд ульты'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
     this.add.rectangle(px + 24, 194, this.hpBarW, 22, COLORS.ink).setOrigin(0)
     this.ultFill = this.add.rectangle(px + 26, 196, 1, 18, COLORS.toxicDark).setOrigin(0)
     createButton(this, cx, 250, {
-      label: '☢  УЛЬТА (Space)', width: PANEL_W - 60, height: 46, fontSize: 18,
+      label: t('☢  УЛЬТА (Space)'), width: PANEL_W - 60, height: 46, fontSize: 18,
       color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => this.tryUlt(),
     })
 
@@ -163,7 +164,7 @@ export default class BattleScene extends Phaser.Scene {
     }).setOrigin(0)
 
     createButton(this, cx, GAME.HEIGHT - 50, {
-      label: '⟵ В лагерь', width: PANEL_W - 60, height: 50, fontSize: 20,
+      label: t('⟵ В лагерь'), width: PANEL_W - 60, height: 50, fontSize: 20,
       onClick: () => { State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.bestScore); this.scene.start(SCENES.HUB) },
     })
   }
@@ -406,7 +407,7 @@ export default class BattleScene extends Phaser.Scene {
   // ---------------- Ульта (AoE по волне) ----------------
   tryUlt() {
     if (State.ult < BAL.ultMax) {
-      this.floatText(this.arenaW / 2, 120, 'Ульта не заряжена', '#ff6a6a', 22)
+      this.floatText(this.arenaW / 2, 120, t('Ульта не заряжена'), '#ff6a6a', 22)
       return
     }
     if (this.enemies.length === 0) return // нет целей — не палим заряд впустую
@@ -453,9 +454,9 @@ export default class BattleScene extends Phaser.Scene {
   showDeathModal() {
     const cx = this.arenaW / 2, cy = GAME.HEIGHT / 2
     const ov = this.add.rectangle(0, 0, this.arenaW, GAME.HEIGHT, COLORS.ink, 0.72).setOrigin(0).setDepth(85).setInteractive()
-    const t = this.add.text(cx, cy - 90, 'Ты пал на пустоши', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: '#ff5a5a', fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(86)
+    const title = this.add.text(cx, cy - 90, t('Ты пал на пустоши'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: '#ff5a5a', fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(86)
     const revive = createButton(this, cx, cy - 6, {
-      label: '📺 Возродиться (реклама)', width: 340, height: 56, fontSize: 20,
+      label: t('📺 Возродиться (реклама)'), width: 340, height: 56, fontSize: 20,
       color: COLORS.toxicDark, hover: COLORS.toxic,
       onClick: () => Platform.showRewarded(() => {
         if (!this._deathModal) return
@@ -463,11 +464,11 @@ export default class BattleScene extends Phaser.Scene {
       }),
     })
     const give = createButton(this, cx, cy + 66, {
-      label: 'Смириться (откат зоны)', width: 340, height: 50, fontSize: 18,
+      label: t('Смириться (откат зоны)'), width: 340, height: 50, fontSize: 18,
       onClick: () => { this.closeDeathModal(); State.onHeroDeath(); this.spawnWave() },
     })
     revive.setDepth(86); give.setDepth(86)
-    this._deathModal = [ov, t, revive, give]
+    this._deathModal = [ov, title, revive, give]
   }
   closeDeathModal() {
     if (this._deathModal) { this._deathModal.forEach(o => o.destroy()); this._deathModal = null }
@@ -518,7 +519,7 @@ export default class BattleScene extends Phaser.Scene {
     const bg = this.add.graphics()
     bg.fillStyle(COLORS.ink, 0.75); bg.fillRoundedRect(-220, -34, 440, 68, 10)
     bg.lineStyle(3, 0xff5a3c, 0.9); bg.strokeRoundedRect(-220, -34, 440, 68, 10)
-    const t1 = this.add.text(0, -12, '☠  БОСС-ВОРОТА', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: '#ff6a4a', fontStyle: 'bold' }).setOrigin(0.5)
+    const t1 = this.add.text(0, -12, t('☠  БОСС-ВОРОТА'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: '#ff6a4a', fontStyle: 'bold' }).setOrigin(0.5)
     const t2 = this.add.text(0, 16, name, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0.5)
     c.add([bg, t1, t2])
     c.setScale(0.7)
@@ -600,7 +601,7 @@ export default class BattleScene extends Phaser.Scene {
     this.capsText.setText(fmt(this.capsShown))
 
     const mult = State.comboMult()
-    this.comboText.setText(State.combo > 0 ? `Комбо x${mult.toFixed(2)} (${State.combo})` : '')
+    this.comboText.setText(State.combo > 0 ? t('Комбо x{m} ({n})', { m: mult.toFixed(2), n: State.combo }) : '')
 
     const maxHp = State.heroMaxHp()
     this.hpFill.width = Math.max(0, (this.hpBarW - 4) * Phaser.Math.Clamp(State.hp / maxHp, 0, 1))
@@ -611,14 +612,14 @@ export default class BattleScene extends Phaser.Scene {
     this.ultFill.setFillStyle(full ? COLORS.toxic : COLORS.toxicDark)
     this.ultFill.setAlpha(full ? 0.55 + 0.45 * Math.abs(Math.sin(this.time.now / 180)) : 1)
 
-    this.zoneLabel.setText(`ЗОНА ${State.zoneIndex + 1} · ${this.zone.name.toUpperCase()}`)
-    const prog = State.bossActive ? 'БОСС-ВОРОТА!' : `Зачистка: ${State.killsInZone}/${BAL.zoneKills}`
-    this.progressLabel.setText(`${prog}   ·   Всего убито: ${State.totalKills}`)
+    this.zoneLabel.setText(t('ЗОНА {z} · {name}', { z: State.zoneIndex + 1, name: this.zone.name.toUpperCase() }))
+    const prog = State.bossActive ? t('БОСС-ВОРОТА!') : t('Зачистка: {a}/{b}', { a: State.killsInZone, b: BAL.zoneKills })
+    this.progressLabel.setText(t('{prog}   ·   Всего убито: {t}', { prog, t: State.totalKills }))
 
     this.statsText.setText([
-      `Урон клика: ${fmt(State.clickDamage(false))}`,
-      `Крит: ${(State.critChance() * 100).toFixed(0)}%`,
-      `Союзники: ${fmt(State.allyDps())}/сек`,
+      t('Урон клика: {n}', { n: fmt(State.clickDamage(false)) }),
+      t('Крит: {n}%', { n: (State.critChance() * 100).toFixed(0) }),
+      t('Союзники: {n}/сек', { n: fmt(State.allyDps()) }),
     ].join('\n'))
   }
 }

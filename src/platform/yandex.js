@@ -44,6 +44,14 @@ class YandexPlatform {
     })
   }
 
+  // Язык игрока по правилам Яндекса: из SDK (environment.i18n.lang), иначе из
+  // языка браузера. Возвращает ISO-код ('ru','en',...); дефолт 'ru'.
+  lang() {
+    try { const l = this.ya?.environment?.i18n?.lang; if (l) return l } catch (e) { /* */ }
+    try { const n = (navigator.language || navigator.userLanguage || 'ru'); return n } catch (e) { /* */ }
+    return 'ru'
+  }
+
   // Сообщить платформе, что игра загрузилась / началась / приостановилась.
   ready() { try { this.ya?.features?.LoadingAPI?.ready() } catch (e) { /* */ } }
   gameplayStart() { try { this.ya?.features?.GameplayAPI?.start() } catch (e) { /* */ } }

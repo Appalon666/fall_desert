@@ -8,6 +8,7 @@ import { buildBackground, titleText, panel, applyPostFX } from '../ui/scenery.js
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
+import { t } from '../i18n.js'
 import { fmt, fmtDuration } from '../util/format.js'
 
 export default class HubScene extends Phaser.Scene {
@@ -22,57 +23,57 @@ export default class HubScene extends Phaser.Scene {
     Music.play(this, 'bgm_menu')
 
     // Заголовок
-    titleText(this, cx, 76, 'ЯДРЁН-ПУСТОШЬ', { size: 54 })
-    this.add.text(cx, 124, 'Крышки, пули и абсурд', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: CSS.rust, fontStyle: 'bold' }).setOrigin(0.5)
+    titleText(this, cx, 76, t('ЯДРЁН-ПУСТОШЬ'), { size: 54 })
+    this.add.text(cx, 124, t('Крышки, пули и абсурд'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '24px', color: CSS.rust, fontStyle: 'bold' }).setOrigin(0.5)
 
     // Крышки (крупно, слева сверху)
     this.add.image(60, 44, TEX.CAP).setScale(1.6)
     this.add.text(86, 44, fmt(State.caps), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
     if (State.cores > 0) {
-      this.add.text(60, 82, `☢ ${fmt(State.cores)} ядер`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: '#b6ff5a', fontStyle: 'bold' }).setOrigin(0, 0.5)
+      this.add.text(60, 82, `☢ ${t('{n} ядер', { n: fmt(State.cores) })}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: '#b6ff5a', fontStyle: 'bold' }).setOrigin(0, 0.5)
     }
 
     // Рекорд
-    this.add.text(GAME.WIDTH - 20, 30, `Рекорд: ${fmt(State.bestScore)} убийств`, { fontFamily: 'monospace', fontSize: '16px', color: CSS.sand }).setOrigin(1, 0.5)
-    this.add.text(GAME.WIDTH - 20, 54, `Зона ${State.zoneIndex + 1} · ур. ${State.hero.level}`, { fontFamily: 'monospace', fontSize: '16px', color: '#cbb98e' }).setOrigin(1, 0.5)
-    createButton(this, GAME.WIDTH - 100, 92, { label: '🏆 Рекорды', width: 170, height: 38, fontSize: 15, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
-    createButton(this, GAME.WIDTH - 100, 160, { label: '❔ Как играть', width: 170, height: 38, fontSize: 15, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.showHowTo() })
+    this.add.text(GAME.WIDTH - 20, 30, t('Рекорд: {n} убийств', { n: fmt(State.bestScore) }), { fontFamily: 'monospace', fontSize: '16px', color: CSS.sand }).setOrigin(1, 0.5)
+    this.add.text(GAME.WIDTH - 20, 54, t('Зона {z} · ур. {l}', { z: State.zoneIndex + 1, l: State.hero.level }), { fontFamily: 'monospace', fontSize: '16px', color: '#cbb98e' }).setOrigin(1, 0.5)
+    createButton(this, GAME.WIDTH - 100, 92, { label: t('🏆 Рекорды'), width: 170, height: 38, fontSize: 15, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
+    createButton(this, GAME.WIDTH - 100, 160, { label: t('❔ Как играть'), width: 170, height: 38, fontSize: 15, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.showHowTo() })
     // Переключатель звука
-    const muteTxt = this.add.text(GAME.WIDTH - 20, 128, Sfx.muted ? '🔇 Звук выкл' : '🔊 Звук вкл', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.sand }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
-    muteTxt.on('pointerup', () => { const m = Sfx.toggleMute(); Music.setMuted(m); muteTxt.setText(m ? '🔇 Звук выкл' : '🔊 Звук вкл') })
+    const muteTxt = this.add.text(GAME.WIDTH - 20, 128, Sfx.muted ? t('🔇 Звук выкл') : t('🔊 Звук вкл'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '15px', color: CSS.sand }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true })
+    muteTxt.on('pointerup', () => { const m = Sfx.toggleMute(); Music.setMuted(m); muteTxt.setText(m ? t('🔇 Звук выкл') : t('🔊 Звук вкл')) })
 
     // Герой + полоска опыта
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
     const hero = this.add.image(cx - 360, 456, heroTex).setScale(2.3 / TEX_SS)
     this.tweens.add({ targets: hero, y: hero.y - 6, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
     const xpW = 300, xpX = cx - 510, xpY = 610
-    this.add.text(xpX, xpY - 24, `Уровень ${State.hero.level}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0)
+    this.add.text(xpX, xpY - 24, t('Уровень {l}', { l: State.hero.level }), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0)
     this.add.rectangle(xpX, xpY, xpW, 18, COLORS.ink).setOrigin(0)
     this.add.rectangle(xpX + 2, xpY + 2, (xpW - 4) * Phaser.Math.Clamp(State.hero.xp / State.xpToNext(), 0, 1), 14, COLORS.toxic).setOrigin(0)
     if (State.hero.points > 0) {
-      this.add.text(xpX + xpW + 14, xpY + 8, `+${State.hero.points} очков!`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '16px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
+      this.add.text(xpX + xpW + 14, xpY + 8, t('+{n} очков!', { n: State.hero.points }), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '16px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
     }
 
     // Кнопки навигации
     const bx = cx + 130
     let by = 250
     const gap = 74
-    createButton(this, bx, by, { label: '⚔  ПОХОД', width: 340, height: 66, fontSize: 30, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => this.scene.start(SCENES.BATTLE) })
+    createButton(this, bx, by, { label: t('⚔  ПОХОД'), width: 340, height: 66, fontSize: 30, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => this.scene.start(SCENES.BATTLE) })
     by += gap + 6
-    createButton(this, bx, by, { label: '🔧  Апгрейды и союзники', width: 340, height: 58, onClick: () => this.scene.start(SCENES.SHOP) })
+    createButton(this, bx, by, { label: t('🔧  Апгрейды и союзники'), width: 340, height: 58, onClick: () => this.scene.start(SCENES.SHOP) })
     by += gap
-    createButton(this, bx, by, { label: '🎒  Инвентарь', width: 340, height: 58, onClick: () => this.scene.start(SCENES.INVENTORY) })
+    createButton(this, bx, by, { label: t('🎒  Инвентарь'), width: 340, height: 58, onClick: () => this.scene.start(SCENES.INVENTORY) })
     by += gap
-    createButton(this, bx, by, { label: '🔨  Верстак (крафт)', width: 340, height: 58, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.scene.start(SCENES.FORGE) })
+    createButton(this, bx, by, { label: t('🔨  Верстак (крафт)'), width: 340, height: 58, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.scene.start(SCENES.FORGE) })
     by += gap
     createButton(this, bx, by, {
-      label: State.hero.points > 0 ? `🦸  Герой (+${State.hero.points})` : '🦸  Герой',
+      label: State.hero.points > 0 ? t('🦸  Герой (+{n})', { n: State.hero.points }) : t('🦸  Герой'),
       width: 340, height: 58, color: State.hero.points > 0 ? COLORS.rustLight : COLORS.rust,
       onClick: () => this.scene.start(SCENES.HERO),
     })
     by += gap
     createButton(this, bx, by, {
-      label: State.canPrestige() ? `☢  Перерождение (+${State.coresFromRun()})` : '☢  Перерождение',
+      label: State.canPrestige() ? t('☢  Перерождение (+{n})', { n: State.coresFromRun() }) : t('☢  Перерождение'),
       width: 340, height: 58,
       color: State.canPrestige() ? COLORS.toxicDark : COLORS.rust, hover: COLORS.toxic,
       onClick: () => this.scene.start(SCENES.PRESTIGE),
@@ -104,7 +105,7 @@ export default class HubScene extends Phaser.Scene {
     const w = 760, h = 470
     const g = panel(this, cx - w / 2, cy - h / 2, w, h, { fill: COLORS.steelDark, border: COLORS.cap, borderAlpha: 0.8 })
     g.setDepth(91)
-    const title = this.add.text(cx, cy - h / 2 + 34, '❔  КАК ИГРАТЬ', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(92)
+    const title = this.add.text(cx, cy - h / 2 + 34, t('❔  КАК ИГРАТЬ'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(92)
     const lines = [
       '🖱  КЛИК / ТАП по врагу — выстрел. Пуля бьёт БЛИЖАЙШЕГО — целься в опасных.',
       '☢  SPACE или кнопка УЛЬТА — залп по ВСЕЙ волне (копится от попаданий).',
@@ -115,11 +116,11 @@ export default class HubScene extends Phaser.Scene {
       '🎁  С врагов падает лут → «Инвентарь» и «Верстак» (крафт за металлолом).',
       '☢  «Перерождение» — сброс забега ради вечных бонусов (Ядра). Мета-цель.',
       '⚠️  Враги крепнут по мере твоего роста — качайся и не зевай удары!',
-    ]
+    ].map(l => t(l))
     const body = this.add.text(cx - w / 2 + 40, cy - h / 2 + 76, lines.join('\n\n'), {
       fontFamily: 'Trebuchet MS, sans-serif', fontSize: '17px', color: CSS.paper, lineSpacing: 2, wordWrap: { width: w - 80 },
     }).setOrigin(0, 0).setDepth(92)
-    const close = createButton(this, cx, cy + h / 2 - 34, { label: 'Понятно!', width: 220, height: 46, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { ov.destroy(); g.destroy(); title.destroy(); body.destroy(); close.destroy() } })
+    const close = createButton(this, cx, cy + h / 2 - 34, { label: t('Понятно!'), width: 220, height: 46, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { ov.destroy(); g.destroy(); title.destroy(); body.destroy(); close.destroy() } })
     close.setDepth(92)
   }
 
@@ -134,13 +135,13 @@ export default class HubScene extends Phaser.Scene {
     const bg = this.add.graphics()
     bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(-230, -130, 460, 260, 14)
     bg.lineStyle(3, COLORS.cap, 0.8); bg.strokeRoundedRect(-230, -130, 460, 260, 14)
-    const t1 = this.add.text(0, -90, 'С возвращением, выживший!', { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
-    const t2 = this.add.text(0, -40, `Отряд работал ${fmtDuration(res.seconds)}\nи собрал:`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: CSS.paper, align: 'center' }).setOrigin(0.5)
+    const t1 = this.add.text(0, -90, t('С возвращением, выживший!'), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '22px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
+    const t2 = this.add.text(0, -40, t('Отряд работал {t}\nи собрал:', { t: fmtDuration(res.seconds) }), { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '18px', color: CSS.paper, align: 'center' }).setOrigin(0.5)
     const cap = this.add.image(-40, 30, TEX.CAP).setScale(1.6)
     const t3 = this.add.text(-10, 30, `+${fmt(res.caps)}`, { fontFamily: 'Trebuchet MS, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
     box.add([bg, t1, t2, cap, t3])
     const close = () => { overlay.destroy(); box.destroy(); take.destroy(); dbl.destroy() }
-    const take = createButton(this, cx - 108, cy + 95, { label: 'Забрать', width: 180, height: 50, onClick: close })
+    const take = createButton(this, cx - 108, cy + 95, { label: t('Забрать'), width: 180, height: 50, onClick: close })
     const dbl = createButton(this, cx + 108, cy + 95, {
       label: '📺 ×2', width: 180, height: 50, color: COLORS.toxicDark, hover: COLORS.toxic,
       onClick: () => { Platform.showRewarded(() => State.addCaps(res.caps)); close() },
