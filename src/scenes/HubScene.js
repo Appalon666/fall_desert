@@ -75,14 +75,16 @@ export default class HubScene extends Phaser.Scene {
       onClick: () => this.scene.start(SCENES.PRESTIGE),
     })
 
-    this.add.text(cx, GAME.HEIGHT - 20, 'v0.1.0 — Этапы 1-6', { fontFamily: 'monospace', fontSize: '13px', color: '#9a8c70' }).setOrigin(0.5)
+    this.add.text(cx, GAME.HEIGHT - 20, 'v0.2.0', { fontFamily: 'monospace', fontSize: '13px', color: '#9a8c70' }).setOrigin(0.5)
 
-    // Debug: мгновенный сброс прогресса
-    createButton(this, 110, GAME.HEIGHT - 30, {
-      label: '⟲ Сброс (debug)', width: 190, height: 38, fontSize: 15,
-      color: COLORS.blood, hover: 0xc23b3b,
-      onClick: () => { State.wipe(); this.scene.start(SCENES.CLASS_SELECT) },
-    })
+    // Debug-сброс прогресса — только в dev-сборке (Vite вырежет в проде).
+    if (import.meta.env?.DEV) {
+      createButton(this, 110, GAME.HEIGHT - 30, {
+        label: '⟲ Сброс (debug)', width: 190, height: 38, fontSize: 15,
+        color: COLORS.blood, hover: 0xc23b3b,
+        onClick: () => { State.wipe(); this.scene.start(SCENES.CLASS_SELECT) },
+      })
+    }
 
     // Офлайн-доход
     this.showOfflineReward()

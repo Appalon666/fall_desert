@@ -50,6 +50,10 @@ export default class BattleScene extends Phaser.Scene {
     this.applyZoneVisuals()
     this.spawnWave()
     this.maybeTutorial()
+
+    // Яндекс: активный геймплей начался; на выходе из сцены — остановить.
+    Platform.gameplayStart()
+    this.events.once('shutdown', () => Platform.gameplayStop())
   }
 
   maybeTutorial() {

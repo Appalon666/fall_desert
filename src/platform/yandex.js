@@ -13,6 +13,7 @@ class YandexPlatform {
     this.lb = null
     this._initP = null
     this._lastCloud = 0
+    this._lastAd = Date.now() // не показываем межстраничную сразу после загрузки
   }
 
   init() {
@@ -82,10 +83,13 @@ class YandexPlatform {
     } catch (e) { this.gameplayStart(); reward(); closed() }
   }
 
-  // Межстраничная реклама (Яндекс сам соблюдает мин. интервал).
-  // Пауза геймплея на время показа, снятие — в onClose/onError.
+  // Межстраничная реклама. Клиентский троттлинг ≥75с (Яндекс требует ≥60с и
+  // не одобряет частый показ; зоны могут сменяться чаще). Пауза геймплея.
   showInterstitial() {
     if (!this.available || !this.ya?.adv) return
+    const now = Date.now()
+    if (now - this._lastAd < 75000) return
+    this._lastAd = now
     this.gameplayStop()
     try {
       this.ya.adv.showFullscreenAdv({
