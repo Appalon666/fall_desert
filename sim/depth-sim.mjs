@@ -116,6 +116,7 @@ function runOne(classId, rng) {
   let clickAccum = 0, sinceSpend = 0
   const prestigeTimes = []; const prestigeZones = []; let maxZone = 0
   let lastZoneT = 0 // когда в последний раз взяли НОВУЮ зону
+  let firstCoreT = null // когда впервые стал доступен престиж (coresFromRun>=1)
   spawnWave()
 
   for (let t = 0; t < SESSION; t += DT) {
@@ -145,31 +146,37 @@ function runOne(classId, rng) {
       }
     }
     if (st.zoneIndex > maxZone) maxZone = st.zoneIndex
+    if (firstCoreT === null && coresFromRun() >= 1) firstCoreT = t
   }
 
-  return { classId, maxZone, prestigeCount: meta.prestigeCount, cores: meta.cores, prestige: meta.prestige, prestigeTimes, prestigeZones, level: st.hero.level, legacy: meta.prestige.legacy }
+  return { classId, maxZone, prestigeCount: meta.prestigeCount, cores: meta.cores, prestige: meta.prestige, prestigeTimes, prestigeZones, level: st.hero.level, legacy: meta.prestige.legacy, firstCoreT }
 }
 
 function fmtT(s) { if (s == null) return '—'; const m = Math.floor(s / 60), sec = Math.round(s % 60); return `${m}м${String(sec).padStart(2, '0')}` }
 const med = arr => { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length / 2)] }
 
-console.log(`\n=== ГЛУБИНА: ${RUNS} прогонов по ${SESSION / 60} мин с престижем (новая модель) ===\n`)
-console.log('Класс     | maxЗона | Престижей | Ядра | Legacy ур. | 1й престиж | Ур.')
-console.log('-'.repeat(76))
+const PER_CLASS = 8
+console.log(`\n=== ГЛУБИНА ПО КЛАССАМ: ${PER_CLASS} прогонов/класс по ${SESSION / 60} мин с престижем ===\n`)
+console.log('Класс     | 1е Ядро | 1й престиж | Престижей | Ядра всего | Legacy | maxЗона')
+console.log('-'.repeat(80))
 let seed = 777
-const rows = []
-for (let i = 0; i < RUNS; i++) {
-  const cls = CLASSES[i % CLASSES.length]
-  const r = runOne(cls.id, mulberry32(seed++))
-  rows.push(r)
-  console.log(`${cls.name.padEnd(9)} | ${String(r.maxZone).padStart(7)} | ${String(r.prestigeCount).padStart(9)} | ${String(r.cores).padStart(4)} | ${String(r.legacy).padStart(10)} | ${fmtT(r.prestigeTimes[0]).padStart(10)} | ${r.level}`)
+const byClass = {}
+for (const cls of CLASSES) {
+  const runs = []
+  for (let i = 0; i < PER_CLASS; i++) runs.push(runOne(cls.id, mulberry32(seed++)))
+  byClass[cls.id] = runs
+  const g = k => med(runs.map(r => r[k]))
+  const firstCore = med(runs.map(r => r.firstCoreT).filter(x => x != null))
+  const firstPr = med(runs.map(r => r.prestigeTimes[0]).filter(x => x != null))
+  console.log(`${cls.name.padEnd(9)} | ${fmtT(firstCore).padStart(7)} | ${fmtT(firstPr).padStart(10)} | ${String(g('prestigeCount')).padStart(9)} | ${String(g('cores')).padStart(10)} | ${String(g('legacy')).padStart(6)} | ${g('maxZone')}`)
 }
 
-console.log('\n--- Вывод по долговременности ---')
-console.log(`Макс. зона за 2ч (медиана): ${med(rows.map(r => r.maxZone))}`)
-console.log(`Престижей за 2ч (медиана): ${med(rows.map(r => r.prestigeCount))}   (цель: 3-12 — веха, не спам)`)
-console.log(`Первый престиж (медиана): ${fmtT(med(rows.map(r => r.prestigeTimes[0]).filter(x => x != null)))}   (цель: 15-40 мин)`)
-console.log(`Legacy-уровней (медиана): ${med(rows.map(r => r.legacy))}   (мета компаундится, если растёт)`)
-// Глубина стены от забега к забегу (первый прогон): растёт ли?
-const wallDepths = rows[0].prestigeZones
-console.log(`Глубина стены по забегам (прогон 1): ${wallDepths.join(' → ') || '—'}   (должна расти → компаунд)`)
+const all = Object.values(byClass).flat()
+console.log('\n--- Реально ли дойти до Ядра? ---')
+const reachedCore = all.filter(r => r.firstCoreT != null).length
+const didPrestige = all.filter(r => r.prestigeCount > 0).length
+console.log(`Дошли до первого Ядра (престиж доступен): ${reachedCore}/${all.length} прогонов`)
+console.log(`Реально переродились хотя бы раз: ${didPrestige}/${all.length} прогонов`)
+console.log(`Медиана времени до первого Ядра: ${fmtT(med(all.map(r => r.firstCoreT).filter(x => x != null)))}`)
+console.log(`Медиана времени до 1-го престижа: ${fmtT(med(all.map(r => r.prestigeTimes[0]).filter(x => x != null)))}`)
+console.log(`Глубина стены по забегам (пример): ${(byClass.gunner[0].prestigeZones).join(' → ') || '—'}`)

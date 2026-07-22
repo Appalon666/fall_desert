@@ -36,10 +36,11 @@ export default class HubScene extends Phaser.Scene {
     // Рекорд
     this.add.text(GAME.WIDTH - 20, 30, t('Рекорд: {n} убийств', { n: fmt(State.bestScore) }), { fontFamily: 'monospace', fontSize: '16px', color: CSS.sand }).setOrigin(1, 0.5)
     this.add.text(GAME.WIDTH - 20, 54, t('Зона {z} · ур. {l}', { z: State.zoneIndex + 1, l: State.hero.level }), { fontFamily: 'monospace', fontSize: '16px', color: '#cbb98e' }).setOrigin(1, 0.5)
-    createButton(this, GAME.WIDTH - 100, 92, { label: t('🏆 Рекорды'), width: 170, height: 38, fontSize: 15, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
-    createButton(this, GAME.WIDTH - 100, 160, { label: t('❔ Как играть'), width: 170, height: 38, fontSize: 15, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.showHowTo() })
-    // Настройки (громкость звука/музыки, мьют)
-    createButton(this, GAME.WIDTH - 100, 128, { label: t('⚙ Настройки'), width: 170, height: 38, fontSize: 15, onClick: () => this.showSettings() })
+    // Компактные иконки-кнопки в ряд (рекорды / как играть / настройки)
+    const iy = 96, iw = 48, ig = 56
+    createButton(this, GAME.WIDTH - 40, iy, { label: '⚙', width: iw, height: 44, fontSize: 24, onClick: () => this.showSettings() })
+    createButton(this, GAME.WIDTH - 40 - ig, iy, { label: '❔', width: iw, height: 44, fontSize: 24, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.showHowTo() })
+    createButton(this, GAME.WIDTH - 40 - ig * 2, iy, { label: '🏆', width: iw, height: 44, fontSize: 24, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
 
     // Герой + полоска опыта
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
