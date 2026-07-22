@@ -127,6 +127,15 @@ export class GameState extends Emitter {
     const depth = this.zoneIndex + this.killsInZone / BAL.zoneKills
     return Math.floor(Math.pow(Math.max(0, depth), 1.6))
   }
+  // Масштаб врагов под ПЕРМАНЕНТНУЮ силу героя (мета). Иначе после престижа
+  // враги картонные (их HP считается от totalKills, что сброшено, а бонусы меты —
+  // нет). Берём ~70% прироста: накал сохраняется, но герой всё равно чуть сильнее
+  // → глубина от забега к забегу растёт (компаунд), а не обнуляется.
+  enemyMetaHpMul() {
+    const power = this.prestigeDamageMul() * Math.pow(1.15, this.prestige.quickstart)
+    return Math.pow(power, 0.7)
+  }
+  enemyMetaDmgMul() { return 1 + this.prestigeHpMul() * 0.7 }
   canPrestige() { return this.coresFromRun() >= 1 }
   doPrestige() {
     const gain = this.coresFromRun()

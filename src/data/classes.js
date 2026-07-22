@@ -11,8 +11,8 @@ export const CLASSES = [
   {
     id: 'gunner', name: 'Стрелок', icon: '🔫',
     desc: 'Мастер точного выстрела. Пули ПРОБИВАЮТ строй врагов насквозь.',
-    perks: ['🎯 пуля бьёт до 2 врагов', '+30% урон клика, +6% крит, +20% HP'],
-    bonus: { clickMul: 0.30, critChance: 0.06, hpMul: 0.20 },
+    perks: ['🎯 пуля бьёт до 2 врагов', '+30% урон клика, +6% крит, +35% HP'],
+    bonus: { clickMul: 0.30, critChance: 0.06, hpMul: 0.35 },
     pierce: 2,
     startStats: { str: 2, vit: 0, luck: 1 },
     startAllies: {}, lootLuck: 0,
