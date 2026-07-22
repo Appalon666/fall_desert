@@ -10,9 +10,9 @@ export const ENEMIES = {
   raider:   { name: 'Рейдер',     tint: 0x7a5230, scale: 2.1, hpMul: 1.2, rewardMul: 1.3, dmgMul: 1.2, speedMul: 1.1, flip: true },
   dog:      { name: 'Пёс-мутант', tint: 0x6b6b73, scale: 1.9, hpMul: 0.9, rewardMul: 1.0, dmgMul: 1.1, speedMul: 1.9, flip: true },
   lurker:   { name: 'Тень',       tint: 0x4a4358, scale: 2.0, hpMul: 1.0, rewardMul: 1.2, dmgMul: 1.3, speedMul: 1.3 },
-  spitter:  { name: 'Плевун',     tint: 0x5a7a26, scale: 2.0, hpMul: 1.1, rewardMul: 1.3, dmgMul: 1.1, speedMul: 0.9, flip: true },
+  spitter:  { name: 'Плевун',     tint: 0x5a7a26, scale: 2.0, hpMul: 1.1, rewardMul: 1.3, dmgMul: 1.1, speedMul: 0.9 },
   bloat:    { name: 'Пузырь',     tint: 0x8fbf6f, scale: 2.6, hpMul: 2.0, rewardMul: 1.8, dmgMul: 1.0, speedMul: 0.6 },
-  brute:    { name: 'Громила',    tint: 0x9c2b2b, scale: 2.8, hpMul: 2.6, rewardMul: 2.2, dmgMul: 1.8, speedMul: 0.7 },
+  brute:    { name: 'Громила',    tint: 0x9c2b2b, scale: 2.8, hpMul: 2.6, rewardMul: 2.2, dmgMul: 1.8, speedMul: 0.7, flip: true },
 }
 
 export const ENEMY_IDS = Object.keys(ENEMIES)
