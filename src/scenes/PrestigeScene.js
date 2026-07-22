@@ -12,7 +12,7 @@ const PRESTIGE = [
   { id: 'legacy', name: 'Наследие бойца', icon: '⚔️', desc: '+10% урон клика за уровень' },
   { id: 'stash', name: 'Схрон', icon: '🎒', desc: '+10% крышек за уровень' },
   { id: 'vitality', name: 'Крепкий род', icon: '❤️', desc: '+8% макс. HP за уровень' },
-  { id: 'quickstart', name: 'Быстрый старт', icon: '⚡', desc: '+500 стартовых крышек за уровень' },
+  { id: 'quickstart', name: 'Быстрый старт', icon: '⚡', desc: '+300 крышек и +1 ур. «Калибра» на старте за уровень' },
 ]
 
 export default class PrestigeScene extends Phaser.Scene {

@@ -414,12 +414,16 @@ export class GameState extends Emitter {
     // Гвардия от не-конечных чисел (Infinity/NaN из старых переполненных сейвов):
     // без неё «битое» число протекло бы обратно в игру.
     const fin = (n, def = 0) => (Number.isFinite(n) ? n : def)
+    // Санитайз словаря числовых значений (уровни апгрейдов/союзников/престижа).
+    const finMap = (o, def = 0) => { const r = {}; for (const k in (o || {})) r[k] = fin(o[k], def); return r }
+    const h = { level: 1, xp: 0, points: 0, str: 0, vit: 0, luck: 0, ...(d.hero || {}) }
+    for (const k in h) h[k] = fin(h[k], k === 'level' ? 1 : 0)
     Object.assign(this, {
       caps: fin(d.caps),
       heroClass: d.heroClass || null,
-      hero: { level: 1, xp: 0, points: 0, str: 0, vit: 0, luck: 0, ...(d.hero || {}) },
-      upgrades: d.upgrades || {},
-      allies: d.allies || {},
+      hero: h,
+      upgrades: finMap(d.upgrades),
+      allies: finMap(d.allies),
       equipment: { weapon: null, helmet: null, armor: null, boots: null, acc1: null, acc2: null, ...(d.equipment || {}) },
       inventory: d.inventory || [],
       scrap: fin(d.scrap),
@@ -428,7 +432,7 @@ export class GameState extends Emitter {
       totalKills: fin(d.totalKills),
       waveCount: fin(d.waveCount),
       cores: fin(d.cores),
-      prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0, ...(d.prestige || {}) },
+      prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0, ...finMap(d.prestige) },
       prestigeCount: fin(d.prestigeCount),
       bestScore: fin(d.bestScore),
       lastSeen: d.lastSeen || Date.now(),

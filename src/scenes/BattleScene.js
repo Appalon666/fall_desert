@@ -239,9 +239,12 @@ export default class BattleScene extends Phaser.Scene {
     const wave = State.waveScaleMul() // +1% за волну (HP и урон)
     // боссам прогрессию даём мягче (^0.6), иначе бой с воротами затягивается
     const prog = isBoss ? Math.pow(State.enemyProgMul(), 0.6) : State.enemyProgMul()
-    const hp = Math.ceil(base.hp * af.hp * mHp * prog * wave)
-    const reward = Math.ceil(base.reward * af.rew)
-    const dmg = base.dmg * af.dmg * mDmg * wave
+    // Кэпим ИТОГ (base уже закэплен, но множители могут пробить MAX_SAFE → Infinity
+    // → неубиваемый враг). Держим числа конечными.
+    const MAX = Number.MAX_SAFE_INTEGER
+    const hp = Math.min(MAX, Math.ceil(base.hp * af.hp * mHp * prog * wave))
+    const reward = Math.min(MAX, Math.ceil(base.reward * af.rew))
+    const dmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave)
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd
     const scale = isBoss ? BAL.bossScale : def.scale
     // строй: боссы выходят вплотную; обычные — колонной у правого края арены
@@ -460,7 +463,9 @@ export default class BattleScene extends Phaser.Scene {
       color: COLORS.toxicDark, hover: COLORS.toxic,
       onClick: () => Platform.showRewarded(() => {
         if (!this._deathModal) return
-        this.closeDeathModal(); State.hp = State.heroMaxHp(); this.spawnWave()
+        // Сбрасываем bossActive: если пали в бою с боссом, иначе он больше не
+        // заспавнится (bossDue гейтится bossActive) и зона застрянет навсегда.
+        this.closeDeathModal(); State.hp = State.heroMaxHp(); State.bossActive = false; this.spawnWave()
       }),
     })
     const give = createButton(this, cx, cy + 66, {
@@ -573,8 +578,8 @@ export default class BattleScene extends Phaser.Scene {
         if (e.attackTimer >= BAL.enemyAttackRate) {
           e.attackTimer = 0
           this.heroTakeDamage(e.dmg)
+          if (State.hp <= 0) break // герой мёртв → врагов уже уничтожили, не твиним
           this.tweens.add({ targets: e.sprite, x: e.sprite.x - 14, duration: 90, yoyo: true })
-          if (State.hp <= 0) break
         }
       }
       if (e.aura) { e.aura.x = e.sprite.x; e.aura.y = e.sprite.y }
