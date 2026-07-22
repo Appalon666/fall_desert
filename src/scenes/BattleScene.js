@@ -465,7 +465,8 @@ export default class BattleScene extends Phaser.Scene {
     })
     const give = createButton(this, cx, cy + 66, {
       label: t('Смириться (откат зоны)'), width: 340, height: 50, fontSize: 18,
-      onClick: () => { this.closeDeathModal(); State.onHeroDeath(); this.spawnWave() },
+      // Смерть без возрождения → межстраничная реклама Яндекса (сама троттлит ≥60с).
+      onClick: () => { this.closeDeathModal(); Platform.showInterstitial(); State.onHeroDeath(); this.spawnWave() },
     })
     revive.setDepth(86); give.setDepth(86)
     this._deathModal = [ov, title, revive, give]

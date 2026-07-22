@@ -21,9 +21,9 @@ export const CLASSES = [
   {
     id: 'brute', name: 'Бугай', icon: '🛡️',
     desc: 'Ходячий шкаф. Лечится от нанесённого урона и держит удар босса.',
-    perks: ['🩸 +6% урона возвращается в HP', '+50% макс. HP, старт +3 живучести'],
+    perks: ['🩸 +4.5% урона возвращается в HP', '+50% макс. HP, старт +3 живучести'],
     bonus: { hpMul: 0.5 },
-    lifesteal: 0.06,
+    lifesteal: 0.045,
     startStats: { str: 1, vit: 3, luck: 0 },
     startAllies: {}, lootLuck: 0,
     tex: 'tex-hero-brute', color: 0xc23b3b,
