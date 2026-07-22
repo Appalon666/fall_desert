@@ -61,11 +61,30 @@ export function rollItem(rng, level = 1, luckBonus = 0) {
   } else {
     value = +(0.05 * rarity.mul * (1 + level * 0.04)).toFixed(3)
   }
-  const name = `${choose(rng, PREFIX)} ${choose(rng, NOUN[slotDef.id])}`
-  return {
+  const nouns = NOUN[slotDef.id]
+  const nounIdx = Math.floor(rng() * nouns.length)
+  const name = `${choose(rng, PREFIX)} ${nouns[nounIdx]}`
+  const item = {
     uid: `${Date.now().toString(36)}${Math.floor(rng() * 1e9).toString(36)}`,
     slot: slotDef.id, rarity: rarity.id, name, stat, value, level,
   }
+  // Тип оружия (индекс NOUN.weapon) → визуал выстрела в бою.
+  if (slotDef.id === 'weapon') item.wtype = nounIdx
+  return item
+}
+
+// Визуал выстрела по типу оружия (порядок = NOUN.weapon). Только внешний вид,
+// на урон не влияет. Индекс по умолчанию 2 (пистоль) — когда оружие не надето.
+export const WEAPON_STYLES = [
+  { id: 'obrez', tint: 0xffb060, trail: 0xffcf8a, scale: 2.7, speed: 1500, spread: 0.05 },
+  { id: 'gvozdomet', tint: 0xcfd6e0, trail: 0xeef2f7, scale: 1.8, speed: 2050, spread: 0.02 },
+  { id: 'pistol', tint: 0xffe08a, trail: 0xfff0b0, scale: 2.2, speed: 1600, spread: 0.02 },
+  { id: 'drobovik', tint: 0xff9a4a, trail: 0xffc27a, scale: 2.5, speed: 1450, spread: 0.09 },
+  { id: 'samopal', tint: 0xff5a4a, trail: 0xff8a6a, scale: 2.6, speed: 1350, spread: 0.10 },
+]
+export function weaponStyleFor(item) {
+  const idx = (item && Number.isInteger(item.wtype)) ? item.wtype : 2
+  return WEAPON_STYLES[idx] || WEAPON_STYLES[2]
 }
 
 export const RARITY_BY_ID = Object.fromEntries(RARITIES.map(r => [r.id, r]))

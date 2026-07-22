@@ -7,7 +7,7 @@ import { BAL } from '../data/balance.js'
 import { UPGRADES, upgradeCost } from '../data/upgrades.js'
 import { ALLIES, allyCost } from '../data/allies.js'
 import { CLASS_BY_ID } from '../data/classes.js'
-import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, CRAFT_TIERS } from '../data/loot.js'
+import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, CRAFT_TIERS, weaponStyleFor } from '../data/loot.js'
 import { Platform } from '../platform/yandex.js'
 
 const SAVE_KEY = 'wasteland_save_v1'
@@ -118,6 +118,8 @@ export class GameState extends Emitter {
   capsBonus() { return this.equipSum('capsMul') + this.classBonus('capsMul') + this.prestigeCapsMul() }
   // Удача для дропа лута (характеристика + класс).
   lootLuck() { const c = this.classDef(); return this.hero.luck * 0.05 + (c ? c.lootLuck : 0) }
+  // Визуал выстрела по надетому оружию (без оружия — пистоль по умолчанию).
+  weaponStyle() { return weaponStyleFor(this.equipment.weapon) }
 
   // ---------- престиж ----------
   prestigeDamageMul() { return 1 + this.prestige.legacy * 0.12 }

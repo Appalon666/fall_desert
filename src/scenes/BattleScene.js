@@ -309,17 +309,20 @@ export default class BattleScene extends Phaser.Scene {
   // ---------------- Стрельба ----------------
   shoot(tx, ty) {
     Sfx.resume(); Sfx.shoot()
-    const b = this.add.image(this.muzzle.x, this.muzzle.y, TEX.BULLET).setScale(2.3 / TEX_SS).setBlendMode('ADD').setDepth(30)
-    const ang = Phaser.Math.Angle.Between(this.muzzle.x, this.muzzle.y, tx, ty)
+    const ws = State.weaponStyle() // визуал выстрела зависит от надетого оружия
+    const b = this.add.image(this.muzzle.x, this.muzzle.y, TEX.BULLET).setScale(ws.scale / TEX_SS).setTint(ws.tint).setBlendMode('ADD').setDepth(30)
+    let ang = Phaser.Math.Angle.Between(this.muzzle.x, this.muzzle.y, tx, ty)
+    ang += (Math.random() - 0.5) * ws.spread // лёгкий разброс по типу оружия
     b.setRotation(ang)
-    const speed = 1500
+    const speed = ws.speed
     b.vx = Math.cos(ang) * speed
     b.vy = Math.sin(ang) * speed
+    b.trailTint = ws.trail
     b.pierceLeft = State.classPierce() // сколько врагов пробьёт (Стрелок > 1)
     b.hitSet = new Set()               // кого уже задела эта пуля
     this.bullets.push(b)
 
-    const flash = this.add.image(this.muzzle.x, this.muzzle.y, TEX.GLOW).setTint(0xffe08a).setScale(0.85).setDepth(20).setBlendMode('ADD')
+    const flash = this.add.image(this.muzzle.x, this.muzzle.y, TEX.GLOW).setTint(ws.tint).setScale(0.85).setDepth(20).setBlendMode('ADD')
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 130, onComplete: () => flash.destroy() })
     this.tweens.add({ targets: this.hero, x: this.hero.x - 5, duration: 45, yoyo: true })
   }
@@ -543,8 +546,8 @@ export default class BattleScene extends Phaser.Scene {
       b.x += b.vx * dt; b.y += b.vy * dt
       b.trailToggle = !b.trailToggle
       if (b.trailToggle) {
-        const t = this.add.image(b.x, b.y, TEX.DOT).setTint(0xffe08a).setScale(0.55).setDepth(29).setBlendMode('ADD').setAlpha(0.5)
-        this.tweens.add({ targets: t, alpha: 0, scale: 0.1, duration: 150, onComplete: () => t.destroy() })
+        const tr = this.add.image(b.x, b.y, TEX.DOT).setTint(b.trailTint || 0xffe08a).setScale(0.55).setDepth(29).setBlendMode('ADD').setAlpha(0.5)
+        this.tweens.add({ targets: tr, alpha: 0, scale: 0.1, duration: 150, onComplete: () => tr.destroy() })
       }
       const target = this.nearestEnemy(b.x, b.y, 46, b.hitSet)
       let spent = false
