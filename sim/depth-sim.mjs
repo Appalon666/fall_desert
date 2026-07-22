@@ -88,8 +88,8 @@ function runOne(classId, rng) {
     wave = []
     for (let i = 0; i < count; i++) {
       const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
-      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.7)
-      const mDmg = 1 + pHp() * 0.7
+      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.85)
+      const mDmg = 1 + pHp() * 0.85
       const b = enemyStats(def, st.totalKills, boss)
       const hp = b.hp * af.hp * mHp, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg
       const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd

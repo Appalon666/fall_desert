@@ -133,9 +133,9 @@ export class GameState extends Emitter {
   // → глубина от забега к забегу растёт (компаунд), а не обнуляется.
   enemyMetaHpMul() {
     const power = this.prestigeDamageMul() * Math.pow(1.15, this.prestige.quickstart)
-    return Math.pow(power, 0.7)
+    return Math.pow(power, 0.85)
   }
-  enemyMetaDmgMul() { return 1 + this.prestigeHpMul() * 0.7 }
+  enemyMetaDmgMul() { return 1 + this.prestigeHpMul() * 0.85 }
   canPrestige() { return this.coresFromRun() >= 1 }
   doPrestige() {
     const gain = this.coresFromRun()
