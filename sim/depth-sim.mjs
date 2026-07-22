@@ -109,7 +109,7 @@ function runOne(classId, rng) {
     if (e.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
     else { st.totalKills++; st.killsInZone++ }
   }
-  function heroDie() { st.killsInZone = 0; st.waveCount = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
+  function heroDie() { st.killsInZone = Math.floor(st.killsInZone / 2); st.waveCount = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
 
   freshRun()
   const cps = 4, acc = 0.9

@@ -390,10 +390,13 @@ export class GameState extends Emitter {
     this.emit('zone')
     return true
   }
-  // Откат при смерти героя — теряем прогресс текущей зоны.
+  // Смерть героя: откатываем прогресс зоны НАПОЛОВИНУ (не в ноль — иначе при
+  // частых смертях игрок вечно перегринживает и не лезет выше; но и не бесплатно
+  // — иначе бесконечно долбится в непробиваемую стену). Теряем комбо/волну/ваве-
+  // рамп; HP восстанавливается. Рекламу показывает сцена.
   onHeroDeath() {
-    this.killsInZone = 0
-    this.waveCount = 0 // зона перезапускается — ваве-рамп с нуля
+    this.killsInZone = Math.floor(this.killsInZone / 2)
+    this.waveCount = 0
     this.bossActive = false
     this.hp = this.heroMaxHp()
     this.combo = 0
