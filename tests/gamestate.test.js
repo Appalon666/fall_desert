@@ -82,11 +82,11 @@ describe('волны / зоны / босс-ворота', () => {
     expect(s.killsInZone).toBe(0)
     expect(s.bossActive).toBe(false)
   })
-  it('смерть героя откатывает прогресс зоны, но не зону', () => {
+  it('смерть героя откатывает прогресс зоны наполовину, но не зону', () => {
     s.zoneIndex = 3; s.killsInZone = 50; s.bossActive = true; s.hp = 1
     s.onHeroDeath()
     expect(s.zoneIndex).toBe(3)
-    expect(s.killsInZone).toBe(0)
+    expect(s.killsInZone).toBe(25) // полуоткат, не в ноль
     expect(s.bossActive).toBe(false)
     expect(s.hp).toBe(s.heroMaxHp())
   })
