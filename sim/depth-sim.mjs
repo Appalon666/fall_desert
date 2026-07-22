@@ -88,10 +88,13 @@ function runOne(classId, rng) {
     wave = []
     for (let i = 0; i < count; i++) {
       const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
-      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.85)
-      const mDmg = 1 + pHp() * 0.85
+      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.45)
+      const mDmg = 1 + pHp() * 0.45
+      const lv = st.hero.level - 1
+      const progFull = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyZoneRamp, st.zoneIndex)
+      const prog = boss ? Math.pow(progFull, 0.6) : progFull
       const b = enemyStats(def, st.totalKills, boss)
-      const hp = b.hp * af.hp * mHp, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg
+      const hp = b.hp * af.hp * mHp * prog, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg
       const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
       const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed) + i * 0.6
       wave.push({ hp, reward, dmg, approach, attackAccum: 0, boss })

@@ -132,10 +132,20 @@ export class GameState extends Emitter {
   // нет). Берём ~70% прироста: накал сохраняется, но герой всё равно чуть сильнее
   // → глубина от забега к забегу растёт (компаунд), а не обнуляется.
   enemyMetaHpMul() {
+    // Мягко: основную «не-картонность» после престижа даёт enemyProgMul (уровень),
+    // здесь лишь небольшая добавка, чтобы глубина от престижа всё же росла.
     const power = this.prestigeDamageMul() * Math.pow(1.15, this.prestige.quickstart)
-    return Math.pow(power, 0.85)
+    return Math.pow(power, 0.45)
   }
-  enemyMetaDmgMul() { return 1 + this.prestigeHpMul() * 0.85 }
+  enemyMetaDmgMul() { return 1 + this.prestigeHpMul() * 0.45 }
+  // Прогрессия HP врагов по уровню героя и зоне — чтобы очки силы от левелапов
+  // не превращали мобов в картон. Ранний разгон до cap, затем мягкий хвост.
+  enemyProgMul() {
+    const lv = this.hero.level - 1
+    const ramp = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap))
+    const tail = Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap))
+    return ramp * tail * Math.pow(BAL.enemyZoneRamp, this.zoneIndex)
+  }
   canPrestige() { return this.coresFromRun() >= 1 }
   doPrestige() {
     const gain = this.coresFromRun()

@@ -52,25 +52,34 @@ function runOne(classId, rng) {
 
   st.hp = heroMaxHp()
 
+  // Агрессивный DPS-игрок: урон в приоритете, немного HP «на выживание».
   function spend() {
     let bought = true
     while (bought) {
       bought = false
-      const wantHp = upgLevel('hp') < upgLevel('damage') - 1
-      let hpCand = null, cheapest = null
-      for (const u of UPGRADES) {
-        const c = upgradeCost(u, upgLevel(u.id))
-        if (c <= st.caps) {
-          if (u.id === 'hp') hpCand = { type: 'u', ref: u, cost: c }
-          if (!cheapest || c < cheapest.cost) cheapest = { type: 'u', ref: u, cost: c }
-        }
-      }
+      const dmgU = UPGRADES.find(u => u.id === 'damage')
+      const dCost = upgradeCost(dmgU, upgLevel('damage'))
+      // немного HP: держим брони ~треть от уровня урона
+      const hpU = UPGRADES.find(u => u.id === 'hp')
+      const hCost = upgradeCost(hpU, upgLevel('hp'))
+      if (upgLevel('hp') < upgLevel('damage') * 0.35 && hCost <= st.caps) { st.caps -= hCost; st.upgrades.hp = upgLevel('hp') + 1; bought = true; continue }
+      if (dCost <= st.caps) { st.caps -= dCost; st.upgrades.damage = upgLevel('damage') + 1; bought = true; continue }
+      // остаток — в самое дешёвое (крит/картечь/союзники)
+      let cheapest = null
+      for (const u of UPGRADES) { const c = upgradeCost(u, upgLevel(u.id)); if (c <= st.caps && (!cheapest || c < cheapest.cost)) cheapest = { type: 'u', ref: u, cost: c } }
       for (const a of ALLIES) { const c = allyCost(a, st.allies[a.id] || 0); if (c <= st.caps && (!cheapest || c < cheapest.cost)) cheapest = { type: 'a', ref: a, cost: c } }
-      const pick = (wantHp && hpCand) ? hpCand : cheapest
-      if (pick) { st.caps -= pick.cost; if (pick.type === 'u') st.upgrades[pick.ref.id] = upgLevel(pick.ref.id) + 1; else st.allies[pick.ref.id] = (st.allies[pick.ref.id] || 0) + 1; bought = true }
+      if (cheapest) { st.caps -= cheapest.cost; if (cheapest.type === 'u') st.upgrades[cheapest.ref.id] = upgLevel(cheapest.ref.id) + 1; else st.allies[cheapest.ref.id] = (st.allies[cheapest.ref.id] || 0) + 1; bought = true }
     }
   }
-  function allocate() { while (st.hero.points > 0) { const pick = st.hero.str <= st.hero.vit * 2 ? 'str' : 'vit'; st.hero[pick]++; st.hero.points-- } }
+  // Реальный игрок льёт очки в СИЛУ (немного в живучесть, чтобы не спираль).
+  function allocate() { while (st.hero.points > 0) { const pick = st.hero.vit < st.hero.str * 0.2 ? 'vit' : 'str'; st.hero[pick]++; st.hero.points-- } }
+  // Прогрессия HP врагов по уровню/зоне (как в GameState.enemyProgMul).
+  const progMul = () => {
+    const lv = st.hero.level - 1
+    return Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap))
+      * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap))
+      * Math.pow(BAL.enemyZoneRamp, st.zoneIndex)
+  }
 
   // ---- волна из нескольких врагов / босс-ворота ----
   let wave = []          // живые враги текущей волны
@@ -83,7 +92,8 @@ function runOne(classId, rng) {
     for (let i = 0; i < count; i++) {
       const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
       const b = enemyStats(def, st.totalKills, boss)
-      const hp = b.hp * af.hp, reward = b.reward * af.rew, dmg = b.dmg * af.dmg
+      const prog = boss ? Math.pow(progMul(), 0.6) : progMul()
+      const hp = b.hp * af.hp * prog, reward = b.reward * af.rew, dmg = b.dmg * af.dmg
       const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
       const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed) + i * 0.6
       wave.push({ hp, maxHp: hp, reward, dmg, approach, attackAccum: 0, boss })
@@ -149,9 +159,9 @@ function runOne(classId, rng) {
 
   const effDps = cps * acc * clickHit() + allyDps()
   const avgDef = { hpMul: 1, rewardMul: 1, dmgMul: 1, speedMul: 1 }
-  const typicalHp = enemyStats(avgDef, st.totalKills, false).hp
+  const typicalHp = enemyStats(avgDef, st.totalKills, false).hp * progMul()
   const ttkEnd = typicalHp / effDps
-  const bossTtkEnd = enemyStats(avgDef, st.totalKills, true).hp / effDps
+  const bossTtkEnd = enemyStats(avgDef, st.totalKills, true).hp * Math.pow(progMul(), 0.6) / effDps
   const earlyRate = (checkpoints[120] || st.totalKills) / 120
   const lateRate = (st.totalKills - (checkpoints[1080] || st.totalKills)) / 120
 
