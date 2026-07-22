@@ -17,12 +17,9 @@ export function lighten(c, f) {
   return (r << 16) | (g << 8) | b
 }
 
-// Полноэкранная виньетка поверх всего (мягко затемняет края).
-export function addVignette(scene) {
-  return scene.add.image(GAME.WIDTH / 2, GAME.HEIGHT / 2, TEX.VIGNETTE)
-    .setDisplaySize(GAME.WIDTH + 60, GAME.HEIGHT + 60)
-    .setDepth(900).setAlpha(0.85)
-}
+// Виньетка отключена — сильно затемняла края и «съедала» детали спрайтов.
+// Оставлен no-op, чтобы не трогать все места вызова (легко вернуть при желании).
+export function addVignette() { return null }
 
 // Дрейфующая пыль (частицы). Возвращает эмиттер.
 export function addDust(scene, groundY = GAME.HEIGHT) {
