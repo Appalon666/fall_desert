@@ -13,7 +13,7 @@ import { getZone } from '../data/zones.js'
 import { enemiesInWave, bossDue } from '../data/progression.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
-import { darken, addDust, addVignette, addFog, addGodRays, applyPostFX } from '../ui/scenery.js'
+import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX } from '../ui/scenery.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { fmt } from '../util/format.js'
@@ -40,6 +40,7 @@ export default class BattleScene extends Phaser.Scene {
     const heroScale = 2.1
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
     this.hero = this.add.image(this.arenaW * 0.16, this.groundY - 124 * heroScale * 0.42, heroTex).setScale(heroScale)
+    addRim(this.hero, 0xffe0a8, 3, 0.08, 12) // тёплая контурная подсветка героя
     this.tweens.add({ targets: this.hero, y: this.hero.y - 5, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
     this.muzzle = { x: this.hero.x + 66, y: this.hero.y - 8 }
 
@@ -77,8 +78,13 @@ export default class BattleScene extends Phaser.Scene {
       this.ruins.push(r); this.ruinLayer.add(r)
     }
     this.tweens.add({ targets: this.ruinLayer, x: 26, duration: 16000, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
+    // свечение горизонта (мягкая полоса света у земли) — тинт задаётся по зоне
+    this.horizonGlow = this.add.image(W / 2, gy - 6, TEX.GLOW).setBlendMode('ADD')
+      .setDepth(-7).setAlpha(0.28).setScale(W / 90, 1.5)
     this.groundRect = this.add.rectangle(0, gy, W, GAME.HEIGHT - gy, COLORS.rust).setOrigin(0).setDepth(-7)
-    this.accentLine = this.add.rectangle(0, gy, W, 4, COLORS.rustLight).setOrigin(0).setDepth(-6).setAlpha(0.8)
+    this.accentLine = this.add.rectangle(0, gy, W, 4, COLORS.rustLight).setOrigin(0).setDepth(-6).setAlpha(0.9)
+    // мягкая тень-градиент у верха земли (объём)
+    this.add.rectangle(0, gy, W, 26, COLORS.ink).setOrigin(0).setDepth(-6).setAlpha(0.28)
     this.debris = []
     for (let i = 0; i < 6; i++) {
       this.debris.push(this.add.rectangle(60 + i * (W - 120) / 5, gy + 30 + (i % 3) * 12, 26, 6, COLORS.steelDark).setOrigin(0.5).setDepth(-6))
@@ -104,6 +110,7 @@ export default class BattleScene extends Phaser.Scene {
     this.skyGfx.fillGradientStyle(skyTop, skyTop, this.zone.sky, this.zone.sky, 1)
     this.skyGfx.fillRect(0, 0, this.arenaW, this.groundY)
     this.sun.setTint(this.zone.accent)
+    if (this.horizonGlow) this.horizonGlow.setTint(this.zone.accent)
     this.groundRect.setFillStyle(this.zone.ground)
     this.accentLine.setFillStyle(this.zone.accent)
     const ruinCol = darken(this.zone.ground, 0.55)
@@ -197,6 +204,8 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     const sprite = this.add.image(spawnX, yPos, texKey).setScale(scale).setAlpha(0).setDepth(10 - (i % 2))
+    // контурная подсветка: босс — тревожно-красная, мобы — по своему цвету
+    addRim(sprite, isBoss ? 0xff5a2a : lighten(def.tint, 0.28), isBoss ? 6 : 3, 0.08, isBoss ? 20 : 11)
     this.tweens.add({ targets: sprite, alpha: 1, duration: 200 })
     this.tweens.add({ targets: sprite, y: yPos - 10, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: i * 60 })
 

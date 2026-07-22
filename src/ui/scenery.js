@@ -93,6 +93,13 @@ export function panel(scene, x, y, w, h, opts = {}) {
   return g
 }
 
+// Контурная подсветка объекта (rim/outline) через preFX-glow. Только WebGL —
+// на Canvas тихо пропускается. Делает спрайты «сочными» и читаемыми на фоне.
+export function addRim(obj, color = 0xffffff, outer = 3, quality = 0.08, distance = 12) {
+  try { if (obj && obj.preFX) obj.preFX.addGlow(color, outer, 0, false, quality, distance) } catch (e) { /* нет WebGL FX */ }
+  return obj
+}
+
 // Постобработка камеры: bloom (свечение ярких участков). Только WebGL.
 export function applyPostFX(scene, bloom = true, strength = 0.7) {
   const cam = scene.cameras.main
