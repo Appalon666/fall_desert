@@ -163,7 +163,6 @@ export default class BattleScene extends Phaser.Scene {
   // ---------------- Спавн волны ----------------
   spawnWave() {
     this.wavePending = false
-    if (!this.scene.isActive()) return
     // Босс-ворота: набрали норму убийств в зоне → один жирный босс.
     const isBoss = !State.bossActive && bossDue(State.killsInZone)
     if (isBoss) {
@@ -195,8 +194,9 @@ export default class BattleScene extends Phaser.Scene {
     const dmg = base.dmg * af.dmg
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd
     const scale = isBoss ? BAL.bossScale : def.scale
-    // строй: боссы выходят вплотную; обычные — колонной справа, в две «глубины».
-    const spawnX = isBoss ? (this.hero.x + BAL.enemyAttackRange + 60) : (this.arenaW - 50 + i * 66)
+    // строй: боссы выходят вплотную; обычные — колонной у правого края арены
+    // (в пределах видимой зоны), в две «глубины», и наступают влево на героя.
+    const spawnX = isBoss ? (this.hero.x + BAL.enemyAttackRange + 60) : (this.arenaW - 70 - i * 56)
     const rowLift = isBoss ? 0 : (i % 2) * 46
     const yPos = this.groundY - TEX_H * scale * 0.42 - rowLift
     const texKey = `tex-e-${defId}`
@@ -350,7 +350,7 @@ export default class BattleScene extends Phaser.Scene {
     // Волна зачищена → следующая (или босс-ворота).
     if (this.enemies.length === 0 && !this.wavePending) {
       this.wavePending = true
-      this.time.delayedCall(240, () => this.spawnWave())
+      this.time.delayedCall(240, () => { if (this.scene.isActive()) this.spawnWave() })
     }
   }
 
