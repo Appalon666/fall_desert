@@ -237,4 +237,28 @@ describe('инвентарь и экипировка', () => {
     s.sanitizeItems()
     expect(s.inventory[0].slot).toBe('accessory')
   })
+  it('продажа предмета без level не ломает крышки (не NaN)', () => {
+    // Старый/битый предмет без поля level раньше давал caps = NaN навсегда.
+    s.inventory = [{ uid: 'noLvl', slot: 'weapon', rarity: 'common', stat: 'clickMul', value: 0.1 }]
+    s.sanitizeItems()
+    expect(s.inventory[0].level).toBe(1)
+    const caps0 = s.caps
+    s.sellItem('noLvl')
+    expect(Number.isFinite(s.caps)).toBe(true)
+    expect(s.caps).toBeGreaterThan(caps0)
+  })
+})
+
+describe('мультипокупка союзников', () => {
+  it('hireAllyMulti списывает крышки, растит счётчик и эмитит caps', () => {
+    s.addCaps(1e9)
+    let capsEvents = 0
+    s.on('caps', () => { capsEvents++ })
+    const caps0 = s.caps
+    const n = s.hireAllyMulti('dog', 10)
+    expect(n).toBe(10)
+    expect(s.allies.dog).toBe(10)
+    expect(s.caps).toBeLessThan(caps0)
+    expect(capsEvents).toBeGreaterThan(0)
+  })
 })

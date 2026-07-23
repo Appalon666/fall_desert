@@ -59,7 +59,7 @@ export default class BattleScene extends Phaser.Scene {
     }
     this.tweens.add({ targets: this.hero, y: this.hero.y - 6, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
 
-    this.input.on('pointerdown', (p) => { if (p.x < this.arenaW) this.shoot(p.x, p.y) })
+    this.input.on('pointerdown', (p) => { if (this._deathModal || State.hp <= 0) return; if (p.x < this.arenaW) this.shoot(p.x, p.y) })
     this.input.keyboard.on('keydown-SPACE', () => this.tryUlt())
 
     this.buildAllies()
@@ -498,6 +498,7 @@ export default class BattleScene extends Phaser.Scene {
 
   // ---------------- Ульта (AoE по волне) ----------------
   tryUlt() {
+    if (this._deathModal) return // на экране смерти ульта недоступна
     if (State.ult < BAL.ultMax) {
       this.floatText(this.arenaW / 2, 120, t('Ульта не заряжена'), '#ff6a6a', 22)
       return
@@ -545,7 +546,7 @@ export default class BattleScene extends Phaser.Scene {
 
   showDeathModal() {
     const cx = this.arenaW / 2, cy = GAME.HEIGHT / 2
-    const ov = this.add.rectangle(0, 0, this.arenaW, GAME.HEIGHT, COLORS.ink, 0.72).setOrigin(0).setDepth(85).setInteractive()
+    const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.72).setOrigin(0).setDepth(85).setInteractive()
     const title = this.add.text(cx, cy - 90, t('Ты пал на пустоши'), { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: '#ff5a5a', fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(86)
     const revive = createButton(this, cx, cy - 6, {
       label: t('📺 Возродиться (реклама)'), width: 340, height: 56, fontSize: 20,

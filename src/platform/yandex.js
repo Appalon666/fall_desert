@@ -3,6 +3,8 @@
 // localStorage (через GameState), лидерборды — заглушка. На Яндексе —
 // облачные сейвы, реклама, таблицы рекордов.
 
+import { Sfx } from '../audio/sfx.js'
+
 export const LEADERBOARD = 'kills'
 
 class YandexPlatform {
@@ -77,23 +79,42 @@ class YandexPlatform {
 
   // Реклама за награду. Гарантирует РОВНО один вызов onReward (успех/ошибка),
   // ставит геймплей на паузу на время ролика и всегда снимает её в onClose.
+  // Ссылка на Phaser.Game — чтобы паузить активные сцены на время рекламы
+  // (Яндекс 4.7: и звук, и игровой процесс должны стоять под fullscreen-рекламой).
+  attachGame(game) { this.game = game }
+  _pauseGame() {
+    try {
+      Sfx.suspend()
+      if (!this.game) return
+      this._paused = this.game.scene.getScenes(true)
+      for (const s of this._paused) s.scene.pause()
+    } catch (e) { /* */ }
+  }
+  _resumeGame() {
+    try {
+      Sfx.resume()
+      if (this._paused) { for (const s of this._paused) s.scene.resume() }
+    } catch (e) { /* */ }
+    this._paused = null
+  }
+
   // Локально (без SDK) — сразу выдаём награду.
   showRewarded(onReward, onClose) {
     let settled = false
     const reward = () => { if (settled) return; settled = true; try { onReward && onReward() } catch (e) { /* */ } }
     const closed = () => { try { onClose && onClose() } catch (e) { /* */ } }
     if (!this.available || !this.ya?.adv) { reward(); closed(); return }
-    this.gameplayStop()
+    this.gameplayStop(); this._pauseGame()
     try {
       this.ya.adv.showRewardedVideo({
         callbacks: {
           onRewarded: () => reward(),
           // Досмотрели/закрыли: не наказываем игрока — если награды не было, выдаём.
-          onClose: () => { this.gameplayStart(); reward(); closed() },
-          onError: () => { this.gameplayStart(); reward(); closed() },
+          onClose: () => { this._resumeGame(); this.gameplayStart(); reward(); closed() },
+          onError: () => { this._resumeGame(); this.gameplayStart(); reward(); closed() },
         },
       })
-    } catch (e) { this.gameplayStart(); reward(); closed() }
+    } catch (e) { this._resumeGame(); this.gameplayStart(); reward(); closed() }
   }
 
   // Межстраничная реклама. Клиентский троттлинг ≥75с (Яндекс требует ≥60с и
@@ -102,13 +123,16 @@ class YandexPlatform {
     if (!this.available || !this.ya?.adv) return
     const now = Date.now()
     if (now - this._lastAd < 75000) return
-    this._lastAd = now
-    this.gameplayStop()
     try {
       this.ya.adv.showFullscreenAdv({
-        callbacks: { onClose: () => this.gameplayStart(), onError: () => this.gameplayStart() },
+        callbacks: {
+          // Троттл сбрасываем только когда реклама реально открылась (onOpen).
+          onOpen: () => { this._lastAd = Date.now(); this.gameplayStop(); this._pauseGame() },
+          onClose: () => { this._resumeGame(); this.gameplayStart() },
+          onError: () => { this._resumeGame(); this.gameplayStart() },
+        },
       })
-    } catch (e) { this.gameplayStart() }
+    } catch (e) { this._resumeGame(); this.gameplayStart() }
   }
 
   // Лидерборды.

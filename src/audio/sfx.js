@@ -31,6 +31,8 @@ class SfxEngine {
     } catch (e) { this.ctx = null }
   }
   resume() { this.ensure(); if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume() }
+  // Глушим аудиоконтекст при сворачивании вкладки / показе рекламы (Яндекс 1.3, 4.7).
+  suspend() { try { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend() } catch (e) { /* */ } }
 
   setMuted(m) {
     this.muted = m

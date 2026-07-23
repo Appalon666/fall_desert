@@ -260,8 +260,9 @@ export class GameState extends Emitter {
     const def = UPGRADES.find(u => u.id === id)
     const lvl = this.upgLevel(id)
     if (mode === 'max') {
+      const budget = Number.isFinite(this.caps) ? this.caps : 0
       let n = 0, cost = 0
-      for (; n < 100000;) { const c = upgradeCost(def, lvl + n); if (cost + c > this.caps) break; cost += c; n++ }
+      for (; n < 100000;) { const c = upgradeCost(def, lvl + n); if (cost + c > budget) break; cost += c; n++ }
       return { count: n, cost }
     }
     let cost = 0
@@ -280,8 +281,9 @@ export class GameState extends Emitter {
     const def = ALLIES.find(a => a.id === id)
     const owned = this.allies[id] || 0
     if (mode === 'max') {
+      const budget = Number.isFinite(this.caps) ? this.caps : 0
       let n = 0, cost = 0
-      for (; n < 100000;) { const c = allyCost(def, owned + n); if (cost + c > this.caps) break; cost += c; n++ }
+      for (; n < 100000;) { const c = allyCost(def, owned + n); if (cost + c > budget) break; cost += c; n++ }
       return { count: n, cost }
     }
     let cost = 0
@@ -293,7 +295,7 @@ export class GameState extends Emitter {
     if (q.count <= 0 || this.caps < q.cost) return 0
     this.caps -= q.cost
     this.allies[id] = (this.allies[id] || 0) + q.count
-    this.emit('ally'); this.save()
+    this.emit('caps'); this.emit('ally'); this.save()
     return q.count
   }
 
@@ -331,7 +333,7 @@ export class GameState extends Emitter {
     if (idx < 0) return
     const it = this.inventory[idx]
     this.inventory.splice(idx, 1)
-    this.addCaps(10 + it.level * 3)
+    this.addCaps(10 + (it.level || 1) * 3)
     this.emit('inventory'); this.save()
   }
   // Разобрать предмет на металлолом.
@@ -497,7 +499,12 @@ export class GameState extends Emitter {
   sanitizeItems() {
     const valid = (it) => it && it.uid && SLOT_BY_ID[it.slot] && RARITY_BY_ID[it.rarity]
       && it.stat && typeof it.value === 'number'
-    const remap = (it) => { if (it && it.slot === 'trinket') it.slot = 'accessory'; return it }
+    const remap = (it) => {
+      if (it && it.slot === 'trinket') it.slot = 'accessory'
+      // Нормализуем level: без него sellItem/scrapValue дают NaN-крышки.
+      if (it && !Number.isFinite(it.level)) it.level = 1
+      return it
+    }
 
     this.inventory = (Array.isArray(this.inventory) ? this.inventory : []).map(remap).filter(valid)
 

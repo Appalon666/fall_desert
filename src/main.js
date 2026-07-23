@@ -13,6 +13,8 @@ import HeroScene from './scenes/HeroScene.js'
 import PrestigeScene from './scenes/PrestigeScene.js'
 import LeaderboardScene from './scenes/LeaderboardScene.js'
 import ForgeScene from './scenes/ForgeScene.js'
+import { Platform } from './platform/yandex.js'
+import { Sfx } from './audio/sfx.js'
 
 // Глобальный контраст текста: тёмная обводка + тень под каждой надписью,
 // чтобы текст читался поверх пёстрых нарисованных фонов. Уважаем стиль:
@@ -48,7 +50,17 @@ const config = {
 }
 
 // eslint-disable-next-line no-new
-new Phaser.Game(config)
+const game = new Phaser.Game(config)
+Platform.attachGame(game)
+
+// Жизненный цикл вкладки (Яндекс 1.3): при сворачивании глушим кастомный
+// аудиоконтекст SFX и сообщаем платформе о паузе; при возврате — возобновляем.
+try {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { Sfx.suspend(); Platform.gameplayStop() }
+    else { Sfx.resume(); Platform.gameplayStart() }
+  })
+} catch (e) { /* */ }
 
 // Отладочная ссылка на сцены в консоли браузера.
 if (import.meta.env?.DEV) {
