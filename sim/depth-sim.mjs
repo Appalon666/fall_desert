@@ -84,7 +84,7 @@ function runOne(classId, rng) {
     st.waveCount++
     const boss = !st.bossActive && bossDue(st.killsInZone)
     if (boss) st.bossActive = true
-    const count = boss ? 1 : enemiesInWave(st.zoneIndex)
+    const count = boss ? 1 : enemiesInWave(st.zoneIndex, st.waveCount)
     const z = getZone(st.zoneIndex); const pool = z.enemies; const af = z.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
     wave = []
     for (let i = 0; i < count; i++) {

@@ -250,7 +250,7 @@ export default class BattleScene extends Phaser.Scene {
       Sfx.boss()
       return
     }
-    const n = enemiesInWave(State.zoneIndex)
+    const n = enemiesInWave(State.zoneIndex, State.waveCount)
     const pool = this.zone.enemies
     for (let i = 0; i < n; i++) {
       const defId = pool[Math.floor(Math.random() * pool.length)]
