@@ -32,7 +32,7 @@ export const CLASSES = [
     id: 'mechanic', name: 'Механик', icon: '🤖',
     desc: 'Командир железа. Отряд бьёт сильнее, а офлайн-доход заметно жирнее.',
     perks: ['⚙️ +35% урон союзников', '📦 +60% офлайн-дохода, старт с псом'],
-    bonus: { allyMul: 0.35 },
+    bonus: { allyMul: 0.35, clickMul: 0.15, hpMul: 0.1 },
     offlineBonus: 0.6,
     startStats: { str: 0, vit: 1, luck: 1 },
     startAllies: { dog: 1 }, lootLuck: 0,
