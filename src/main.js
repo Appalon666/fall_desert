@@ -14,6 +14,22 @@ import PrestigeScene from './scenes/PrestigeScene.js'
 import LeaderboardScene from './scenes/LeaderboardScene.js'
 import ForgeScene from './scenes/ForgeScene.js'
 
+// Глобальный контраст текста: тёмная обводка + тень под каждой надписью,
+// чтобы текст читался поверх пёстрых нарисованных фонов. Уважаем стиль:
+// если у текста уже задана своя обводка (stroke) — не трогаем.
+const _origText = Phaser.GameObjects.GameObjectFactory.prototype.text
+Phaser.GameObjects.GameObjectFactory.prototype.text = function (x, y, text, style) {
+  const t = _origText.call(this, x, y, text, style)
+  const hasStroke = style && (style.stroke || style.strokeThickness)
+  if (!hasStroke && !(style && style.noOutline)) {
+    const fs = parseInt(t.style.fontSize, 10) || 16
+    t.setStroke('#1a1206', Math.min(6, Math.max(2, Math.round(fs * 0.13))))
+    t.setShadow(0, 2, '#000000', 4, false, true)
+    t.setResolution(2) // резче на масштабировании FIT
+  }
+  return t
+}
+
 const config = {
   type: Phaser.AUTO,
   parent: 'game',
