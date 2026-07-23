@@ -90,8 +90,10 @@ function runOne(classId, rng) {
     for (let i = 0; i < count; i++) {
       const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
       const pEnemy = Math.pow(1.05, meta.prestigeCount) // +5% за каждое перерождение
-      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.45) * pEnemy
-      const mDmg = (1 + pHp() * 0.45) * pEnemy
+      // после 1-го престижа +2.5% за каждый уровень героя выше 10
+      const pLevel = meta.prestigeCount >= 1 ? Math.pow(1.025, Math.max(0, st.hero.level - 10)) : 1
+      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.45) * pEnemy * pLevel
+      const mDmg = (1 + pHp() * 0.45) * pEnemy * pLevel
       const lv = st.hero.level - 1
       const progFull = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyZoneRamp, st.zoneIndex)
       const prog = boss ? Math.pow(progFull, 0.6) : progFull

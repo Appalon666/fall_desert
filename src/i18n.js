@@ -46,24 +46,32 @@ const EN = {
   // — Как играть —
   '❔  КАК ИГРАТЬ': '❔  HOW TO PLAY',
   'Понятно!': 'Got it!',
-  '🖱  КЛИК / ТАП по врагу — выстрел. Пуля бьёт БЛИЖАЙШЕГО — целься в опасных.':
+  '🖱  КЛИК / ТАП по врагу — выстрел. Пуля бьёт БЛИЖАЙШЕГО, целься в опасных.':
     '🖱  CLICK / TAP an enemy to shoot. The bullet hits the NEAREST one — aim at dangerous ones.',
   '☢  SPACE или кнопка УЛЬТА — залп по ВСЕЙ волне (копится от попаданий).':
     '☢  SPACE or the ULT button — blast the WHOLE wave (charges from hits).',
-  '🍾  Крышки за убийства → «Апгрейды»: урон, броня, союзники.':
-    '🍾  Caps from kills → “Upgrades”: damage, armor, allies.',
-  '🤖  Союзники бьют сами (и приносят доход, пока игра закрыта).':
-    '🤖  Allies fight on their own (and earn while the game is closed).',
-  '💥  В конце каждой зоны — БОСС-ВОРОТА: пробей, чтобы идти дальше.':
-    '💥  Each zone ends with a BOSS GATE: break it to advance.',
-  '🦸  За уровни — очки в Силу / Живучесть / Удачу (раздел «Герой»).':
-    '🦸  Levels grant points into Strength / Vitality / Luck (“Hero” screen).',
-  '🎁  С врагов падает лут → «Инвентарь» и «Верстак» (крафт за металлолом).':
-    '🎁  Enemies drop loot → “Inventory” and “Workbench” (craft from scrap).',
-  '☢  «Перерождение» — сброс забега ради ЯДЕР и вечных бонусов (урон/HP/крышки).':
-    '☢  “Prestige” — reset the run for CORES and permanent bonuses (damage/HP/caps).',
-  '💠  Ядра даёт ТОЛЬКО перерождение: чем дальше прошёл (выше зона) — тем больше Ядер.':
-    '💠  Cores come ONLY from prestige: the deeper you got (higher zone), the more Cores.',
+  '🍾  Крышки за убийства → «Апгрейды»: урон, броня, картечь, крит, союзники.':
+    '🍾  Caps from kills → “Upgrades”: damage, armor, buckshot, crit, allies.',
+  '🤖  Союзники бьют сами и приносят доход, пока игра закрыта (офлайн).':
+    '🤖  Allies fight on their own and earn while the game is closed (offline).',
+  '💥  Каждые 20 убийств в зоне волна пополняется врагом — под конец жарче.':
+    '💥  Every 20 kills in a zone adds one more enemy per wave — it heats up.',
+  '🚪  В конце каждой зоны — БОСС-ВОРОТА: пробей, чтобы идти дальше.':
+    '🚪  Each zone ends with a BOSS GATE: break it to advance.',
+  '🦸  За уровни героя — очки в Силу / Живучесть / Удачу (раздел «Герой»).':
+    '🦸  Hero levels grant points into Strength / Vitality / Luck (“Hero” screen).',
+  '🎁  С врагов падает ЛУТ. Хлам разбирай в металлолом, куй новое на «Верстаке».':
+    '🎁  Enemies drop LOOT. Scrap junk into metal, craft new gear at the “Workbench”.',
+  '🎨  Редкость: Хлам ‹ Годное ‹ Редкое ‹ Легенда ‹ РЕЛИКВИЯ (оранж). Выше — сильнее бонус.':
+    '🎨  Rarity: Junk ‹ Fine ‹ Rare ‹ Legendary ‹ RELIC (orange). Higher = stronger bonus.',
+  '⚒  Чем дороже сборка на «Верстаке», тем выше шанс редкого предмета.':
+    '⚒  The pricier the craft at the “Workbench”, the higher the chance of a rare item.',
+  '☢  ПЕРЕРОЖДЕНИЕ откроется после босса 4-й локации и даёт 4 ЯДРА.':
+    '☢  PRESTIGE unlocks after the 4th location boss and grants 4 CORES.',
+  '💠  Ядра — на вечные бонусы (урон/HP/крышки/старт). Забег сбрасывается.':
+    '💠  Spend Cores on permanent bonuses (damage/HP/caps/head-start). The run resets.',
+  '🔥  Каждое перерождение делает врагов на +5% сильнее — пустошь звереет.':
+    '🔥  Each prestige makes enemies +5% stronger — the wasteland grows fiercer.',
   '⚠️  Враги крепнут по мере твоего роста — качайся и не зевай удары!':
     '⚠️  Enemies grow stronger as you do — level up and don’t take hits!',
   // — Оффлайн —

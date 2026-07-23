@@ -135,13 +135,19 @@ export class GameState extends Emitter {
   // → глубина от забега к забегу растёт (компаунд), а не обнуляется.
   // Перманентное усиление врагов за каждое перерождение: +5% (компаундится).
   prestigeEnemyMul() { return Math.pow(1.05, this.prestigeCount) }
+  // После 1-го перерождения враги растут на +2.5% за каждый уровень героя выше 10 —
+  // иначе высокоуровневый герой (20-30-40) становится слишком сильным.
+  postPrestigeLevelMul() {
+    if (this.prestigeCount < 1) return 1
+    return Math.pow(1.025, Math.max(0, this.hero.level - 10))
+  }
   enemyMetaHpMul() {
     // Мягко: основную «не-картонность» после престижа даёт enemyProgMul (уровень),
     // здесь лишь небольшая добавка, чтобы глубина от престижа всё же росла.
     const power = this.prestigeDamageMul() * Math.pow(1.15, this.prestige.quickstart)
-    return Math.pow(power, 0.45) * this.prestigeEnemyMul()
+    return Math.pow(power, 0.45) * this.prestigeEnemyMul() * this.postPrestigeLevelMul()
   }
-  enemyMetaDmgMul() { return (1 + this.prestigeHpMul() * 0.45) * this.prestigeEnemyMul() }
+  enemyMetaDmgMul() { return (1 + this.prestigeHpMul() * 0.45) * this.prestigeEnemyMul() * this.postPrestigeLevelMul() }
   // Прогрессия HP врагов по уровню героя и зоне — чтобы очки силы от левелапов
   // не превращали мобов в картон. Ранний разгон до cap, затем мягкий хвост.
   enemyProgMul() {
