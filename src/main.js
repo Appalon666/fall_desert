@@ -53,12 +53,24 @@ const config = {
 const game = new Phaser.Game(config)
 Platform.attachGame(game)
 
-// Жизненный цикл вкладки (Яндекс 1.3): при сворачивании глушим кастомный
-// аудиоконтекст SFX и сообщаем платформе о паузе; при возврате — возобновляем.
+// Яндекс 1.6: отключаем контекстное меню браузера в игровой области
+// (правый клик на ПК, долгий тап на мобиле).
+game.events.once('ready', () => {
+  try { game.input.mouse?.disableContextMenu() } catch (e) { /* */ }
+})
+try { window.addEventListener('contextmenu', (e) => e.preventDefault()) } catch (e) { /* */ }
+
+// Жизненный цикл вкладки (Яндекс 1.3): при сворачивании глушим SFX-аудиоконтекст
+// И музыку (Phaser SoundManager), сообщаем платформе о паузе; при возврате — назад.
 try {
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { Sfx.suspend(); Platform.gameplayStop() }
-    else { Sfx.resume(); Platform.gameplayStart() }
+    if (document.hidden) {
+      Sfx.suspend(); try { game.sound.pauseAll() } catch (e) { /* */ }
+      Platform.gameplayStop()
+    } else {
+      Sfx.resume(); try { game.sound.resumeAll() } catch (e) { /* */ }
+      Platform.gameplayStart()
+    }
   })
 } catch (e) { /* */ }
 
