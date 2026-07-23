@@ -31,7 +31,7 @@ export function createButton(scene, x, y, opts = {}) {
   let g = null
   let draw
   if (usePlate) {
-    plate = scene.add.nineslice(0, 0, 'ui-button', undefined, width, height, 46, 46, 24, 24)
+    plate = scene.add.nineslice(0, 0, 'ui-button', undefined, width, height, 70, 70, 60, 60)
     // Плашка самодостаточна по цвету — тинтом лишь передаём состояние:
     // обычное — как есть, наведение — теплее/ярче, выключено — приглушённо.
     draw = (fill) => { plate.setTint(!enabled ? 0x8f867c : fill === hover ? 0xffe4b0 : 0xffffff) }
