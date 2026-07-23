@@ -109,10 +109,10 @@ export default class HubScene extends Phaser.Scene {
   showHowTo() {
     const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
     const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.8).setOrigin(0).setDepth(90).setInteractive()
-    const w = 760, h = 524
+    const w = 780, h = 620
     const g = panel(this, cx - w / 2, cy - h / 2, w, h, { fill: COLORS.steelDark, border: COLORS.cap, borderAlpha: 0.8 })
     g.setDepth(91)
-    const title = this.add.text(cx, cy - h / 2 + 34, t('❔  КАК ИГРАТЬ'), { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(92)
+    const title = this.add.text(cx, cy - h / 2 + 32, t('КАК ИГРАТЬ'), { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(92)
     const lines = [
       '🖱  КЛИК / ТАП по врагу — выстрел. Пуля бьёт БЛИЖАЙШЕГО — целься в опасных.',
       '☢  SPACE или кнопка УЛЬТА — залп по ВСЕЙ волне (копится от попаданий).',
@@ -125,10 +125,10 @@ export default class HubScene extends Phaser.Scene {
       '💠  Ядра даёт ТОЛЬКО перерождение: чем дальше прошёл (выше зона) — тем больше Ядер.',
       '⚠️  Враги крепнут по мере твоего роста — качайся и не зевай удары!',
     ].map(l => t(l))
-    const body = this.add.text(cx - w / 2 + 40, cy - h / 2 + 76, lines.join('\n\n'), {
-      fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: CSS.paper, lineSpacing: 2, wordWrap: { width: w - 80 },
+    const body = this.add.text(cx - w / 2 + 42, cy - h / 2 + 74, lines.join('\n'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper, lineSpacing: 12, wordWrap: { width: w - 84 },
     }).setOrigin(0, 0).setDepth(92)
-    const close = createButton(this, cx, cy + h / 2 - 34, { label: t('Понятно!'), width: 220, height: 46, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { ov.destroy(); g.destroy(); title.destroy(); body.destroy(); close.destroy() } })
+    const close = createButton(this, cx, cy + h / 2 - 40, { label: t('Понятно!'), width: 220, height: 46, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { ov.destroy(); g.destroy(); title.destroy(); body.destroy(); close.destroy() } })
     close.setDepth(92)
   }
 

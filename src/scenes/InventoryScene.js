@@ -75,7 +75,7 @@ export default class InventoryScene extends Phaser.Scene {
     const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
     const heroImg = this.add.image(hx, hy, heroTex, 0).setScale(0.62)
     const cls = State.classDef()
-    const clsLabel = this.add.text(hx, hy + 150, cls ? `${cls.icon} ${t(cls.name)}` : '', { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
+    const clsLabel = this.add.text(hx, hy + 150, cls ? t(cls.name) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
     this.uiObjs.push(heroImg, clsLabel)
 
     const slotPos = {
