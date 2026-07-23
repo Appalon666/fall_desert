@@ -56,7 +56,7 @@ function runOne(classId, rng) {
   const allyDps = () => { let b = 0; for (const a of ALLIES) b += (st.allies[a.id] || 0) * a.dps; return b * (1 + uA('allyMul') + cb('allyMul')) * uP('allyPow') }
   const capsBonus = () => cb('capsMul') + pCaps()
   const xpNeed = () => Math.floor(BAL.baseXpToLevel * Math.pow(BAL.xpGrowth, st.hero.level - 1))
-  const coresFromRun = () => Math.floor(Math.pow(Math.max(0, st.zoneIndex + st.killsInZone / BAL.zoneKills), 1.6))
+  const coresFromRun = () => (st.zoneIndex >= 4 ? 4 : 0)
 
   function spend() {
     let bought = true

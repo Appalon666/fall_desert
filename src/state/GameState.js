@@ -125,11 +125,9 @@ export class GameState extends Emitter {
   prestigeDamageMul() { return 1 + this.prestige.legacy * 0.12 }
   prestigeHpMul() { return this.prestige.vitality * 0.10 }
   prestigeCapsMul() { return this.prestige.stash * 0.12 }
-  // Ядра растут от ГЛУБИНЫ забега (зона), а не линейно от киллов → каждый
-  // следующий (более глубокий) забег даёт заметно больше → мета компаундится.
+  // Фиксированная награда: каждое перерождение даёт 4 ядра (гейт — 4-я локация).
   coresFromRun() {
-    const depth = this.zoneIndex + this.killsInZone / BAL.zoneKills
-    return Math.floor(Math.pow(Math.max(0, depth), 1.6))
+    return this.zoneIndex >= 4 ? 4 : 0
   }
   // Масштаб врагов под ПЕРМАНЕНТНУЮ силу героя (мета). Иначе после престижа
   // враги картонные (их HP считается от totalKills, что сброшено, а бонусы меты —
@@ -159,7 +157,7 @@ export class GameState extends Emitter {
   bumpWave() { this.waveCount++ }
   // Перерождение открывается только после убийства босса 4-й локации
   // (zoneIndex доходит до 4 = пройдены все 4 зоны, начался endless).
-  canPrestige() { return this.zoneIndex >= 4 && this.coresFromRun() >= 1 }
+  canPrestige() { return this.zoneIndex >= 4 }
   doPrestige() {
     if (!this.canPrestige()) return 0
     const gain = this.coresFromRun()
