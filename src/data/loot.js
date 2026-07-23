@@ -87,6 +87,12 @@ export function weaponStyleFor(item) {
   return WEAPON_STYLES[idx] || WEAPON_STYLES[2]
 }
 
+// Ключ текстуры арта оружия по предмету (или null, если не оружие/нет типа).
+export function weaponTexKey(item) {
+  if (!item || item.slot !== 'weapon' || !Number.isInteger(item.wtype)) return null
+  return `weapon-${item.wtype}`
+}
+
 export const RARITY_BY_ID = Object.fromEntries(RARITIES.map(r => [r.id, r]))
 export const SLOT_BY_ID = Object.fromEntries(SLOTS.map(s => [s.id, s]))
 

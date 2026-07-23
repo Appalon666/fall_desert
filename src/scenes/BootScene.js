@@ -34,6 +34,8 @@ export default class BootScene extends Phaser.Scene {
     }
     // Нарисованная плашка кнопки (9-slice). Нет — рисуем графикой.
     this.load.image('ui-button', 'ui/button.png')
+    // Арт оружия (по wtype 0..4) — иконка слота оружия. Нет — эмодзи-фолбэк.
+    for (let i = 0; i < 5; i++) this.load.image(`weapon-${i}`, `weapons/w${i}.png`)
   }
 
   create() {

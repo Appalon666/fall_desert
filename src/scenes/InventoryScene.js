@@ -5,7 +5,7 @@
 import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
-import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue } from '../data/loot.js'
+import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue, weaponTexKey } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
 import { Sfx } from '../audio/sfx.js'
@@ -111,6 +111,18 @@ export default class InventoryScene extends Phaser.Scene {
     return parts.length ? t('От экипировки:  {parts}', { parts: parts.join('   ') }) : t('Экипировка пуста')
   }
 
+  // Иконка предмета: арт оружия (по wtype), иначе эмодзи-фолбэк слота.
+  slotIcon(x, y, item, fallbackIcon, px) {
+    const key = weaponTexKey(item)
+    if (key && this.textures.exists(key)) {
+      const img = this.add.image(x, y, key).setOrigin(0, 0.5)
+      const src = this.textures.get(key).getSourceImage()
+      img.setScale(px / Math.max(src.width, src.height))
+      return img
+    }
+    return this.add.text(x, y, fallbackIcon, { fontSize: `${px}px` }).setOrigin(0, 0.5)
+  }
+
   makeSlot(key, x, y) {
     const w = 176, h = 66
     const raw = State.equipment[key]
@@ -121,7 +133,7 @@ export default class InventoryScene extends Phaser.Scene {
     const bg = this.add.graphics()
     bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(-w / 2, -h / 2, w, h, 8)
     bg.lineStyle(2, rar ? rar.color : COLORS.ink, 0.9); bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8)
-    const icon = this.add.text(-w / 2 + 12, 0, meta.icon, { fontSize: '26px' }).setOrigin(0, 0.5)
+    const icon = this.slotIcon(-w / 2 + 12, 0, it, meta.icon, 30)
     const head = this.add.text(-w / 2 + 46, -16, t(meta.name), { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#c4b998' }).setOrigin(0, 0.5)
     const body = this.add.text(-w / 2 + 46, 4, it ? it.name : t('— пусто —'), {
       fontFamily: 'Rubik, sans-serif', fontSize: it ? '13px' : '14px',
@@ -160,7 +172,7 @@ export default class InventoryScene extends Phaser.Scene {
       const bg = this.add.graphics()
       bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(0, 0, w, h, 8)
       bg.lineStyle(2, rar.color, 1); bg.strokeRoundedRect(0, 0, w, h, 8)
-      const icon = this.add.text(14, h / 2, slot.icon, { fontSize: '24px' }).setOrigin(0, 0.5)
+      const icon = this.slotIcon(14, h / 2, it, slot.icon, 32)
       const name = this.add.text(50, 12, it.name, { fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: rar.css, fontStyle: 'bold' }).setOrigin(0)
       const st = this.add.text(50, 33, `${t(slot.name)} · ${t(rar.name)} · ${statText(it)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#ddd2b4' }).setOrigin(0)
       c.add([bg, icon, name, st])
