@@ -102,13 +102,15 @@ export default class ForgeScene extends Phaser.Scene {
     const rar = RARITY_BY_ID[item.rarity]
     const slot = SLOT_BY_ID[item.slot]
     const w = 520, h = 84
-    panel(this, -w / 2, -h / 2, w, h, { radius: 10, fill: 0x241d15, border: rar.color, borderW: 3 })
+    // Плашку кладём В контейнер (panel рисует в координатах, но не добавляет сам),
+    // иначе фон результата улетает в левый верхний угол сцены.
+    const bg = panel(this, -w / 2, -h / 2, w, h, { radius: 10, fill: 0x241d15, border: rar.color, borderW: 3 })
     const glow = this.add.image(0, 0, 'tex-glow').setTint(rar.color).setAlpha(0.35).setScale(4, 2).setBlendMode('ADD')
     const icon = this.add.text(-w / 2 + 30, 0, slot.icon, { fontSize: '38px' }).setOrigin(0.5)
     const name = this.add.text(-w / 2 + 62, -16, item.name, { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: rar.css, fontStyle: 'bold' }).setOrigin(0, 0.5)
     const sub = this.add.text(-w / 2 + 62, 12, `${t(slot.name)} · ${t(rar.name)} · ${statText(item)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '14px', color: '#ddd2b4' }).setOrigin(0, 0.5)
     const tag = this.add.text(w / 2 - 20, 0, t('скован!'), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic }).setOrigin(1, 0.5)
-    this.resultBox.add([glow, icon, name, sub, tag])
+    this.resultBox.add([bg, glow, icon, name, sub, tag])
     this.resultBox.setScale(0.8).setAlpha(0)
     this.tweens.add({ targets: this.resultBox, scale: 1, alpha: 1, duration: 220, ease: 'Back.out' })
   }
