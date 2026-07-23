@@ -36,6 +36,12 @@ export default class BootScene extends Phaser.Scene {
     this.load.image('ui-button', 'ui/button.png')
     // Арт оружия (по wtype 0..4) — иконка слота оружия. Нет — эмодзи-фолбэк.
     for (let i = 0; i < 5; i++) this.load.image(`weapon-${i}`, `weapons/w${i}.png`)
+    // Иконки апгрейдов / союзников / слотов инвентаря. Нет — эмодзи-фолбэк.
+    for (const k of ['up-damage', 'up-hp', 'up-allyPower', 'up-multishot', 'up-crit',
+      'ally-dog', 'ally-gunner', 'ally-turret', 'ally-sniper', 'ally-mech',
+      'slot-weapon', 'slot-helmet', 'slot-armor', 'slot-boots', 'slot-accessory']) {
+      this.load.image(k, `icons/${k}.png`)
+    }
   }
 
   create() {

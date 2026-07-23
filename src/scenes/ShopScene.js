@@ -64,7 +64,7 @@ export default class ShopScene extends Phaser.Scene {
       const level = State.upgLevel(u.id)
       const q = State.upgradeQuote(u.id, this.buyMode)
       this.makeRow(leftX, y + i * 88, w, {
-        icon: u.icon, title: `${t(u.name)}  (${t('ур.')} ${level})`, desc: t(u.desc),
+        icon: u.icon, iconTex: `up-${u.id}`, title: `${t(u.name)}  (${t('ур.')} ${level})`, desc: t(u.desc),
         cost: q.cost, count: q.count,
         onBuy: () => { if (State.buyUpgradeMulti(u.id, this.buyMode)) this.render() },
       })
@@ -74,7 +74,7 @@ export default class ShopScene extends Phaser.Scene {
       const owned = State.allies[a.id] || 0
       const q = State.allyQuote(a.id, this.buyMode)
       this.makeRow(rightX, y + i * 88, w, {
-        icon: a.icon, title: `${t(a.name)}  ×${owned}`, desc: t('+{n} урона/сек', { n: fmt(a.dps) }),
+        icon: a.icon, iconTex: `ally-${a.id}`, title: `${t(a.name)}  ×${owned}`, desc: t('+{n} урона/сек', { n: fmt(a.dps) }),
         cost: q.cost, count: q.count,
         onBuy: () => { if (State.hireAllyMulti(a.id, this.buyMode)) this.render() },
       })
@@ -96,7 +96,14 @@ export default class ShopScene extends Phaser.Scene {
     }
     paint(false)
 
-    const icon = this.add.text(16, h / 2, opts.icon, { fontSize: '34px' }).setOrigin(0, 0.5)
+    let icon
+    if (opts.iconTex && this.textures.exists(opts.iconTex)) {
+      icon = this.add.image(38, h / 2, opts.iconTex).setOrigin(0.5)
+      const src = this.textures.get(opts.iconTex).getSourceImage()
+      icon.setScale(46 / Math.max(src.width, src.height))
+    } else {
+      icon = this.add.text(16, h / 2, opts.icon, { fontSize: '34px' }).setOrigin(0, 0.5)
+    }
     const title = this.add.text(64, 18, opts.title, { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
     const desc = this.add.text(64, 46, opts.desc, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0)
     // бейдж «сколько купим» при режиме ≠ ×1

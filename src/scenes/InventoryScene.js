@@ -111,9 +111,11 @@ export default class InventoryScene extends Phaser.Scene {
     return parts.length ? t('От экипировки:  {parts}', { parts: parts.join('   ') }) : t('Экипировка пуста')
   }
 
-  // Иконка предмета: арт оружия (по wtype), иначе эмодзи-фолбэк слота.
-  slotIcon(x, y, item, fallbackIcon, px) {
-    const key = weaponTexKey(item)
+  // Иконка предмета: арт оружия (по wtype) → иконка слота → эмодзи-фолбэк.
+  slotIcon(x, y, item, fallbackIcon, px, slotKey) {
+    const base = (slotKey === 'acc1' || slotKey === 'acc2') ? 'accessory' : slotKey
+    let key = weaponTexKey(item)
+    if (!key && base && this.textures.exists(`slot-${base}`)) key = `slot-${base}`
     if (key && this.textures.exists(key)) {
       const img = this.add.image(x, y, key).setOrigin(0, 0.5)
       const src = this.textures.get(key).getSourceImage()
@@ -133,7 +135,7 @@ export default class InventoryScene extends Phaser.Scene {
     const bg = this.add.graphics()
     bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(-w / 2, -h / 2, w, h, 8)
     bg.lineStyle(2, rar ? rar.color : COLORS.ink, 0.9); bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8)
-    const icon = this.slotIcon(-w / 2 + 12, 0, it, meta.icon, 30)
+    const icon = this.slotIcon(-w / 2 + 12, 0, it, meta.icon, 34, key)
     const head = this.add.text(-w / 2 + 46, -16, t(meta.name), { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#c4b998' }).setOrigin(0, 0.5)
     const body = this.add.text(-w / 2 + 46, 4, it ? it.name : t('— пусто —'), {
       fontFamily: 'Rubik, sans-serif', fontSize: it ? '13px' : '14px',
@@ -172,7 +174,7 @@ export default class InventoryScene extends Phaser.Scene {
       const bg = this.add.graphics()
       bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(0, 0, w, h, 8)
       bg.lineStyle(2, rar.color, 1); bg.strokeRoundedRect(0, 0, w, h, 8)
-      const icon = this.slotIcon(14, h / 2, it, slot.icon, 32)
+      const icon = this.slotIcon(14, h / 2, it, slot.icon, 34, it.slot)
       const name = this.add.text(50, 12, it.name, { fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: rar.css, fontStyle: 'bold' }).setOrigin(0)
       const st = this.add.text(50, 33, `${t(slot.name)} · ${t(rar.name)} · ${statText(it)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#ddd2b4' }).setOrigin(0)
       c.add([bg, icon, name, st])
