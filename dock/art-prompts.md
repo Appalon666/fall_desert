@@ -164,6 +164,97 @@ seamless side-scroller game background 1920x720, dark blood-red boss lair with j
 
 ---
 
+## 🧪 Иконки апгрейдов — квадрат 96×96, прозрачный фон
+
+Одинаковый стиль: чёткая читаемая иконка предмета крупным планом по центру, без фона.
+
+**Калибр** (урон клика) — `up-damage.png`
+```
+2D game upgrade icon, single object centered, a glowing golden bullet cartridge with a spark, post-apocalyptic, hand-painted cartoon style, thick dark outlines, rust and gold palette, transparent background, no text
+```
+
+**Броня** (макс. HP) — `up-hp.png`
+```
+2D game upgrade icon, single object centered, a riveted steel armor plate shield, post-apocalyptic, hand-painted cartoon style, thick dark outlines, steel-blue palette, transparent background, no text
+```
+
+**Выучка отряда** (урон союзников) — `up-allyPower.png`
+```
+2D game upgrade icon, single object centered, a rusty megaphone with a small banner, post-apocalyptic, hand-painted cartoon style, thick dark outlines, sand and rust palette, transparent background, no text
+```
+
+**Картечь** (мультивыстрел) — `up-multishot.png`
+```
+2D game upgrade icon, single object centered, a shotgun shell bursting into spreading pellets, post-apocalyptic, hand-painted cartoon style, thick dark outlines, red and orange palette, transparent background, no text
+```
+
+**Меткий глаз** (крит) — `up-crit.png`
+```
+2D game upgrade icon, single object centered, a red target crosshair with a glinting eye, post-apocalyptic, hand-painted cartoon style, thick dark outlines, red and toxic green palette, transparent background, no text
+```
+
+---
+
+## 🐾 Иконки союзников — квадрат 96×96, прозрачный фон
+
+**Верный пёс** — `ally-dog.png`
+```
+2D game unit icon, single character centered, a scrappy loyal wasteland dog with a spiked collar, post-apocalyptic, hand-painted cartoon style, thick dark outlines, brown and rust palette, transparent background, no text
+```
+
+**Стрелок** — `ally-gunner.png`
+```
+2D game unit icon, single character bust centered, a grinning gunslinger in a cowboy hat and bandana holding a rifle, post-apocalyptic, hand-painted cartoon style, thick dark outlines, rust-orange palette, transparent background, no text
+```
+
+**Турель** — `ally-turret.png`
+```
+2D game unit icon, single object centered, an automated scrap-metal machine-gun turret on a tripod, post-apocalyptic, hand-painted cartoon style, thick dark outlines, steel-grey palette, transparent background, no text
+```
+
+**Снайпер** — `ally-sniper.png`
+```
+2D game unit icon, single character bust centered, a hooded sniper with a scoped long rifle and a medal, post-apocalyptic, hand-painted cartoon style, thick dark outlines, green and rust palette, transparent background, no text
+```
+
+**Боевой мех** — `ally-mech.png`
+```
+2D game unit icon, single robot centered, a bulky battle mech with glowing blue eyes and gun arms, post-apocalyptic, hand-painted cartoon style, thick dark outlines, steel-blue palette, transparent background, no text
+```
+
+---
+
+## 🎒 Иконки слотов инвентаря — квадрат 96×96, прозрачный фон
+
+Пустой слот = эта иконка приглушённо; занятый = арт предмета.
+
+**Оружие** — `slot-weapon.png`
+```
+2D game equipment slot icon, single object centered, a crossed rusty pistol and knife, post-apocalyptic, hand-painted cartoon style, thick dark outlines, rust palette, transparent background, no text
+```
+
+**Шлем** — `slot-helmet.png`
+```
+2D game equipment slot icon, single object centered, a battered riveted combat helmet with a cracked visor, post-apocalyptic, hand-painted cartoon style, thick dark outlines, steel and rust palette, transparent background, no text
+```
+
+**Броня** — `slot-armor.png`
+```
+2D game equipment slot icon, single object centered, a patched scrap-metal chest armor vest, post-apocalyptic, hand-painted cartoon style, thick dark outlines, rust and steel palette, transparent background, no text
+```
+
+**Обувь** — `slot-boots.png`
+```
+2D game equipment slot icon, single object centered, a pair of worn armored combat boots, post-apocalyptic, hand-painted cartoon style, thick dark outlines, brown and steel palette, transparent background, no text
+```
+
+**Аксессуар** — `slot-accessory.png`
+```
+2D game equipment slot icon, single object centered, a lucky charm amulet made of bottle caps and a mutant tooth, post-apocalyptic, hand-painted cartoon style, thick dark outlines, gold and rust palette, transparent background, no text
+```
+
+---
+
 ## Порядок (рекомендация)
 Иконка → обложка → 4 героя → 10 монстров → 5 оружий → 4 фона. Как сгенеришь PNG —
 присылай, впаяю в код (спрайтшиты, анимации, разные выстрелы, параллакс).
