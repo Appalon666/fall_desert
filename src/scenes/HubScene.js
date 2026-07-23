@@ -151,23 +151,49 @@ export default class HubScene extends Phaser.Scene {
         onClick: () => { const m = Sfx.toggleMute(); Music.setMuted(m); draw() },
       }).setDepth(92)
       dyn.push(mute)
-      dyn.push(...this.volumeRow(cx, cy - 10, t('Звук'), Math.round(Sfx.volume * 100), (d) => { Sfx.setVolume(Sfx.volume + d); Sfx.resume(); Sfx.hit(); draw() }))
-      dyn.push(...this.volumeRow(cx, cy + 60, t('Музыка'), Math.round(Music.userVolume * 100), (d) => { Music.setUserVolume(Music.userVolume + d); draw() }))
+      dyn.push(...this.volumeRow(cx, cy - 10, t('Звук'), Sfx.volume, (frac) => { Sfx.setVolume(frac); Sfx.resume() }, () => Sfx.hit()))
+      dyn.push(...this.volumeRow(cx, cy + 60, t('Музыка'), Music.userVolume, (frac) => { Music.setUserVolume(frac) }))
     }
     draw()
     const close = createButton(this, cx, cy + h / 2 - 32, { label: t('Закрыть'), width: 200, height: 44, fontSize: 18, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { base.forEach(o => o.destroy()); clear(); close.destroy() } }).setDepth(92)
   }
 
   // Строка регулятора громкости: label, [–] полоска [+], NN%.
-  volumeRow(cx, y, label, pct, onDelta) {
+  // frac0 — начальное значение 0..1; onSet(frac) применяет громкость;
+  // onFeedback() — опциональный звук-отклик. Полоску можно тянуть мышью/тачем.
+  volumeRow(cx, y, label, frac0, onSet, onFeedback) {
     const objs = []
+    const barX = cx + 6, barW = 108, innerW = barW - 4
+    let frac = Math.min(1, Math.max(0, frac0))
+
     objs.push(this.add.text(cx - 240, y, label, { fontFamily: 'Rubik, sans-serif', fontSize: '19px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(92))
-    const minus = createButton(this, cx - 30, y, { label: '–', width: 42, height: 40, fontSize: 24, onClick: () => onDelta(-0.1) }).setDepth(92)
-    const plus = createButton(this, cx + 150, y, { label: '+', width: 42, height: 40, fontSize: 24, onClick: () => onDelta(0.1) }).setDepth(92)
-    const barBg = this.add.rectangle(cx + 6, y, 108, 16, COLORS.ink).setOrigin(0, 0.5).setDepth(92)
-    const barFill = this.add.rectangle(cx + 8, y, (108 - 4) * (pct / 100), 12, COLORS.toxic).setOrigin(0, 0.5).setDepth(92)
-    const txt = this.add.text(cx + 200, y, `${pct}%`, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(92)
-    objs.push(minus, plus, barBg, barFill, txt)
+    const barBg = this.add.rectangle(barX, y, barW, 16, COLORS.ink).setOrigin(0, 0.5).setDepth(92)
+    const barFill = this.add.rectangle(barX + 2, y, innerW * frac, 12, COLORS.toxic).setOrigin(0, 0.5).setDepth(92)
+    const knob = this.add.circle(barX + 2 + innerW * frac, y, 10, COLORS.toxic).setStrokeStyle(2, COLORS.ink).setDepth(93)
+    const txt = this.add.text(cx + 200, y, `${Math.round(frac * 100)}%`, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5).setDepth(92)
+
+    const refresh = () => {
+      barFill.width = innerW * frac
+      knob.x = barX + 2 + innerW * frac
+      txt.setText(`${Math.round(frac * 100)}%`)
+    }
+    const apply = (f, feedback) => {
+      frac = Math.min(1, Math.max(0, f))
+      refresh(); onSet(frac)
+      if (feedback && onFeedback) onFeedback()
+    }
+
+    const minus = createButton(this, cx - 30, y, { label: '–', width: 42, height: 40, fontSize: 24, onClick: () => apply(Math.round((frac - 0.1) * 10) / 10, true) }).setDepth(92)
+    const plus = createButton(this, cx + 150, y, { label: '+', width: 42, height: 40, fontSize: 24, onClick: () => apply(Math.round((frac + 0.1) * 10) / 10, true) }).setDepth(92)
+
+    // Перетаскивание/клик по полоске: зона чуть выше для удобного тача.
+    const hit = this.add.zone(barX, y, barW, 34).setOrigin(0, 0.5).setInteractive({ useHandCursor: true, draggable: true }).setDepth(94)
+    const setFromX = (px, feedback) => apply((px - (barX + 2)) / innerW, feedback)
+    hit.on('pointerdown', (p) => setFromX(p.x, false))
+    hit.on('drag', (p) => setFromX(p.x, false)) // тянем ползунок за курсором/пальцем
+    hit.on('pointerup', () => { if (onFeedback) onFeedback() })
+
+    objs.push(minus, plus, barBg, barFill, knob, txt, hit)
     return objs
   }
 
