@@ -47,6 +47,11 @@ class YandexPlatform {
   // Язык игрока по правилам Яндекса: из SDK (environment.i18n.lang), иначе из
   // языка браузера. Возвращает ISO-код ('ru','en',...); дефолт 'ru'.
   lang() {
+    // Override через URL (?lang=en|ru) — удобно для скриншотов магазина.
+    try {
+      const q = new URLSearchParams(window.location.search).get('lang')
+      if (q) return q
+    } catch (e) { /* */ }
     try { const l = this.ya?.environment?.i18n?.lang; if (l) return l } catch (e) { /* */ }
     try { const n = (navigator.language || navigator.userLanguage || 'ru'); return n } catch (e) { /* */ }
     return 'ru'
