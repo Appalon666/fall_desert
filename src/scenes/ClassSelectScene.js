@@ -39,23 +39,23 @@ export default class ClassSelectScene extends Phaser.Scene {
     bar.fillStyle(tint, 1); bar.fillRoundedRect(-w / 2, top, w, 10, { tl: 16, tr: 16, bl: 0, br: 0 })
     const glow = this.add.image(0, top + 96, TEX.GLOW).setTint(tint).setAlpha(0.22).setScale(3.4, 3)
 
-    const icon = this.add.text(0, top + 52, cls.icon, { fontSize: '60px' }).setOrigin(0.5)
-    const hero = this.add.image(0, top + 150, cls.tex, 0).setScale(0.52)
-    const name = this.add.text(0, top + 214, t(cls.name), {
+    // Крупный арт героя вместо эмодзи-иконки — он и есть «иконка» класса.
+    const hero = this.add.image(0, top + 118, cls.tex, 0).setScale(0.62)
+    const name = this.add.text(0, top + 208, t(cls.name), {
       fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold',
       stroke: '#120d09', strokeThickness: 4,
     }).setOrigin(0.5)
-    const line = this.add.rectangle(0, top + 244, w - 60, 2, tint, 0.6).setOrigin(0.5)
-    const desc = this.add.text(0, top + 258, t(cls.desc), {
+    const line = this.add.rectangle(0, top + 238, w - 60, 2, tint, 0.6).setOrigin(0.5)
+    const desc = this.add.text(0, top + 252, t(cls.desc), {
       fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.paper,
       align: 'center', wordWrap: { width: w - 44 }, lineSpacing: 3,
     }).setOrigin(0.5, 0)
-    const perks = this.add.text(0, top + 336, cls.perks.map(p => `✦ ${t(p)}`).join('\n'), {
-      fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic,
-      align: 'center', lineSpacing: 6, fontStyle: 'bold',
+    const perks = this.add.text(0, top + 320, cls.perks.map(p => `✦ ${t(p)}`).join('\n'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '13.5px', color: CSS.toxic,
+      align: 'center', lineSpacing: 4, fontStyle: 'bold', wordWrap: { width: w - 22 },
     }).setOrigin(0.5, 0)
 
-    c.add([bg, bar, glow, icon, hero, name, line, desc, perks])
+    c.add([bg, bar, glow, hero, name, line, desc, perks])
 
     const btn = createButton(this, 0, h / 2 - 38, {
       label: t('Выбрать'), width: w - 56, height: 46, fontSize: 20,
