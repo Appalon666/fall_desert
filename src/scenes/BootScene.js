@@ -8,6 +8,7 @@ import { ENEMY_IDS } from '../data/enemies.js'
 import { State } from '../state/GameState.js'
 import { Platform } from '../platform/yandex.js'
 import { Music } from '../audio/music.js'
+import { Sfx } from '../audio/sfx.js'
 import { setLang } from '../i18n.js'
 
 export default class BootScene extends Phaser.Scene {
@@ -19,6 +20,10 @@ export default class BootScene extends Phaser.Scene {
     // Опциональная фоновая музыка (public/music/*). Нет файлов — тихо пропускаем.
     this.load.on('loaderror', () => { /* нет ассета — не страшно, есть фолбэк */ })
     Music.queue(this.load)
+    // Звуковые сэмплы (выстрелы/монстры, CC0). Нет — синтез-фолбэк в Sfx.
+    for (const [k, f] of [['sfx-shoot', 'shoot.wav'], ['sfx-shoot-sg', 'shoot_shotgun.wav'], ['sfx-enemy-die', 'enemy_die.ogg'], ['sfx-boss', 'boss.ogg']]) {
+      this.load.audio(k, `audio/sfx/${f}`)
+    }
     // Спрайтшиты героев (6 кадров 3×2, кадр 341×279). Есть — используются вместо
     // процедурных; нет — остаётся процедурный fallback (tex-hero-*).
     for (const c of ['gunner', 'brute', 'mechanic', 'scavenger']) {
@@ -48,6 +53,7 @@ export default class BootScene extends Phaser.Scene {
   create() {
     generateTextures(this)
     this.buildEnemyAnims()
+    Sfx.attach(this.sound) // звук-менеджер для сэмплов выстрелов/монстров
 
     // Прячем HTML-прелоадер — движок готов.
     const pre = document.getElementById('preloader')

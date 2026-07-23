@@ -369,8 +369,8 @@ export default class BattleScene extends Phaser.Scene {
 
   // ---------------- Стрельба ----------------
   shoot(tx, ty) {
-    Sfx.resume(); Sfx.shoot()
     const ws = State.weaponStyle() // визуал выстрела зависит от надетого оружия
+    Sfx.resume(); Sfx.shoot(ws.id === 'drobovik' || ws.id === 'obrez')
     const b = this.add.image(this.muzzle.x, this.muzzle.y, TEX.BULLET).setScale(ws.scale / TEX_SS).setTint(ws.tint).setBlendMode('ADD').setDepth(30)
     let ang = Phaser.Math.Angle.Between(this.muzzle.x, this.muzzle.y, tx, ty)
     ang += (Math.random() - 0.5) * ws.spread // лёгкий разброс по типу оружия

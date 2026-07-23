@@ -34,6 +34,18 @@ class SfxEngine {
   // Глушим аудиоконтекст при сворачивании вкладки / показе рекламы (Яндекс 1.3, 4.7).
   suspend() { try { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend() } catch (e) { /* */ } }
 
+  // Звук-менеджер Phaser для проигрывания загруженных сэмплов (выстрелы/монстры).
+  attach(soundManager) { this.smgr = soundManager }
+  // Проиграть загруженный сэмпл по ключу; вернёт true, если получилось.
+  sample(key, vol = 1) {
+    if (this.muted || !this.smgr) return false
+    try {
+      if (!this.smgr.game.cache.audio.exists(key)) return false
+      this.smgr.play(key, { volume: Math.min(1, this.volume * vol), rate: 0.94 + Math.random() * 0.12 })
+      return true
+    } catch (e) { return false }
+  }
+
   setMuted(m) {
     this.muted = m
     this.applyGain()
@@ -78,12 +90,16 @@ class SfxEngine {
     src.start(t); src.stop(t + dur + 0.02)
   }
 
-  shoot() { this._noise(0.07, 0.22, 1400); this._tone(240, 0.07, 'square', 0.12, 90) }
+  // Выстрел: нарисованный сэмпл (по типу оружия), иначе синтез. shotgun — для дробовиков.
+  shoot(shotgun = false) {
+    if (this.sample(shotgun ? 'sfx-shoot-sg' : 'sfx-shoot', 0.4)) return
+    this._noise(0.07, 0.22, 1400); this._tone(240, 0.07, 'square', 0.12, 90)
+  }
   hit() { this._tone(430, 0.05, 'square', 0.16, 220) }
   crit() { this._tone(720, 0.12, 'sawtooth', 0.2, 300); this._noise(0.06, 0.12, 2500) }
-  kill() { this._noise(0.16, 0.28, 900); this._tone(160, 0.16, 'square', 0.14, 60) }
+  kill() { if (this.sample('sfx-enemy-die', 0.6)) return; this._noise(0.16, 0.28, 900); this._tone(160, 0.16, 'square', 0.14, 60) }
   cap() { this._tone(920, 0.05, 'sine', 0.14, 1300) }
-  boss() { this._tone(70, 0.5, 'sawtooth', 0.32, 48); this._tone(110, 0.5, 'square', 0.16, 70) }
+  boss() { if (this.sample('sfx-boss', 0.85)) return; this._tone(70, 0.5, 'sawtooth', 0.32, 48); this._tone(110, 0.5, 'square', 0.16, 70) }
   ult() { this._noise(0.4, 0.35, 700); this._tone(130, 0.4, 'sawtooth', 0.28, 900) }
   levelup() { this._tone(523, 0.1, 'sine', 0.22, null, 0); this._tone(659, 0.1, 'sine', 0.22, null, 0.09); this._tone(784, 0.16, 'sine', 0.22, null, 0.18) }
   click() { this._tone(320, 0.035, 'square', 0.1) }
