@@ -44,10 +44,10 @@ export default class PrestigeScene extends Phaser.Scene {
 
     // Кнопка перерождения
     const gain = State.coresFromRun()
-    const can = gain >= 1
+    const can = State.canPrestige()
     const info = this.add.text(GAME.WIDTH / 2, 148, can
       ? t('За этот забег получишь: +{g} ☢   (убито {k})', { g: gain, k: fmt(State.totalKills) })
-      : t('Нужно больше убийств за забег (сейчас {k}). Копи прогресс и возвращайся.', { k: fmt(State.totalKills) }),
+      : t('Перерождение — после босса 4-й локации (ты в зоне {z}).', { z: State.zoneIndex + 1 }),
       { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: can ? '#b6ff5a' : '#b8ad9a', fontStyle: 'bold' }).setOrigin(0.5)
     const pb = createButton(this, GAME.WIDTH / 2, 196, {
       label: can ? t('☢ Переродиться (+{g})', { g: gain }) : t('☢ Пока рано'),

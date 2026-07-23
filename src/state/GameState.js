@@ -135,13 +135,15 @@ export class GameState extends Emitter {
   // враги картонные (их HP считается от totalKills, что сброшено, а бонусы меты —
   // нет). Берём ~70% прироста: накал сохраняется, но герой всё равно чуть сильнее
   // → глубина от забега к забегу растёт (компаунд), а не обнуляется.
+  // Перманентное усиление врагов за каждое перерождение: +5% (компаундится).
+  prestigeEnemyMul() { return Math.pow(1.05, this.prestigeCount) }
   enemyMetaHpMul() {
     // Мягко: основную «не-картонность» после престижа даёт enemyProgMul (уровень),
     // здесь лишь небольшая добавка, чтобы глубина от престижа всё же росла.
     const power = this.prestigeDamageMul() * Math.pow(1.15, this.prestige.quickstart)
-    return Math.pow(power, 0.45)
+    return Math.pow(power, 0.45) * this.prestigeEnemyMul()
   }
-  enemyMetaDmgMul() { return 1 + this.prestigeHpMul() * 0.45 }
+  enemyMetaDmgMul() { return (1 + this.prestigeHpMul() * 0.45) * this.prestigeEnemyMul() }
   // Прогрессия HP врагов по уровню героя и зоне — чтобы очки силы от левелапов
   // не превращали мобов в картон. Ранний разгон до cap, затем мягкий хвост.
   enemyProgMul() {
@@ -155,8 +157,11 @@ export class GameState extends Emitter {
   // волна сильнее» ощущается, но не компаундится в абсурд за сотни волн.
   waveScaleMul() { return Math.pow(BAL.enemyWaveRamp, this.waveCount) }
   bumpWave() { this.waveCount++ }
-  canPrestige() { return this.coresFromRun() >= 1 }
+  // Перерождение открывается только после убийства босса 4-й локации
+  // (zoneIndex доходит до 4 = пройдены все 4 зоны, начался endless).
+  canPrestige() { return this.zoneIndex >= 4 && this.coresFromRun() >= 1 }
   doPrestige() {
+    if (!this.canPrestige()) return 0
     const gain = this.coresFromRun()
     if (gain < 1) return 0
     this.cores += gain

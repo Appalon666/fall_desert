@@ -181,6 +181,8 @@ const EN = {
   'За этот забег получишь: +{g} ☢   (убито {k})': 'This run grants: +{g} ☢   ({k} kills)',
   'Нужно больше убийств за забег (сейчас {k}). Копи прогресс и возвращайся.':
     'Need more kills this run (now {k}). Build progress and come back.',
+  'Перерождение — после босса 4-й локации (ты в зоне {z}).':
+    'Prestige unlocks after the 4th location boss (you are in zone {z}).',
   '☢ Переродиться (+{g})': '☢ Prestige (+{g})', '☢ Пока рано': '☢ Not yet',
   'Переродиться за +{g} ☢ ?\nПрогресс забега сбросится.': 'Prestige for +{g} ☢ ?\nRun progress resets.',
   'Переродиться': 'Prestige',

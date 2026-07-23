@@ -89,8 +89,9 @@ function runOne(classId, rng) {
     wave = []
     for (let i = 0; i < count; i++) {
       const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
-      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.45)
-      const mDmg = 1 + pHp() * 0.45
+      const pEnemy = Math.pow(1.05, meta.prestigeCount) // +5% за каждое перерождение
+      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.45) * pEnemy
+      const mDmg = (1 + pHp() * 0.45) * pEnemy
       const lv = st.hero.level - 1
       const progFull = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyZoneRamp, st.zoneIndex)
       const prog = boss ? Math.pow(progFull, 0.6) : progFull
@@ -152,7 +153,7 @@ function runOne(classId, rng) {
       }
     }
     if (st.zoneIndex > maxZone) maxZone = st.zoneIndex
-    if (firstCoreT === null && coresFromRun() >= 1) firstCoreT = t
+    if (firstCoreT === null && coresFromRun() >= 1 && st.zoneIndex >= 4) firstCoreT = t
   }
 
   return { classId, maxZone, prestigeCount: meta.prestigeCount, cores: meta.cores, prestige: meta.prestige, prestigeTimes, prestigeZones, level: st.hero.level, legacy: meta.prestige.legacy, firstCoreT }
