@@ -17,8 +17,15 @@ export default class HubScene extends Phaser.Scene {
   create() {
     const cx = GAME.WIDTH / 2
 
-    // Атмосферный фон
-    buildBackground(this, { sky: 0x2c2416, ground: 0x3a2a18, accent: 0xc9a76a }, { groundY: GAME.HEIGHT * 0.82 })
+    // Атмосферный фон: нарисованный арт меню (если есть) или процедурный.
+    if (this.textures.exists('bg-menu')) {
+      const src = this.textures.get('bg-menu').getSourceImage()
+      const sc = Math.max(GAME.WIDTH / src.width, GAME.HEIGHT / src.height)
+      this.add.image(GAME.WIDTH / 2, GAME.HEIGHT / 2, 'bg-menu').setScale(sc).setDepth(-20)
+      this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, 0x0a0806, 0.42).setOrigin(0).setDepth(-19)
+    } else {
+      buildBackground(this, { sky: 0x2c2416, ground: 0x3a2a18, accent: 0xc9a76a }, { groundY: GAME.HEIGHT * 0.82 })
+    }
     applyPostFX(this, true, 0.45)
     Music.play(this, 'bgm_menu')
 

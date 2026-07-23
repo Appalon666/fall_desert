@@ -6,25 +6,25 @@ export const ZONES = [
     name: 'Ржавый Пустырь',
     sky: 0x2c2416, ground: 0x8a4b2a, accent: 0xc9a76a,
     enemies: ['radrat', 'crawler', 'wasp', 'ghoul'],
-    bossTint: 0xb5652f,
+    bossTint: 0xb5652f, bg: 'bg-rust',
   },
   {
     name: 'Руины Города',
     sky: 0x23262b, ground: 0x3c3c42, accent: 0x6b6b73,
     enemies: ['ghoul', 'raider', 'lurker', 'dog'],
-    bossTint: 0x8a8a92,
+    bossTint: 0x8a8a92, bg: 'bg-city',
   },
   {
     name: 'Токсичный Бункер',
     sky: 0x16240f, ground: 0x2c3a12, accent: 0x8fbf3f,
     enemies: ['bloat', 'spitter', 'brute', 'ghoul'],
-    bossTint: 0x8fbf3f,
+    bossTint: 0x8fbf3f, bg: 'bg-bunker',
   },
   {
     name: 'Логово Босса',
     sky: 0x2a1010, ground: 0x3a1414, accent: 0x9c2b2b,
     enemies: ['brute', 'lurker', 'raider', 'bloat', 'dog'],
-    bossTint: 0xff5a3c,
+    bossTint: 0xff5a3c, bg: 'bg-lair',
   },
 ]
 
@@ -51,5 +51,7 @@ export function getZone(index) {
   const base = ZONES[ZONES.length - 1]
   const affix = affixForLoop(loop)
   const suffix = affix.name ? ` +${loop} · ${affix.name}` : ` +${loop}`
-  return { ...base, name: `${base.name}${suffix}`, endless: true, loop, affix }
+  // В endless фон циклится по всем 4 зонам (визуальное разнообразие).
+  const bg = ZONES[index % ZONES.length].bg
+  return { ...base, bg, name: `${base.name}${suffix}`, endless: true, loop, affix }
 }

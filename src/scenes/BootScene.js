@@ -28,6 +28,10 @@ export default class BootScene extends Phaser.Scene {
     for (const id of ENEMY_IDS) {
       this.load.spritesheet(`enemy-${id}`, `sprites/enemy-${id}.png`, { frameWidth: 170, frameHeight: 186 })
     }
+    // Фоны зон + меню (нарисованные). Нет файла — процедурный fallback.
+    for (const k of ['rust', 'city', 'bunker', 'lair', 'menu']) {
+      this.load.image(`bg-${k}`, `bg/${k}.jpg`)
+    }
   }
 
   create() {

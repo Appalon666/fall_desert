@@ -87,6 +87,8 @@ export default class BattleScene extends Phaser.Scene {
   // ---------------- Арена и фон ----------------
   buildArena() {
     const W = this.arenaW, gy = this.groundY
+    // Нарисованный фон зоны (если загружен) — за всем; иначе процедурное небо.
+    this.zoneBg = this.add.image(W / 2, GAME.HEIGHT / 2, TEX.GLOW).setDepth(-12).setVisible(false)
     this.skyGfx = this.add.graphics().setDepth(-10)
     this.sun = this.add.image(W * 0.7, gy * 0.4, TEX.GLOW).setDepth(-9).setAlpha(0.32).setScale(4.6)
     this.godrays = addGodRays(this, W * 0.7, gy * 0.4 - 30, 0xffdf9a)
@@ -125,16 +127,31 @@ export default class BattleScene extends Phaser.Scene {
 
   applyZoneVisuals() {
     this.zone = getZone(State.zoneIndex)
-    const skyTop = darken(this.zone.sky, 0.45)
-    this.skyGfx.clear()
-    this.skyGfx.fillGradientStyle(skyTop, skyTop, this.zone.sky, this.zone.sky, 1)
-    this.skyGfx.fillRect(0, 0, this.arenaW, this.groundY)
-    this.sun.setTint(this.zone.accent)
+    const bgKey = this.zone.bg
+    const usePainted = bgKey && this.textures.exists(bgKey)
+    // Процедурное небо/солнце/руины показываем только без нарисованного фона.
+    this.skyGfx.setVisible(!usePainted)
+    this.sun.setVisible(!usePainted)
+    if (this.godrays) this.godrays.setVisible(!usePainted)
+    if (this.ruinLayer) this.ruinLayer.setVisible(!usePainted)
+
+    if (usePainted) {
+      const src = this.textures.get(bgKey).getSourceImage()
+      const sc = Math.max(this.arenaW / src.width, GAME.HEIGHT / src.height)
+      this.zoneBg.setTexture(bgKey).setScale(sc).setVisible(true)
+    } else {
+      this.zoneBg.setVisible(false)
+      const skyTop = darken(this.zone.sky, 0.45)
+      this.skyGfx.clear()
+      this.skyGfx.fillGradientStyle(skyTop, skyTop, this.zone.sky, this.zone.sky, 1)
+      this.skyGfx.fillRect(0, 0, this.arenaW, this.groundY)
+      this.sun.setTint(this.zone.accent)
+      const ruinCol = darken(this.zone.ground, 0.55)
+      this.ruins.forEach(r => r.setTint(ruinCol))
+    }
     if (this.horizonGlow) this.horizonGlow.setTint(this.zone.accent)
     this.groundRect.setFillStyle(this.zone.ground)
     this.accentLine.setFillStyle(this.zone.accent)
-    const ruinCol = darken(this.zone.ground, 0.55)
-    this.ruins.forEach(r => r.setTint(ruinCol))
     this.debris.forEach(d => d.setFillStyle(darken(this.zone.ground, 0.7)))
   }
 
