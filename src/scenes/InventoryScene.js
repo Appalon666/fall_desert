@@ -72,9 +72,10 @@ export default class InventoryScene extends Phaser.Scene {
 
     // --- Кукла персонажа ---
     const hx = GAME.WIDTH * 0.26, hy = 330
-    const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
-    const heroImg = this.add.image(hx, hy, heroTex, 0).setScale(0.62)
     const cls = State.classDef()
+    const heroTex = (cls && cls.tex) || TEX.HERO
+    const footY = (cls && cls.footY) || 0.98 // ноги на одной линии для всех классов
+    const heroImg = this.add.image(hx, hy + 85, heroTex, 0).setOrigin(0.5, footY).setScale(0.62)
     const clsLabel = this.add.text(hx, hy + 150, cls ? t(cls.name) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
     this.uiObjs.push(heroImg, clsLabel)
 

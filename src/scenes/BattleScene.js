@@ -48,7 +48,8 @@ export default class BattleScene extends Phaser.Scene {
     this.heroNew = this.textures.exists(heroKey) && this.textures.get(heroKey).frameTotal > 1
     if (this.heroNew) {
       const HS = 0.95 // ← масштаб героя (кадр 341×279); подстрой при желании
-      this.hero = this.add.sprite(hx, this.groundY + 18, heroKey, 0).setOrigin(0.5, 1).setScale(HS)
+      const footY = (cls && cls.footY) || 0.98 // якорь по ногам: все классы на одной линии
+      this.hero = this.add.sprite(hx, this.groundY + 18, heroKey, 0).setOrigin(0.5, footY).setScale(HS)
       this.muzzle = { x: hx + 138 * HS, y: this.hero.y - 160 * HS }
     } else {
       const fk = (cls && `tex-${cls.tex}`) || TEX.HERO

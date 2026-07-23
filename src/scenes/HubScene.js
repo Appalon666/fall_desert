@@ -51,8 +51,10 @@ export default class HubScene extends Phaser.Scene {
     createButton(this, GAME.WIDTH - 40 - ig * 2, iy, { label: '🏆', width: iw, height: 44, fontSize: 24, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
 
     // Герой + полоска опыта
-    const heroTex = (State.classDef() && State.classDef().tex) || TEX.HERO
-    const hero = this.add.image(cx - 360, 470, heroTex, 0).setScale(0.62)
+    const heroCls = State.classDef()
+    const heroTex = (heroCls && heroCls.tex) || TEX.HERO
+    const footY = (heroCls && heroCls.footY) || 0.98 // ноги на одной линии для всех классов
+    const hero = this.add.image(cx - 360, 556, heroTex, 0).setOrigin(0.5, footY).setScale(0.62)
     this.tweens.add({ targets: hero, y: hero.y - 6, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
     const xpW = 300, xpX = cx - 510, xpY = 610
     this.add.text(xpX, xpY - 24, t('Уровень {l}', { l: State.hero.level }), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0)

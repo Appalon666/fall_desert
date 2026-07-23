@@ -40,7 +40,9 @@ export default class ClassSelectScene extends Phaser.Scene {
     const glow = this.add.image(0, top + 96, TEX.GLOW).setTint(tint).setAlpha(0.22).setScale(3.4, 3)
 
     // Крупный арт героя вместо эмодзи-иконки — он и есть «иконка» класса.
-    const hero = this.add.image(0, top + 118, cls.tex, 0).setScale(0.62)
+    // Якорь по ногам (footY) — чтобы все классы стояли на одной линии в карточке.
+    const footY = cls.footY || 0.98
+    const hero = this.add.image(0, top + 203, cls.tex, 0).setOrigin(0.5, footY).setScale(0.62)
     const name = this.add.text(0, top + 208, t(cls.name), {
       fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold',
       stroke: '#120d09', strokeThickness: 4,
