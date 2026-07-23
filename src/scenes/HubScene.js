@@ -62,25 +62,25 @@ export default class HubScene extends Phaser.Scene {
     }
 
     // Кнопки навигации
-    const bx = cx + 130
+    const bx = cx + 210
     let by = 250
     const gap = 74
-    createButton(this, bx, by, { label: t('⚔  ПОХОД'), width: 340, height: 66, fontSize: 30, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => this.scene.start(SCENES.BATTLE) })
+    createButton(this, bx, by, { label: t('ПОХОД'), width: 340, height: 66, fontSize: 30, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => this.scene.start(SCENES.BATTLE) })
     by += gap + 6
-    createButton(this, bx, by, { label: t('🔧  Апгрейды и союзники'), width: 340, height: 58, onClick: () => this.scene.start(SCENES.SHOP) })
+    createButton(this, bx, by, { label: t('Апгрейды и союзники'), width: 340, height: 58, onClick: () => this.scene.start(SCENES.SHOP) })
     by += gap
-    createButton(this, bx, by, { label: t('🎒  Инвентарь'), width: 340, height: 58, onClick: () => this.scene.start(SCENES.INVENTORY) })
+    createButton(this, bx, by, { label: t('Инвентарь'), width: 340, height: 58, onClick: () => this.scene.start(SCENES.INVENTORY) })
     by += gap
-    createButton(this, bx, by, { label: t('🔨  Верстак (крафт)'), width: 340, height: 58, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.scene.start(SCENES.FORGE) })
+    createButton(this, bx, by, { label: t('Верстак (крафт)'), width: 340, height: 58, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.scene.start(SCENES.FORGE) })
     by += gap
     createButton(this, bx, by, {
-      label: State.hero.points > 0 ? t('🦸  Герой (+{n})', { n: State.hero.points }) : t('🦸  Герой'),
+      label: State.hero.points > 0 ? t('Герой (+{n})', { n: State.hero.points }) : t('Герой'),
       width: 340, height: 58, color: State.hero.points > 0 ? COLORS.rustLight : COLORS.rust,
       onClick: () => this.scene.start(SCENES.HERO),
     })
     by += gap
     createButton(this, bx, by, {
-      label: State.canPrestige() ? t('☢  Перерождение (+{n})', { n: State.coresFromRun() }) : t('☢  Перерождение'),
+      label: State.canPrestige() ? t('Перерождение (+{n})', { n: State.coresFromRun() }) : t('Перерождение'),
       width: 340, height: 58,
       color: State.canPrestige() ? COLORS.toxicDark : COLORS.rust, hover: COLORS.toxic,
       onClick: () => this.scene.start(SCENES.PRESTIGE),
