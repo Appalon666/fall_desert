@@ -8,11 +8,11 @@
 import { BAL } from './balance.js'
 
 // Сколько врагов в очередной волне (батч на экране). Медленно растёт по зонам,
-// плюс +1 враг за каждые 10 выпущенных волн (напряг нарастает; waveCount
-// сбрасывается в новой зоне, поэтому прибавка ограничена).
-export function enemiesInWave(zoneIndex, waveCount = 0) {
+// плюс +1 враг за каждые 20 убийств в зоне (напряг нарастает; killsInZone
+// сбрасывается в новой зоне и делится пополам при смерти — прибавка ограничена).
+export function enemiesInWave(zoneIndex, killsInZone = 0) {
   const byZone = Math.min(BAL.waveCountMax, BAL.waveCountBase + Math.floor(zoneIndex / 3))
-  return byZone + Math.floor(waveCount / 10)
+  return byZone + Math.floor(killsInZone / 20)
 }
 
 // Пора ли выпускать босса-ворот (набрали норму убийств в зоне).

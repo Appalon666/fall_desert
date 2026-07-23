@@ -250,7 +250,7 @@ export default class BattleScene extends Phaser.Scene {
       Sfx.boss()
       return
     }
-    const n = enemiesInWave(State.zoneIndex, State.waveCount)
+    const n = enemiesInWave(State.zoneIndex, State.killsInZone)
     const pool = this.zone.enemies
     for (let i = 0; i < n; i++) {
       const defId = pool[Math.floor(Math.random() * pool.length)]
@@ -282,7 +282,7 @@ export default class BattleScene extends Phaser.Scene {
     const dispScale = useNew ? baseScale * 0.62 : baseScale / TEX_SS
     const onScreenH = texH * dispScale
     // строй: боссы выходят вплотную; обычные — колонной у правого края арены.
-    const spawnX = isBoss ? (this.hero.x + BAL.enemyAttackRange + 60) : (this.arenaW - 70 - i * 56)
+    const spawnX = isBoss ? (this.arenaW - 130) : (this.arenaW - 70 - i * 56)
     const rowLift = isBoss ? 0 : (i % 2) * 46
     const yPos = this.groundY - onScreenH * 0.42 - rowLift
 
