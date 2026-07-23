@@ -32,6 +32,8 @@ export default class BootScene extends Phaser.Scene {
     for (const k of ['rust', 'city', 'bunker', 'lair', 'menu']) {
       this.load.image(`bg-${k}`, `bg/${k}.jpg`)
     }
+    // Нарисованная плашка кнопки (9-slice). Нет — рисуем графикой.
+    this.load.image('ui-button', 'ui/button.png')
   }
 
   create() {

@@ -23,21 +23,35 @@ export function createButton(scene, x, y, opts = {}) {
 
   const container = scene.add.container(x, y)
   const baseColor = enabled ? color : COLORS.steelDark
-  const g = scene.add.graphics()
 
-  const draw = (fill) => {
-    g.clear()
-    // тень
-    g.fillStyle(COLORS.ink, 0.4)
-    g.fillRoundedRect(-width / 2 + 3, -height / 2 + 4, width, height, 10)
-    // тело
-    g.fillStyle(fill, 1)
-    g.fillRoundedRect(-width / 2, -height / 2, width, height, 10)
-    // обводка
-    g.lineStyle(2, COLORS.ink, 0.6)
-    g.strokeRoundedRect(-width / 2, -height / 2, width, height, 10)
+  // Нарисованная плашка (9-slice) — если текстура загрузилась. Тинт передаёт
+  // цвет кнопки/состояние (наведение — теплее, выключено — приглушённо).
+  const usePlate = scene.textures.exists('ui-button')
+  let plate = null
+  let g = null
+  let draw
+  if (usePlate) {
+    plate = scene.add.nineslice(0, 0, 'ui-button', undefined, width, height, 46, 46, 24, 24)
+    // Плашка самодостаточна по цвету — тинтом лишь передаём состояние:
+    // обычное — как есть, наведение — теплее/ярче, выключено — приглушённо.
+    draw = (fill) => { plate.setTint(!enabled ? 0x8f867c : fill === hover ? 0xffe4b0 : 0xffffff) }
+    draw(baseColor)
+  } else {
+    g = scene.add.graphics()
+    draw = (fill) => {
+      g.clear()
+      // тень
+      g.fillStyle(COLORS.ink, 0.4)
+      g.fillRoundedRect(-width / 2 + 3, -height / 2 + 4, width, height, 10)
+      // тело
+      g.fillStyle(fill, 1)
+      g.fillRoundedRect(-width / 2, -height / 2, width, height, 10)
+      // обводка
+      g.lineStyle(2, COLORS.ink, 0.6)
+      g.strokeRoundedRect(-width / 2, -height / 2, width, height, 10)
+    }
+    draw(baseColor)
   }
-  draw(baseColor)
 
   const text = scene.add.text(0, 0, label, {
     fontFamily: 'Rubik, sans-serif',
@@ -46,7 +60,7 @@ export function createButton(scene, x, y, opts = {}) {
     fontStyle: 'bold',
   }).setOrigin(0.5)
 
-  container.add([g, text])
+  container.add([plate || g, text])
   container.setSize(width, height)
 
   if (enabled) {
