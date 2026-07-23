@@ -17,7 +17,7 @@ export function isEn() { return LANG === 'en' }
 // EN-переводы, ключ = русская строка-исходник.
 const EN = {
   // — Hub / меню —
-  'ЯДРЁН-ПУСТОШЬ': 'ATOM-WASTELAND',
+  'ЯДРЁН-ПУСТОШЬ': 'ATOMIC WASTELAND',
   'Крышки, пули и абсурд': 'Caps, bullets and absurd',
   'Рекорд: {n} убийств': 'Best: {n} kills',
   'Зона {z} · ур. {l}': 'Zone {z} · lvl {l}',
