@@ -255,6 +255,27 @@ seamless side-scroller game background 1920x720, dark blood-red boss lair with j
 
 ---
 
+## 💰 Ресурсы (валюты) — квадрат 96×96, прозрачный фон
+
+Крупным планом по центру, читается на маленьком размере, единый стиль.
+
+**Крышки** (основная валюта за убийства) — `res-caps.png`
+```
+2D game currency icon, single object centered, a shiny golden bottle cap with a bottle-cap crown edge and a tiny star stamp, post-apocalyptic, hand-painted cartoon style, thick dark outlines, gold and rust palette, transparent background, no text
+```
+
+**Металлолом** (для крафта на верстаке) — `res-scrap.png`
+```
+2D game currency icon, single object centered, a small pile of rusty scrap metal: bolts, gears and a bent nut, post-apocalyptic, hand-painted cartoon style, thick dark outlines, steel-grey and rust palette, transparent background, no text
+```
+
+**Ядра** (валюта перерождения / престижа) — `res-core.png`
+```
+2D game currency icon, single object centered, a glowing radioactive fuel core, a green energy sphere inside a cracked metal casing with a yellow radiation trefoil, ominous glow, post-apocalyptic, hand-painted cartoon style, thick dark outlines, toxic green palette, transparent background, no text
+```
+
+---
+
 ## Порядок (рекомендация)
 Иконка → обложка → 4 героя → 10 монстров → 5 оружий → 4 фона. Как сгенеришь PNG —
 присылай, впаяю в код (спрайтшиты, анимации, разные выстрелы, параллакс).
