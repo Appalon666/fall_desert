@@ -190,6 +190,8 @@ export class GameState extends Emitter {
     if (withCombo) dmg *= this.comboMult()
     return dmg
   }
+  // Картечь: доля урона, которую попадание переносит на соседних врагов.
+  splashFrac() { return this.upgAdd('splash') }
   critChance() {
     return Math.min(0.9,
       BAL.baseCritChance + this.hero.luck * BAL.perLuckCrit

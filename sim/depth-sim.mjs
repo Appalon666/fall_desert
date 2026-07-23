@@ -123,7 +123,13 @@ function runOne(classId, rng) {
     if (wave.length === 0) spawnWave()
     const zoneBefore = st.zoneIndex
     clickAccum += cps * acc * DT
-    while (clickAccum >= 1 && wave.length) { clickAccum -= 1; st.combo++; wave[0].hp -= clickHit(); if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() } }
+    while (clickAccum >= 1 && wave.length) {
+      clickAccum -= 1; st.combo++
+      const hit = clickHit(); wave[0].hp -= hit
+      const sp = uA('splash') // Картечь: разлёт по нескольким врагам сзади
+      if (sp > 0) for (let k = 1; k < wave.length && k <= 3; k++) wave[k].hp -= hit * sp
+      for (let k = wave.length - 1; k >= 0; k--) if (wave[k].hp <= 0) { killFront(wave[k]); wave.splice(k, 1) }
+    }
     if (wave.length) { wave[0].hp -= allyDps() * DT; if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() } }
     if (st.zoneIndex > zoneBefore) lastZoneT = t
     if (wave.length) {

@@ -20,8 +20,8 @@ export const UPGRADES = [
   },
   {
     id: 'multishot', name: 'Картечь', icon: '💥',
-    desc: '+8% к урону клика за уровень',
-    baseCost: 50, costMult: 1.28, kind: 'add', stat: 'clickMul', perLevel: 0.08,
+    desc: '+10% урона по врагам рядом с целью за уровень',
+    baseCost: 50, costMult: 1.28, kind: 'add', stat: 'splash', perLevel: 0.10,
   },
   {
     id: 'crit', name: 'Меткий глаз', icon: '🎯',

@@ -10,6 +10,7 @@ export const BAL = {
   baseClickDamage: 3,
   perStrength: 1.2,        // +урон за очко силы
   critMultiplier: 2.2,     // множитель крит-урона
+  splashRadius: 130,       // радиус разлёта урона «Картечи» вокруг цели
   baseCritChance: 0.03,    // 3% базовый шанс крита
   perLuckCrit: 0.01,       // +1% крит за очко удачи
 

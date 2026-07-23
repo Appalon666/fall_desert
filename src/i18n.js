@@ -137,7 +137,7 @@ const EN = {
   'Урон клика ×1.15 за уровень': 'Click damage ×1.15 per level',
   'Макс. HP ×1.13 за уровень': 'Max HP ×1.13 per level',
   '+25% к урону союзников за уровень': '+25% ally damage per level',
-  '+8% к урону клика за уровень': '+8% click damage per level',
+  '+10% урона по врагам рядом с целью за уровень': '+10% splash damage to enemies near the target per level',
   '+1% шанс крита за уровень': '+1% crit chance per level',
   // — лут: редкости/слоты/статы/крафт —
   'Хлам': 'Junk', 'Годное': 'Decent', 'Редкое': 'Rare', 'Легенда': 'Legend', 'Реликвия': 'Relic',

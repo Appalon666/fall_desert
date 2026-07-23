@@ -419,7 +419,29 @@ export default class BattleScene extends Phaser.Scene {
     this.punchEnemy(e)
     this.impactRing(x, y, crit)
     if (crit) this.cameras.main.shake(70, 0.004)
+
+    // Картечь: часть урона разлетается по врагам рядом с целью.
+    const splash = State.splashFrac()
+    if (splash > 0) this.splashDamage(e, dmg * splash)
+
     if (e.hp <= 0) this.killEnemy(e)
+  }
+
+  // Разлёт урона по врагам в радиусе от цели (сама цель не задевается повторно).
+  splashDamage(target, amount) {
+    const dmg = Math.max(1, Math.round(amount))
+    const R = BAL.splashRadius || 130
+    const dead = []
+    for (const o of this.enemies) {
+      if (o === target || !o.sprite.active) continue
+      const dx = o.sprite.x - target.sprite.x, dy = o.sprite.y - target.sprite.y
+      if (dx * dx + dy * dy > R * R) continue
+      o.hp -= dmg
+      this.floatText(o.sprite.x, o.sprite.y - o.onScreenH * 0.4, fmt(dmg), '#ffb066', 15)
+      this.punchEnemy(o)
+      if (o.hp <= 0) dead.push(o)
+    }
+    for (const o of dead) this.killEnemy(o)
   }
 
   punchEnemy(e) {

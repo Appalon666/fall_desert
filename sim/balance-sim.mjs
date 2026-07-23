@@ -131,6 +131,9 @@ function runOne(classId, rng) {
       if (lifesteal > 0 && st.hp < heroMaxHp()) st.hp = Math.min(heroMaxHp(), st.hp + dmg * lifesteal)
       // пробитие: урон по нескольким передним врагам
       for (let p = 0; p < pierce && p < wave.length; p++) wave[p].hp -= dmg
+      // Картечь: разлёт части урона по врагам сзади
+      const sp = upgAdd('splash')
+      if (sp > 0) for (let k = pierce; k < wave.length && k < pierce + 3; k++) wave[k].hp -= dmg * sp
       for (let k = 0; k < wave.length;) { if (wave[k].hp <= 0) { killFront(wave[k]); wave.splice(k, 1) } else k++ }
     }
     // союзники — тоже по переднему
