@@ -298,7 +298,7 @@ export default class BattleScene extends Phaser.Scene {
     return {
       sprite, aura, bg, fill, nameLabel, barW, def, defId, isBoss, useNew, flip: !!def.flip,
       maxHp: hp, hp, reward, dmg, speed, scale: baseScale, dispScale, texH, onScreenH, baseY: yPos,
-      hitR: onScreenH * 0.32, attackTimer: 0,
+      attackTimer: 0,
     }
   }
 
@@ -326,15 +326,19 @@ export default class BattleScene extends Phaser.Scene {
     ;[e.sprite, e.aura, e.bg, e.fill, e.nameLabel].filter(Boolean).forEach(o => o.destroy())
   }
 
-  // Ближайший к точке живой враг в радиусе r (для попадания пули).
-  // skip — Set уже пробитых этой пулей врагов (не бьём дважды).
-  nearestEnemy(x, y, r, skip) {
-    let best = null, bd = r * r
+  // Попадание пули: враг, в чей хитбокс (по РЕАЛЬНОМУ размеру спрайта) попала точка.
+  // Из нескольких — ближайший по центру. skip — уже пробитые этой пулей.
+  hitTestEnemy(x, y, skip) {
+    let best = null, bd = Infinity
     for (const e of this.enemies) {
       if (skip && skip.has(e)) continue
-      const dx = e.sprite.x - x, dy = e.sprite.y - y
-      const d = dx * dx + dy * dy
-      if (d < bd) { bd = d; best = e }
+      const hw = e.onScreenH * 0.34 // половина ширины хитбокса
+      const hh = e.onScreenH * 0.52 // половина высоты (покрывает голову и ноги)
+      const dx = x - e.sprite.x, dy = y - e.sprite.y
+      if (Math.abs(dx) <= hw && Math.abs(dy) <= hh) {
+        const d = dx * dx + dy * dy
+        if (d < bd) { bd = d; best = e }
+      }
     }
     return best
   }
@@ -592,7 +596,7 @@ export default class BattleScene extends Phaser.Scene {
         const tr = this.add.image(b.x, b.y, TEX.DOT).setTint(b.trailTint || 0xffe08a).setScale(0.55).setDepth(29).setBlendMode('ADD').setAlpha(0.5)
         this.tweens.add({ targets: tr, alpha: 0, scale: 0.1, duration: 150, onComplete: () => tr.destroy() })
       }
-      const target = this.nearestEnemy(b.x, b.y, 46, b.hitSet)
+      const target = this.hitTestEnemy(b.x, b.y, b.hitSet)
       let spent = false
       if (target) {
         b.hitSet.add(target)
