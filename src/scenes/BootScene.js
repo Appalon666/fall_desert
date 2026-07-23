@@ -39,7 +39,8 @@ export default class BootScene extends Phaser.Scene {
     // Иконки апгрейдов / союзников / слотов инвентаря. Нет — эмодзи-фолбэк.
     for (const k of ['up-damage', 'up-hp', 'up-allyPower', 'up-multishot', 'up-crit',
       'ally-dog', 'ally-gunner', 'ally-turret', 'ally-sniper', 'ally-mech',
-      'slot-weapon', 'slot-helmet', 'slot-armor', 'slot-boots', 'slot-accessory']) {
+      'slot-weapon', 'slot-helmet', 'slot-armor', 'slot-boots', 'slot-accessory',
+      'res-caps', 'res-scrap', 'res-core']) {
       this.load.image(k, `icons/${k}.png`)
     }
   }

@@ -6,7 +6,7 @@ import { GAME, COLORS, CSS, SCENES } from '../config.js'
 import { State } from '../state/GameState.js'
 import { CRAFT_TIERS, RARITIES, RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
-import { buildBackground, titleText, applyPostFX, panel } from '../ui/scenery.js'
+import { buildBackground, titleText, applyPostFX, panel, resIcon } from '../ui/scenery.js'
 import { Sfx } from '../audio/sfx.js'
 import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
@@ -34,7 +34,7 @@ export default class ForgeScene extends Phaser.Scene {
       fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper, align: 'center', lineSpacing: 4,
     }).setOrigin(0.5)
 
-    this.add.text(40, 40, '🔩', { fontSize: '28px' }).setOrigin(0.5)
+    resIcon(this, 40, 40, 'scrap', 30)
     this.scrapText = this.add.text(64, 40, '', { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#d8d8e0', fontStyle: 'bold' }).setOrigin(0, 0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 42, { label: t('⟵ В лагерь'), width: 300, height: 50, onClick: () => this.scene.start(SCENES.HUB) })

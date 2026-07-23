@@ -4,7 +4,7 @@ import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
-import { buildBackground, titleText, panel, applyPostFX } from '../ui/scenery.js'
+import { buildBackground, titleText, panel, applyPostFX, resIcon } from '../ui/scenery.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
@@ -34,10 +34,11 @@ export default class HubScene extends Phaser.Scene {
     this.add.text(cx, 124, t('Крышки, пули и абсурд'), { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: CSS.rust, fontStyle: 'bold' }).setOrigin(0.5)
 
     // Крышки (крупно, слева сверху)
-    this.add.image(60, 44, TEX.CAP).setScale(1.6)
+    resIcon(this, 60, 44, 'caps', 42)
     this.add.text(86, 44, fmt(State.caps), { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
     if (State.cores > 0) {
-      this.add.text(60, 82, `☢ ${t('{n} ядер', { n: fmt(State.cores) })}`, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: '#b6ff5a', fontStyle: 'bold' }).setOrigin(0, 0.5)
+      resIcon(this, 60, 84, 'core', 26)
+      this.add.text(78, 84, t('{n} ядер', { n: fmt(State.cores) }), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: '#b6ff5a', fontStyle: 'bold' }).setOrigin(0, 0.5)
     }
 
     // Рекорд
@@ -183,7 +184,7 @@ export default class HubScene extends Phaser.Scene {
     bg.lineStyle(3, COLORS.cap, 0.8); bg.strokeRoundedRect(-230, -130, 460, 260, 14)
     const t1 = this.add.text(0, -90, t('С возвращением, выживший!'), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
     const t2 = this.add.text(0, -40, t('Отряд работал {t}\nи собрал:', { t: fmtDuration(res.seconds) }), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper, align: 'center' }).setOrigin(0.5)
-    const cap = this.add.image(-40, 30, TEX.CAP).setScale(1.6)
+    const cap = resIcon(this, -40, 30, 'caps', 42)
     const t3 = this.add.text(-10, 30, `+${fmt(res.caps)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
     box.add([bg, t1, t2, cap, t3])
     const close = () => { overlay.destroy(); box.destroy(); take.destroy(); dbl.destroy() }

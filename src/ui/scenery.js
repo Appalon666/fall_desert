@@ -21,6 +21,24 @@ export function lighten(c, f) {
 // Оставлен no-op, чтобы не трогать все места вызова (легко вернуть при желании).
 export function addVignette() { return null }
 
+// Иконка ресурса (крышки/металлолом/ядра) заданного размера в пикселях.
+// res: 'caps' | 'scrap' | 'core'. Нет нарисованной текстуры — фолбэк:
+// крышки → процедурная монета, остальное → эмодзи.
+export function resIcon(scene, x, y, res, sizePx = 28, origin = 0.5) {
+  const key = `res-${res}`
+  if (scene.textures.exists(key)) {
+    const img = scene.add.image(x, y, key).setOrigin(origin)
+    const src = scene.textures.get(key).getSourceImage()
+    img.setScale(sizePx / Math.max(src.width, src.height))
+    return img
+  }
+  if (res === 'caps' && scene.textures.exists(TEX.CAP)) {
+    return scene.add.image(x, y, TEX.CAP).setOrigin(origin).setScale(sizePx / 26)
+  }
+  const emo = res === 'scrap' ? '🔩' : res === 'core' ? '☢' : '🍾'
+  return scene.add.text(x, y, emo, { fontSize: `${sizePx}px` }).setOrigin(origin)
+}
+
 // Дрейфующая пыль (частицы). Возвращает эмиттер.
 export function addDust(scene, groundY = GAME.HEIGHT) {
   return scene.add.particles(0, 0, TEX.DOT, {

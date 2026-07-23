@@ -7,7 +7,7 @@ import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
 import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue, weaponTexKey } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
-import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
+import { buildBackground, titleText, applyPostFX, resIcon } from '../ui/scenery.js'
 import { Sfx } from '../audio/sfx.js'
 import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
@@ -36,9 +36,9 @@ export default class InventoryScene extends Phaser.Scene {
     buildBackground(this, { sky: 0x1c1a20, ground: 0x2a2630, accent: 0x6b6b73 }, { groundY: GAME.HEIGHT * 0.88, dust: false })
     applyPostFX(this, true, 0.4)
     titleText(this, GAME.WIDTH / 2, 36, t('ИНВЕНТАРЬ'), { size: 32 })
-    this.add.image(40, 36, TEX.CAP).setScale(1.4)
+    resIcon(this, 40, 36, 'caps', 36)
     this.capsText = this.add.text(62, 36, '', { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
-    this.add.text(220, 36, '🔩', { fontSize: '22px' }).setOrigin(0.5)
+    resIcon(this, 220, 36, 'scrap', 26)
     this.scrapText = this.add.text(242, 36, '', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: '#d8d8e0', fontStyle: 'bold' }).setOrigin(0, 0.5)
 
     this.add.text(GAME.WIDTH * 0.72, 74, t('ДОБЫЧА'), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)

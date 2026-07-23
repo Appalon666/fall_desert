@@ -7,7 +7,7 @@ import { State } from '../state/GameState.js'
 import { UPGRADES } from '../data/upgrades.js'
 import { ALLIES } from '../data/allies.js'
 import { createButton } from '../ui/Button.js'
-import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
+import { buildBackground, titleText, applyPostFX, resIcon } from '../ui/scenery.js'
 import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
 
@@ -21,7 +21,7 @@ export default class ShopScene extends Phaser.Scene {
     applyPostFX(this, true, 0.4)
     titleText(this, GAME.WIDTH / 2, 40, t('МАСТЕРСКАЯ'), { size: 34 })
 
-    this.add.image(40, 40, TEX.CAP).setScale(1.4)
+    resIcon(this, 40, 40, 'caps', 36)
     this.capsText = this.add.text(62, 40, '', { fontFamily: 'Rubik, sans-serif', fontSize: '26px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
 
     this.add.text(GAME.WIDTH * 0.27, 108, t('АПГРЕЙДЫ'), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
@@ -112,7 +112,7 @@ export default class ShopScene extends Phaser.Scene {
       const badge = this.add.text(w - 150, 16, `+${opts.count}`, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: afford ? CSS.toxic : '#8a8a92', fontStyle: 'bold' }).setOrigin(1, 0)
       objs.push(badge)
     }
-    const cap = this.add.image(w - 118, h / 2, TEX.CAP).setScale(1.1)
+    const cap = resIcon(this, w - 118, h / 2, 'caps', 28)
     const cost = this.add.text(w - 100, h / 2, fmt(opts.cost), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: afford ? CSS.cap : '#ab9e80', fontStyle: 'bold' }).setOrigin(0, 0.5)
     objs.push(cap, cost)
     c.add(objs)

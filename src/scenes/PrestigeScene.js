@@ -4,7 +4,7 @@ import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES } from '../config.js'
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
-import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
+import { buildBackground, titleText, applyPostFX, resIcon } from '../ui/scenery.js'
 import { Sfx } from '../audio/sfx.js'
 import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
@@ -24,7 +24,7 @@ export default class PrestigeScene extends Phaser.Scene {
     applyPostFX(this, true, 0.5)
     titleText(this, GAME.WIDTH / 2, 44, t('ПЕРЕРОЖДЕНИЕ'), { size: 34, color: '#b6ff5a', glow: COLORS.toxic })
 
-    this.add.text(40, 40, '☢', { fontSize: '30px', color: CSS.toxic }).setOrigin(0.5)
+    resIcon(this, 40, 40, 'core', 32)
     this.coresText = this.add.text(62, 40, '', { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#b6ff5a', fontStyle: 'bold' }).setOrigin(0, 0.5)
 
     this.add.text(GAME.WIDTH / 2, 88,

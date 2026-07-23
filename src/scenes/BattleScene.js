@@ -14,7 +14,7 @@ import { getZone } from '../data/zones.js'
 import { enemiesInWave, bossDue } from '../data/progression.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
-import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX } from '../ui/scenery.js'
+import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX, resIcon } from '../ui/scenery.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
@@ -164,7 +164,7 @@ export default class BattleScene extends Phaser.Scene {
     const cx = px + PANEL_W / 2
 
     this.add.image(px + 34, 40, TEX.GLOW).setTint(COLORS.cap).setScale(1.2).setAlpha(0.5).setBlendMode('ADD')
-    this.add.image(px + 34, 40, TEX.CAP).setScale(1.3)
+    resIcon(this, px + 34, 40, 'caps', 34)
     this.capsText = this.add.text(px + 54, 40, '0', {
       fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: CSS.cap, fontStyle: 'bold',
     }).setOrigin(0, 0.5)
@@ -588,7 +588,7 @@ export default class BattleScene extends Phaser.Scene {
 
   capsBurst(x, y, n) {
     for (let i = 0; i < n; i++) {
-      const c = this.add.image(x, y, TEX.CAP).setScale(1)
+      const c = resIcon(this, x, y, 'caps', 26)
       const a = Math.random() * Math.PI * 2
       const d = 30 + Math.random() * 50
       this.tweens.add({ targets: c, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d - 20, alpha: 0, angle: 180, duration: 500 + Math.random() * 200, ease: 'Cubic.out', onComplete: () => c.destroy() })
