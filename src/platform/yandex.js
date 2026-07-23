@@ -5,7 +5,7 @@
 
 import { Sfx } from '../audio/sfx.js'
 
-export const LEADERBOARD = 'kills'
+export const LEADERBOARD = 'Leaderboard'
 
 class YandexPlatform {
   constructor() {
