@@ -10,7 +10,7 @@ import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX, resIcon } from '../ui/scenery.js'
 import { heroScaleFor } from '../assets.js'
 import { Sfx } from '../audio/sfx.js'
-import { t } from '../i18n.js'
+import { t, itemName } from '../i18n.js'
 import { fmt } from '../util/format.js'
 
 // Метаданные гнёзд «куклы».
@@ -141,7 +141,7 @@ export default class InventoryScene extends Phaser.Scene {
     bg.lineStyle(2, rar ? rar.color : COLORS.ink, 0.9); bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8)
     const icon = this.slotIcon(-w / 2 + 10, 0, it, meta.icon, 36, key)
     const head = this.add.text(-w / 2 + 52, -34, t(meta.name), { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: '#c4b998' }).setOrigin(0, 0.5)
-    const body = this.add.text(-w / 2 + 52, -4, it ? it.name : t('— пусто —'), {
+    const body = this.add.text(-w / 2 + 52, -4, it ? itemName(it.name) : t('— пусто —'), {
       fontFamily: 'Rubik, sans-serif', fontSize: '16px',
       color: it ? rar.css : '#9a9078', fontStyle: 'bold', wordWrap: { width: w - 62 },
     }).setOrigin(0, 0.5)
@@ -179,7 +179,7 @@ export default class InventoryScene extends Phaser.Scene {
       bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(0, 0, w, h, 8)
       bg.lineStyle(2, rar.color, 1); bg.strokeRoundedRect(0, 0, w, h, 8)
       const icon = this.slotIcon(14, h / 2, it, slot.icon, 34, it.slot)
-      const name = this.add.text(50, 12, it.name, { fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: rar.css, fontStyle: 'bold' }).setOrigin(0)
+      const name = this.add.text(50, 12, itemName(it.name), { fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: rar.css, fontStyle: 'bold' }).setOrigin(0)
       const st = this.add.text(50, 33, `${t(slot.name)} · ${t(rar.name)} · ${statText(it)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#ddd2b4' }).setOrigin(0)
       c.add([bg, icon, name, st])
 

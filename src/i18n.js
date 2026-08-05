@@ -48,52 +48,41 @@ const EN = {
   '{n} ядер': '{n} cores',
   // — Как играть —
   '❔  КАК ИГРАТЬ': '❔  HOW TO PLAY',
+  'КАК ИГРАТЬ': 'HOW TO PLAY',
   'Понятно!': 'Got it!',
-  '🖱  КЛИК / ТАП по врагу — выстрел. Пуля бьёт БЛИЖАЙШЕГО, целься в опасных.':
-    '🖱  CLICK / TAP an enemy to shoot. The bullet hits the NEAREST one — aim at dangerous ones.',
-  '☢  SPACE или кнопка УЛЬТА — залп по ВСЕЙ волне (копится от попаданий).':
-    '☢  SPACE or the ULT button — blast the WHOLE wave (charges from hits).',
-  '🍾  Крышки за убийства → «Апгрейды»: урон, броня, картечь, крит, союзники.':
-    '🍾  Caps from kills → “Upgrades”: damage, armor, buckshot, crit, allies.',
-  '🤖  Союзники бьют сами и приносят доход, пока игра закрыта (офлайн).':
-    '🤖  Allies fight on their own and earn while the game is closed (offline).',
-  '💥  Каждые 20 убийств в зоне волна пополняется врагом — под конец жарче.':
-    '💥  Every 20 kills in a zone adds one more enemy per wave — it heats up.',
-  '🚪  В конце каждой зоны — БОСС-ВОРОТА: пробей, чтобы идти дальше.':
-    '🚪  Each zone ends with a BOSS GATE: break it to advance.',
-  '🦸  За уровни героя — очки в Силу / Живучесть / Удачу (раздел «Герой»).':
-    '🦸  Hero levels grant points into Strength / Vitality / Luck (“Hero” screen).',
-  '🎁  С врагов падает ЛУТ. Хлам разбирай в металлолом, куй новое на «Верстаке».':
-    '🎁  Enemies drop LOOT. Scrap junk into metal, craft new gear at the “Workbench”.',
-  '🎨  Редкость: Хлам ‹ Годное ‹ Редкое ‹ Легенда ‹ РЕЛИКВИЯ (оранж). Выше — сильнее бонус.':
-    '🎨  Rarity: Junk ‹ Fine ‹ Rare ‹ Legendary ‹ RELIC (orange). Higher = stronger bonus.',
-  '⚒  Чем дороже сборка на «Верстаке», тем выше шанс редкого предмета.':
-    '⚒  The pricier the craft at the “Workbench”, the higher the chance of a rare item.',
-  '☢  ПЕРЕРОЖДЕНИЕ откроется после босса 4-й локации и даёт 4 ЯДРА.':
-    '☢  PRESTIGE unlocks after the 4th location boss and grants 4 CORES.',
-  '💠  Ядра — на вечные бонусы (урон/HP/крышки/старт). Забег сбрасывается.':
-    '💠  Spend Cores on permanent bonuses (damage/HP/caps/head-start). The run resets.',
-  '🔥  Каждое перерождение делает врагов на +5% сильнее — пустошь звереет.':
-    '🔥  Each prestige makes enemies +5% stronger — the wasteland grows fiercer.',
-  '⚠️  Враги крепнут по мере твоего роста — качайся и не зевай удары!':
-    '⚠️  Enemies grow stronger as you do — level up and don’t take hits!',
+  // Первая страница «Как играть»: три карточки, по строчке на каждую.
+  'Кликай по врагу': 'Click the enemy',
+  'Пуля летит в точку клика': 'The bullet flies where you click',
+  'Крышки — в силу': 'Caps buy power',
+  'Апгрейды, союзники, снаряга': 'Upgrades, allies, gear',
+  'Босс — ворота зоны': 'Boss guards the gate',
+  'Пробей его, чтобы идти дальше': 'Break through to move on',
+  '☢  SPACE — залп по всей волне': '☢  SPACE — blast the whole wave',
+  'Что дальше →': 'What comes next →',
+  '← Назад': '← Back',
+  // Вторая страница: то, что нужно не в первую минуту.
+  'С врагов падает снаряга — надевай в «Инвентаре»': 'Enemies drop gear — equip it in the Inventory',
+  'Лишнее разбирай в металлолом и куй новое на «Верстаке»':
+    'Scrap spares into metal and forge new gear at the Workbench',
+  'За уровни дают очки: Сила, Живучесть, Удача': 'Levels grant points: Strength, Vitality, Luck',
+  'После 4-й локации откроется Перерождение — вечные бонусы':
+    'Prestige unlocks after the 4th location — permanent bonuses',
+  // — Подсказки в бою —
+  '🖱  КЛИКАЙ ПО ВРАГУ': '🖱  CLICK THE ENEMY',
+  '☢  Ульта заряжена — SPACE': '☢  Ult ready — press SPACE',
   // — Оффлайн —
   'С возвращением, выживший!': 'Welcome back, survivor!',
   'Отряд работал {t}\nи собрал:': 'Your squad worked for {t}\nand gathered:',
   'Забрать': 'Claim',
   // — Бой —
-  'Наведись на врага и КЛИКАЙ — стреляй!\nКрышки трать в «Мастерской», Space — ульта.':
-    'Aim at an enemy and CLICK — shoot!\nSpend caps in the “Workshop”, Space — ult.',
-  'Целься по врагам и КЛИКАЙ — пуля бьёт ближайшего.\nВыбивай опасных первыми! Крышки трать в «Мастерской», Space — ульта (по всем).':
-    'Aim and CLICK — the bullet hits the nearest.\nTake out dangerous ones first! Spend caps in the “Workshop”, Space — ult (hits all).',
   'Ульта не заряжена': 'Ult not charged',
   'ЗОНА {z} · {name}': 'ZONE {z} · {name}',
   'БОСС-ВОРОТА!': 'BOSS GATE!',
   'Зачистка: {a}/{b}': 'Clear: {a}/{b}',
   'Зачистка: {a}/{b}   ·   Всего убито: {t}': 'Clear: {a}/{b}   ·   Total kills: {t}',
   '{prog}   ·   Всего убито: {t}': '{prog}   ·   Total kills: {t}',
-  'Урон клика: {n}': 'Click damage: {n}',
-  'Крит: {n}%': 'Crit: {n}%',
+  // 'Урон клика: {n}' и 'Крит: {n}%' объявлены ниже, в блоке экрана героя —
+  // дубли молча перетирали друг друга, поэтому здесь их нет.
   'Союзники: {n}/сек': 'Allies: {n}/sec',
   '☠  БОСС': '☠  BOSS',
   '☠  БОСС-ВОРОТА': '☠  BOSS GATE',
@@ -115,7 +104,8 @@ const EN = {
   // — общее —
   'Отмена': 'Cancel',
   'В лагерь': 'To camp',
-  '⟵ В лагерь': '⟵ To camp',
+  // единицы длительности (fmtDuration) — уходят в окно офлайн-дохода
+  'ч': 'h', 'мин': 'min', 'сек': 'sec',
 
   // — классы —
   'Стрелок': 'Gunner',
@@ -142,6 +132,12 @@ const EN = {
   'Радкрыса': 'Radrat', 'Ползун': 'Crawler', 'Радоса': 'Radwasp', 'Гуль': 'Ghoul',
   'Рейдер': 'Raider', 'Пёс-мутант': 'Mutt', 'Тень': 'Lurker', 'Плевун': 'Spitter',
   'Пузырь': 'Bloat', 'Громила': 'Brute',
+  'Стервятник': 'Vulture', 'Клещ': 'Tick', 'Катала': 'Wheeler', 'Утопленник': 'Drowned',
+  'Пиявка': 'Leech', 'Слизняк': 'Slug', 'Стеклокраб': 'Glass Crab', 'Мясник': 'Butcher',
+  // — боссы зон —
+  'Крысиный Король': 'Rat King', 'Червь-Бурильщик': 'Borer Worm', 'Кран-Шагоход': 'Crane Walker',
+  'Кувалда': 'Sledge', 'Жаба-Жрун': 'Gulper Toad', 'Печь-Голем': 'Furnace Golem',
+  'Мать Выводка': 'Brood Mother', 'Тиран': 'Tyrant', 'Колосс': 'Colossus',
   // — союзники —
   'Верный пёс': 'Loyal Dog', 'Турель': 'Turret', 'Снайпер': 'Sniper', 'Боевой мех': 'Battle Mech',
   // — апгрейды —
@@ -233,6 +229,26 @@ const EN = {
     'Break down spare gear in the inventory → scrap. Forge equipment here.\nPricier builds — higher rare chance.',
   '{n} металлолома': '{n} scrap', 'редкое+: ~{n}%': 'rare+: ~{n}%',
   'Ковать': 'Forge', 'Мало 🔩': 'Low 🔩', 'скован!': 'forged!',
+  // — части имён предметов (см. PREFIX/NOUN в loot.js и itemName ниже) —
+  'Ржавый': 'Rusty', 'Кривой': 'Crooked', 'Самопальный': 'Homemade', 'Треснутый': 'Cracked',
+  'Ядрёный': 'Atomic', 'Липкий': 'Sticky', 'Гудящий': 'Humming', 'Счастливый': 'Lucky',
+  'Помятый': 'Dented', 'Фонящий': 'Glowing',
+  'обрез': 'sawed-off', 'гвоздомёт': 'nailgun', 'пистоль': 'pistol', 'дробовик': 'shotgun',
+  'самопал': 'zip gun',
+  'каска': 'helm', 'шлем': 'helmet', 'котелок': 'pot', 'противогаз': 'gas mask', 'капюшон': 'hood',
+  'жилет': 'vest', 'нагрудник': 'breastplate', 'куртка': 'jacket', 'щиток': 'plate', 'броник': 'flak vest',
+  'берцы': 'boots', 'сапоги': 'high boots', 'кроссы': 'sneakers', 'ботинки': 'shoes', 'галоши': 'galoshes',
+  'зуб': 'tooth', 'амулет': 'amulet', 'подкова': 'horseshoe', 'жетон': 'dog tag',
+  'крышка-талисман': 'lucky-cap',
+}
+
+// Имя предмета собирается в рантайме из прилагательного и существительного
+// («Ржавый обрез», см. loot.js) и лежит в сейве уже собранной строкой, поэтому
+// целиком в словаре его не найти. Переводим по словам: и новые предметы, и те,
+// что уже сохранены у игрока со старой версии.
+export function itemName(name) {
+  if (LANG !== 'en' || typeof name !== 'string') return name
+  return name.split(' ').map(w => (w in EN ? EN[w] : w)).join(' ')
 }
 
 export function t(ru, params) {

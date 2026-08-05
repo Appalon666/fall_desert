@@ -6,7 +6,7 @@
 // Запуск: node sim/depth-sim.mjs
 
 import { BAL } from '../src/data/balance.js'
-import { ENEMIES } from '../src/data/enemies.js'
+import { defOf } from '../src/data/bosses.js'
 import { enemyStats } from '../src/data/scaling.js'
 import { getZone, ZONES } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
@@ -85,10 +85,10 @@ function runOne(classId, rng) {
     const boss = !st.bossActive && bossDue(st.killsInZone)
     if (boss) st.bossActive = true
     const count = boss ? 1 : enemiesInWave(st.zoneIndex, st.killsInZone)
-    const z = getZone(st.zoneIndex); const pool = z.enemies; const af = z.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
+    const z = getZone(st.zoneIndex); const pool = boss ? z.bosses : z.enemies; const af = z.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
     wave = []
     for (let i = 0; i < count; i++) {
-      const def = ENEMIES[pool[Math.floor(rng() * pool.length)]]
+      const def = defOf(pool[Math.floor(rng() * pool.length)])
       const pEnemy = Math.pow(1.05, meta.prestigeCount) // +5% за каждое перерождение
       // после 1-го престижа +2.5% за каждый уровень героя выше 10
       const pLevel = meta.prestigeCount >= 1 ? Math.pow(1.025, Math.max(0, st.hero.level - 10)) : 1

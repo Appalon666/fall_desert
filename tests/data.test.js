@@ -4,6 +4,10 @@ import { BAL } from '../src/data/balance.js'
 import { enemyStats } from '../src/data/scaling.js'
 import { enemiesInWave, bossDue } from '../src/data/progression.js'
 import { ZONES, getZone, AFFIXES, affixForLoop } from '../src/data/zones.js'
+import { ENEMIES, ENEMY_IDS } from '../src/data/enemies.js'
+import { BOSSES, BOSS_IDS, defOf, sheetKey, isBossId } from '../src/data/bosses.js'
+import { setLang, t, itemName } from '../src/i18n.js'
+import { readFileSync } from 'node:fs'
 import { RARITIES, SLOTS, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID } from '../src/data/loot.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { fmt, fmtDuration } from '../src/util/format.js'
@@ -79,6 +83,71 @@ describe('zones / affixes', () => {
   })
 })
 
+describe('враги и боссы', () => {
+  const ALL = [...Object.entries(ENEMIES), ...Object.entries(BOSSES)]
+
+  it('id врагов и боссов не пересекаются', () => {
+    // ключ анимации ходьбы — `${id}-walk` на всех, совпадение id склеит анимации
+    for (const id of BOSS_IDS) expect(ENEMY_IDS).not.toContain(id)
+  })
+
+  it('у каждого дефа есть все поля, которые читает бой', () => {
+    for (const [id, d] of ALL) {
+      expect(typeof d.name, id).toBe('string')
+      for (const f of ['scale', 'hpMul', 'rewardMul', 'dmgMul', 'speedMul']) {
+        expect(d[f], `${id}.${f}`).toBeGreaterThan(0)
+      }
+      expect(typeof d.tint, id).toBe('number')
+    }
+  })
+
+  it('defOf/sheetKey разводят боссов и врагов', () => {
+    for (const id of ENEMY_IDS) {
+      expect(defOf(id)).toBe(ENEMIES[id])
+      expect(isBossId(id)).toBe(false)
+      expect(sheetKey(id)).toBe(`enemy-${id}`)
+    }
+    for (const id of BOSS_IDS) {
+      expect(defOf(id)).toBe(BOSSES[id])
+      expect(isBossId(id)).toBe(true)
+      expect(sheetKey(id)).toBe(`boss-${id}`)
+    }
+    expect(defOf('нет-такого')).toBeUndefined()
+  })
+
+  it('все имена переведены на английский', () => {
+    setLang('en')
+    try {
+      for (const [id, d] of ALL) expect(t(d.name), `${id}: ${d.name}`).not.toBe(d.name)
+    } finally { setLang('ru') }
+  })
+
+  it('боссы не выше арены', () => {
+    // высота на экране = 100 × scale (ENEMY_H_PER_SCALE), земля на y≈590
+    for (const [id, d] of Object.entries(BOSSES)) expect(d.scale * 100, id).toBeLessThanOrEqual(420)
+  })
+
+  it('пулы всех зон (включая endless) состоят из существующих id', () => {
+    for (let z = 0; z < ZONES.length + 6; z++) {
+      const zone = getZone(z)
+      expect(zone.enemies.length, `зона ${z}`).toBeGreaterThan(0)
+      expect(zone.bosses.length, `зона ${z}`).toBeGreaterThan(0)
+      for (const id of zone.enemies) expect(ENEMIES[id], `зона ${z}: ${id}`).toBeTruthy()
+      for (const id of zone.bosses) expect(BOSSES[id], `зона ${z}: ${id}`).toBeTruthy()
+    }
+  })
+
+  it('каждый враг и босс где-то встречается', () => {
+    const used = new Set()
+    for (let z = 0; z < ZONES.length + 5; z++) {
+      const zone = getZone(z)
+      zone.enemies.forEach(i => used.add(i))
+      zone.bosses.forEach(i => used.add(i))
+    }
+    for (const id of [...ENEMY_IDS, ...BOSS_IDS]) expect(used.has(id), id).toBe(true)
+  })
+})
+
 describe('loot', () => {
   const rng = (seed => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)(42)
   it('rollItem всегда возвращает валидный предмет', () => {
@@ -117,6 +186,53 @@ describe('loot', () => {
   })
   it('веса редкостей убывают (обычное чаще реликвии)', () => {
     expect(RARITIES[0].weight).toBeGreaterThan(RARITIES[RARITIES.length - 1].weight)
+  })
+})
+
+describe('локализация', () => {
+  const CYR = /[а-яА-ЯёЁ]/
+
+  it('в словаре нет дублей ключей (второй молча перетирает первый)', () => {
+    const src = readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8')
+    const en = src.slice(src.indexOf('const EN = {'), src.lastIndexOf('}'))
+    const seen = new Set(), dupes = []
+    for (const m of en.matchAll(/'((?:[^'\\]|\\.)*)'\s*:\s*(?:\n\s*)?'/g)) {
+      if (seen.has(m[1])) dupes.push(m[1])
+      seen.add(m[1])
+    }
+    expect(dupes).toEqual([])
+  })
+
+  it('сгенерированное имя предмета переводится целиком', () => {
+    const rng = (s => () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296)(11)
+    setLang('en')
+    try {
+      for (let i = 0; i < 300; i++) {
+        const name = itemName(rollItem(rng, 1 + i, 0).name)
+        expect(CYR.test(name), name).toBe(false)
+      }
+    } finally { setLang('ru') }
+  })
+
+  it('itemName не трогает имя, пока язык русский', () => {
+    const name = rollItem(Math.random, 5, 0).name
+    expect(itemName(name)).toBe(name)
+  })
+
+  it('единицы длительности переводятся (окно офлайн-дохода)', () => {
+    setLang('en')
+    try {
+      for (const s of [45, 305, 8115]) expect(CYR.test(fmtDuration(s)), String(s)).toBe(false)
+    } finally { setLang('ru') }
+  })
+
+  it('имя endless-зоны переводится вместе с аффиксом', () => {
+    setLang('en')
+    try {
+      for (let z = ZONES.length; z < ZONES.length + AFFIXES.length; z++) {
+        expect(CYR.test(getZone(z).name), `зона ${z}`).toBe(false)
+      }
+    } finally { setLang('ru') }
   })
 })
 

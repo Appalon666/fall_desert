@@ -101,42 +101,100 @@ export default class HubScene extends Phaser.Scene {
     }
 
     // Офлайн-доход
-    this.showOfflineReward()
-
-    // Новичку показываем «Как играть» один раз.
-    let seenHow = false
-    try { seenHow = localStorage.getItem('yp_howto') === '1' } catch (e) { /* */ }
-    if (!seenHow) { try { localStorage.setItem('yp_howto', '1') } catch (e) { /* */ } this.showHowTo() }
+    // Два окна разом показывать нельзя: у каждого свой полноэкранный
+    // перехватчик кликов, и верхнее наглухо блокирует кнопки нижнего (игрок
+    // видел награду за офлайн и не мог нажать «Забрать»). Поэтому «Как играть»
+    // ждёт, пока игрок закроет награду.
+    this.showOfflineReward(() => {
+      let seenHow = false
+      try { seenHow = localStorage.getItem('yp_howto') === '1' } catch (e) { /* */ }
+      if (seenHow) return
+      try { localStorage.setItem('yp_howto', '1') } catch (e) { /* */ }
+      this.showHowTo()
+    })
   }
 
+  // «Как играть». Раньше здесь была стена из 14 строк мелким шрифтом — новичок
+  // такое не читает. Теперь первая страница отвечает ровно на три вопроса
+  // картинками: чем бить, на что тратить, куда идти. Всё, что в первую минуту
+  // не нужно (лут, крафт, перерождение), убрано на вторую страницу.
   showHowTo() {
     const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
-    const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.8).setOrigin(0).setDepth(90).setInteractive()
-    const w = 830, h = 668
-    const g = panel(this, cx - w / 2, cy - h / 2, w, h, { fill: COLORS.steelDark, border: COLORS.cap, borderAlpha: 0.8 })
-    g.setDepth(91)
-    const title = this.add.text(cx, cy - h / 2 + 30, t('КАК ИГРАТЬ'), { fontFamily: 'Rubik, sans-serif', fontSize: '28px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(92)
-    const lines = [
-      '🖱  КЛИК / ТАП по врагу — выстрел. Пуля бьёт БЛИЖАЙШЕГО, целься в опасных.',
-      '☢  SPACE или кнопка УЛЬТА — залп по ВСЕЙ волне (копится от попаданий).',
-      '🍾  Крышки за убийства → «Апгрейды»: урон, броня, картечь, крит, союзники.',
-      '🤖  Союзники бьют сами и приносят доход, пока игра закрыта (офлайн).',
-      '💥  Каждые 20 убийств в зоне волна пополняется врагом — под конец жарче.',
-      '🚪  В конце каждой зоны — БОСС-ВОРОТА: пробей, чтобы идти дальше.',
-      '🦸  За уровни героя — очки в Силу / Живучесть / Удачу (раздел «Герой»).',
-      '🎁  С врагов падает ЛУТ. Хлам разбирай в металлолом, куй новое на «Верстаке».',
-      '🎨  Редкость: Хлам ‹ Годное ‹ Редкое ‹ Легенда ‹ РЕЛИКВИЯ (оранж). Выше — сильнее бонус.',
-      '⚒  Чем дороже сборка на «Верстаке», тем выше шанс редкого предмета.',
-      '☢  ПЕРЕРОЖДЕНИЕ откроется после босса 4-й локации и даёт 4 ЯДРА.',
-      '💠  Ядра — на вечные бонусы (урон/HP/крышки/старт). Забег сбрасывается.',
-      '🔥  Каждое перерождение делает врагов на +5% сильнее — пустошь звереет.',
-      '⚠️  Враги крепнут по мере твоего роста — качайся и не зевай удары!',
-    ].map(l => t(l))
-    const body = this.add.text(cx - w / 2 + 40, cy - h / 2 + 70, lines.join('\n'), {
-      fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.paper, lineSpacing: 9, wordWrap: { width: w - 80 },
-    }).setOrigin(0, 0).setDepth(92)
-    const close = createButton(this, cx, cy + h / 2 - 40, { label: t('Понятно!'), width: 220, height: 46, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => { ov.destroy(); g.destroy(); title.destroy(); body.destroy(); close.destroy() } })
-    close.setDepth(92)
+    const w = 900, h = 500
+    const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.82).setOrigin(0).setDepth(90).setInteractive()
+    const g = panel(this, cx - w / 2, cy - h / 2, w, h, { fill: COLORS.steelDark, border: COLORS.cap, borderAlpha: 0.8 }).setDepth(91)
+    const title = this.add.text(cx, cy - h / 2 + 34, t('КАК ИГРАТЬ'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(92)
+
+    const base = [ov, g, title]
+    let page = []
+    const clear = () => { page.forEach(o => o.destroy()); page = [] }
+    const closeAll = () => { clear(); base.forEach(o => o.destroy()) }
+
+    // Карточка: крупная картинка, короткий заголовок, одна строка пояснения.
+    const card = (x, head, line, makeIcon) => {
+      const cw = 264, ch = 264, top = cy - h / 2 + 76
+      const p = panel(this, x - cw / 2, top, cw, ch, { fill: COLORS.ink, border: COLORS.cap, borderAlpha: 0.3 }).setDepth(92)
+      const icon = makeIcon(x, top + 82).setDepth(93)
+      this.tweens.add({ targets: icon, y: icon.y - 7, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
+      const h1 = this.add.text(x, top + 162, t(head), {
+        fontFamily: 'Rubik, sans-serif', fontSize: '21px', color: CSS.cap, fontStyle: 'bold',
+        align: 'center', wordWrap: { width: cw - 28 },
+      }).setOrigin(0.5).setDepth(93)
+      const h2 = this.add.text(x, top + 194, t(line), {
+        fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper,
+        align: 'center', wordWrap: { width: cw - 32 }, lineSpacing: 5,
+      }).setOrigin(0.5, 0).setDepth(93)
+      page.push(p, icon, h1, h2)
+    }
+
+    const footer = (leftLabel, leftAction) => {
+      const y = cy + h / 2 - 40
+      const left = createButton(this, cx - 130, y, { label: t(leftLabel), width: 220, height: 48, fontSize: 19, onClick: leftAction }).setDepth(92)
+      const ok = createButton(this, cx + 130, y, {
+        label: t('Понятно!'), width: 220, height: 48, fontSize: 19,
+        color: COLORS.toxicDark, hover: COLORS.toxic, onClick: closeAll,
+      }).setDepth(92)
+      page.push(left, ok)
+    }
+
+    const page1 = () => {
+      clear()
+      card(cx - 292, 'Кликай по врагу', 'Пуля летит в точку клика',
+        (x, y) => this.add.image(x, y, TEX.ENEMY).setScale(104 / (72 * TEX_SS)))
+      card(cx, 'Крышки — в силу', 'Апгрейды, союзники, снаряга',
+        (x, y) => resIcon(this, x, y, 'caps', 100))
+      card(cx + 292, 'Босс — ворота зоны', 'Пробей его, чтобы идти дальше',
+        (x, y) => this.add.image(x, y, TEX.BOSS).setScale(112 / (100 * TEX_SS)))
+      const hint = this.add.text(cx, cy + h / 2 - 84, t('☢  SPACE — залп по всей волне'), {
+        fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.toxic, fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(92)
+      page.push(hint)
+      footer('Что дальше →', page2)
+    }
+
+    const page2 = () => {
+      clear()
+      const rows = [
+        ['🎁', 'С врагов падает снаряга — надевай в «Инвентаре»'],
+        ['⚒', 'Лишнее разбирай в металлолом и куй новое на «Верстаке»'],
+        ['🦸', 'За уровни дают очки: Сила, Живучесть, Удача'],
+        ['☢', 'После 4-й локации откроется Перерождение — вечные бонусы'],
+      ]
+      let y = cy - h / 2 + 110
+      for (const [icon, text] of rows) {
+        const em = this.add.text(cx - 330, y, icon, { fontSize: '30px' }).setOrigin(0.5).setDepth(92)
+        const tx = this.add.text(cx - 288, y, t(text), {
+          fontFamily: 'Rubik, sans-serif', fontSize: '19px', color: CSS.paper, wordWrap: { width: 600 },
+        }).setOrigin(0, 0.5).setDepth(92)
+        page.push(em, tx)
+        y += 68
+      }
+      footer('← Назад', page1)
+    }
+
+    page1()
   }
 
   // Настройки: мьют + громкость звука и музыки (шаг 10%, сохраняется).
@@ -203,14 +261,18 @@ export default class HubScene extends Phaser.Scene {
     return objs
   }
 
-  showOfflineReward() {
+  // onClose вызывается и когда награды не было — чтобы то, что стоит в очереди
+  // за этим окном (например «Как играть»), не потерялось.
+  showOfflineReward(onClose = () => {}) {
     const res = State.computeOffline()
-    if (res.caps <= 0 || res.seconds < 60) { State.lastSeen = Date.now(); State.save(); return }
+    if (res.caps <= 0 || res.seconds < 60) { State.lastSeen = Date.now(); State.save(); onClose(); return }
     State.claimOffline()
 
     const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
-    const overlay = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.6).setOrigin(0).setInteractive()
-    const box = this.add.container(cx, cy)
+    // Слои задаём явно: без них окно оставалось на нулевом слое и любое другое
+    // окно накрывало его своим перехватчиком кликов.
+    const overlay = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.6).setOrigin(0).setDepth(90).setInteractive()
+    const box = this.add.container(cx, cy).setDepth(91)
     const bg = this.add.graphics()
     bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(-290, -140, 580, 290, 14)
     bg.lineStyle(3, COLORS.cap, 0.8); bg.strokeRoundedRect(-290, -140, 580, 290, 14)
@@ -219,13 +281,13 @@ export default class HubScene extends Phaser.Scene {
     const cap = resIcon(this, -40, 30, 'caps', 42)
     const t3 = this.add.text(-10, 30, `+${fmt(res.caps)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
     box.add([bg, t1, t2, cap, t3])
-    const close = () => { overlay.destroy(); box.destroy(); take.destroy(); dbl.destroy() }
-    const take = createButton(this, cx - 145, cy + 105, { label: t('Забрать'), width: 200, height: 56, onClick: close })
+    const close = () => { overlay.destroy(); box.destroy(); take.destroy(); dbl.destroy(); onClose() }
+    const take = createButton(this, cx - 145, cy + 105, { label: t('Забрать'), width: 200, height: 56, onClick: close }).setDepth(92)
     // Яндекс 4.5.1: на кнопке вызова rewarded video должно быть однозначно
     // написано, что за награду покажут рекламу — одной иконки 📺 недостаточно.
     const dbl = createButton(this, cx + 145, cy + 105, {
       label: t('📺 Реклама: ×2'), width: 240, height: 56, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic,
       onClick: () => { Platform.showRewarded(() => State.addCaps(res.caps)); close() },
-    })
+    }).setDepth(92)
   }
 }

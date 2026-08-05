@@ -75,10 +75,12 @@ export default class HeroScene extends Phaser.Scene {
 
   confirmWipe() {
     const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
-    const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.7).setOrigin(0).setInteractive()
-    const msg = this.add.text(cx, cy - 70, t('Стереть весь прогресс?\nЭто нельзя отменить.'), { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#fff', align: 'center' }).setOrigin(0.5)
-    const yes = createButton(this, cx - 110, cy + 20, { label: t('Стереть'), width: 190, height: 54, color: COLORS.blood, hover: 0xc23b3b, onClick: () => { State.wipe(); this.scene.start(SCENES.CLASS_SELECT) } })
-    const no = createButton(this, cx + 110, cy + 20, { label: t('Отмена'), width: 190, height: 54, onClick: () => { ov.destroy(); msg.destroy(); yes.destroy(); no.destroy() } })
+    // Слои обязательны: без них окно живёт на нулевом слое вместе с обычным
+    // содержимым сцены, и любой элемент поверх перехватит клики по кнопкам.
+    const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.7).setOrigin(0).setDepth(90).setInteractive()
+    const msg = this.add.text(cx, cy - 70, t('Стереть весь прогресс?\nЭто нельзя отменить.'), { fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: '#fff', align: 'center' }).setOrigin(0.5).setDepth(91)
+    const yes = createButton(this, cx - 110, cy + 20, { label: t('Стереть'), width: 190, height: 54, color: COLORS.blood, hover: 0xc23b3b, onClick: () => { State.wipe(); this.scene.start(SCENES.CLASS_SELECT) } }).setDepth(92)
+    const no = createButton(this, cx + 110, cy + 20, { label: t('Отмена'), width: 190, height: 54, onClick: () => { ov.destroy(); msg.destroy(); yes.destroy(); no.destroy() } }).setDepth(92)
   }
 
   renderSummaryStub(cx, y) {

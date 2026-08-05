@@ -7,19 +7,22 @@ import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
 import { State } from '../state/GameState.js'
 import { BAL } from '../data/balance.js'
-import { ENEMIES } from '../data/enemies.js'
+import { defOf, sheetKey } from '../data/bosses.js'
 import { ALLIES } from '../data/allies.js'
 import { enemyStats } from '../data/scaling.js'
 import { getZone } from '../data/zones.js'
 import { enemiesInWave, bossDue } from '../data/progression.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
-import { loadBattle, battleAssetsReady, buildEnemySheets, buildEnemyAnims, heroScaleFor, buildHeroAnim } from '../assets.js'
+import {
+  loadBattle, battleAssetsReady, buildEnemySheets, buildEnemyAnims, heroScaleFor, buildHeroAnim,
+  loadBosses, bossAssetsReady, buildBossSheets,
+} from '../assets.js'
 import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX, resIcon } from '../ui/scenery.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
-import { t } from '../i18n.js'
+import { t, itemName } from '../i18n.js'
 import { fmt } from '../util/format.js'
 
 const PANEL_W = 320
@@ -62,9 +65,27 @@ export default class BattleScene extends Phaser.Scene {
     this.load.once('complete', () => { [label, bg, fill, pct].forEach(o => o.destroy()) })
   }
 
+  // Листы боссов (~2.5 МБ) не держат вход в бой: босс приходит только после
+  // BAL.zoneKills убийств. Догружаем их фоном и режем, когда приехали; если не
+  // успели (или файла нет) — босс выйдет на процедурном фолбэке, бой не встанет.
+  ensureBossAssets() {
+    try {
+      if (bossAssetsReady(this)) { buildBossSheets(this); return }
+      // Не доехавший лист — не повод падать: у босса останется процедурный
+      // фолбэк (как и у врагов, см. preload).
+      this.load.on('loaderror', () => { /* */ })
+      this.load.once('complete', () => {
+        try { if (this.scene && this.scene.isActive()) buildBossSheets(this) } catch (e) { /* */ }
+      })
+      loadBosses(this.load)
+      this.load.start()
+    } catch (e) { /* останется процедурный фолбэк */ }
+  }
+
   create() {
     buildEnemySheets(this) // режем листы врагов по их раскладке
     buildEnemyAnims(this)  // и заводим цикл ходьбы
+    this.ensureBossAssets() // листы боссов — фоном, они нужны только к воротам
     this.arenaW = GAME.WIDTH - PANEL_W
     this.groundY = GAME.HEIGHT - 130
     this.bullets = []
@@ -72,6 +93,12 @@ export default class BattleScene extends Phaser.Scene {
     this.wavePending = false
     this.lastHitTime = 0
     State.hp = State.heroMaxHp() // полное лечение в начале вылазки
+    // Флаг «идёт бой с боссом» живёт только внутри одной вылазки. Если игрок
+    // ушёл в лагерь прямо во время боя с воротами, флаг оставался поднятым, а
+    // босса на арене уже не было: bossDue гейтится этим флагом, и зона больше
+    // не могла закрыться до самой смерти героя. Каждый вход в бой начинается
+    // с чистого листа — босс придёт заново, когда набьётся норма убийств.
+    State.bossActive = false
 
     this.buildArena()
     this.buildPanel()
@@ -115,16 +142,61 @@ export default class BattleScene extends Phaser.Scene {
     this.events.once('shutdown', () => Platform.gameplayStop())
   }
 
+  // Онбординг боя: не абзац про все механики сразу, а прицел прямо на первом
+  // враге — куда смотреть и что делать, видно без чтения. Гаснет от первого же
+  // выстрела: дальше игрок понял руками.
   maybeTutorial() {
     let seen = false
     try { seen = localStorage.getItem('yp_tut_shoot') === '1' } catch (e) { /* */ }
     if (seen || State.totalKills > 0) return
+    const target = this.frontEnemy()
+    if (!target) return
+    const ring = this.add.circle(target.sprite.x, target.sprite.y, 58).setStrokeStyle(4, COLORS.toxic, 0.95).setDepth(70)
+    const label = this.add.text(target.sprite.x, target.sprite.y - 108, t('🖱  КЛИКАЙ ПО ВРАГУ'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '26px', color: CSS.toxic, fontStyle: 'bold',
+      stroke: '#120d09', strokeThickness: 5,
+    }).setOrigin(0.5).setDepth(70)
+    this.tweens.add({ targets: ring, scale: { from: 1.45, to: 0.9 }, alpha: { from: 0.25, to: 1 }, duration: 900, repeat: -1 })
+    this.tweens.add({ targets: label, y: label.y - 9, duration: 720, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
+    this._tut = { ring, label, target }
+  }
+
+  // Прицел живёт, пока цель жива: враг подходит — кружок едет за ним.
+  updateTutorial() {
+    if (!this._tut) return
+    const { ring, label, target } = this._tut
+    if (!target.sprite || !target.sprite.active || this.enemies.indexOf(target) < 0) { this.clearTutorial(); return }
+    ring.x = target.sprite.x; ring.y = target.sprite.y
+    label.x = target.sprite.x
+  }
+
+  clearTutorial() {
+    if (!this._tut) return
     try { localStorage.setItem('yp_tut_shoot', '1') } catch (e) { /* */ }
-    const tip = this.add.text(this.arenaW / 2, GAME.HEIGHT / 2 + 60,
-      t('Целься по врагам и КЛИКАЙ — пуля бьёт ближайшего.\nВыбивай опасных первыми! Крышки трать в «Мастерской», Space — ульта (по всем).'),
-      { fontFamily: 'Rubik, sans-serif', fontSize: '19px', color: CSS.paper, align: 'center', lineSpacing: 6, stroke: '#120d09', strokeThickness: 4 })
-      .setOrigin(0.5).setDepth(70)
-    this.tweens.add({ targets: tip, alpha: { from: 1, to: 0 }, delay: 4500, duration: 1400, onComplete: () => tip.destroy() })
+    const { ring, label } = this._tut
+    this._tut = null
+    this.tweens.killTweensOf(ring); this.tweens.killTweensOf(label)
+    this.tweens.add({
+      targets: [ring, label], alpha: 0, duration: 260,
+      onComplete: () => { ring.destroy(); label.destroy() },
+    })
+  }
+
+  // Про ульту рассказываем не в начале боя (когда шкала пуста и слово ни о чём
+  // не говорит), а ровно в тот момент, когда она впервые заполнилась.
+  maybeUltHint() {
+    if (this._ultHintDone || State.ult < BAL.ultMax) return
+    this._ultHintDone = true
+    let seen = false
+    try { seen = localStorage.getItem('yp_tut_ult') === '1' } catch (e) { /* */ }
+    if (seen) return
+    try { localStorage.setItem('yp_tut_ult', '1') } catch (e) { /* */ }
+    const tip = this.add.text(this.arenaW / 2, GAME.HEIGHT - 96, t('☢  Ульта заряжена — SPACE'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '26px', color: CSS.toxic, fontStyle: 'bold',
+      stroke: '#120d09', strokeThickness: 5,
+    }).setOrigin(0.5).setDepth(72)
+    this.tweens.add({ targets: tip, scale: { from: 0.75, to: 1 }, duration: 240, ease: 'Back.out' })
+    this.tweens.add({ targets: tip, alpha: 0, delay: 3200, duration: 800, onComplete: () => tip.destroy() })
   }
 
   // ---------------- Арена и фон ----------------
@@ -284,12 +356,14 @@ export default class BattleScene extends Phaser.Scene {
     const isBoss = !State.bossActive && bossDue(State.killsInZone)
     if (isBoss) {
       State.bossActive = true
-      const pool = this.zone.enemies
+      // У зоны свой пул боссов; на старых сейвах/самопальных зонах его может не
+      // быть — тогда, как раньше, ворота держит раздутый обычный враг.
+      const pool = (this.zone.bosses && this.zone.bosses.length) ? this.zone.bosses : this.zone.enemies
       const defId = pool[Math.floor(Math.random() * pool.length)]
       this.enemies.push(this.makeEnemy(defId, true, 0, 1))
       this.cameras.main.flash(220, 60, 0, 0)
       this.cameras.main.shake(200, 0.006)
-      this.showBossBanner(ENEMIES[defId].name)
+      this.showBossBanner(defOf(defId).name)
       Sfx.boss()
       return
     }
@@ -308,7 +382,7 @@ export default class BattleScene extends Phaser.Scene {
 
   // Создать один враг-объект (спрайт, полоска HP, имя, стат).
   makeEnemy(defId, isBoss, i, n, atX = null) {
-    const def = ENEMIES[defId]
+    const def = defOf(defId)
     const af = this.zone.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
     const base = enemyStats(def, State.totalKills, isBoss)
     const mHp = State.enemyMetaHpMul(), mDmg = State.enemyMetaDmgMul()
@@ -322,16 +396,23 @@ export default class BattleScene extends Phaser.Scene {
     const reward = Math.min(MAX, Math.ceil(base.reward * af.rew))
     const dmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave)
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd
-    const baseScale = isBoss ? BAL.bossScale : def.scale
+    // У боссов свой арт со своими пропорциями — берём их собственный scale.
+    // BAL.bossScale остаётся запасным для «босса из обычного врага».
+    const baseScale = isBoss ? (def.scale > BAL.bossScale ? def.scale : BAL.bossScale) : def.scale
     // Новый арт = спрайтшит 2×2 (цикл ходьбы). Иначе процедурный fallback.
-    const newKey = `enemy-${defId}`
+    const newKey = sheetKey(defId)
     const useNew = this.textures.exists(newKey) && this.textures.get(newKey).frameTotal - 1 >= 4
     // Кадр у каждого врага свой, поэтому задаём ВЫСОТУ НА ЭКРАНЕ, а не множитель:
     // ENEMY_H_PER_SCALE × scale из enemies.js. Так баланс размеров не зависит от арта.
-    const texH = useNew ? this.textures.get(newKey).get(0).height : TEX_H
+    // Процедурный фолбэк: у босса своя текстура (100×100), у врагов — 72×72.
+    const fbKey = this.textures.exists(`tex-e-${defId}`) ? `tex-e-${defId}` : (isBoss ? TEX.BOSS : TEX.ENEMY)
+    // Размер в «дизайнерских» px (текстура сгенерирована в TEX_SS× и ужимается
+    // обратно множителем dispScale) — как и было для врагов.
+    const fbSide = fbKey === TEX.BOSS ? 100 : TEX_H
+    const texH = useNew ? this.textures.get(newKey).get(0).height : fbSide
     const dispScale = useNew ? (ENEMY_H_PER_SCALE * baseScale) / texH : baseScale / TEX_SS
     const onScreenH = texH * dispScale
-    const texW = useNew ? this.textures.get(newKey).get(0).width : TEX_H
+    const texW = useNew ? this.textures.get(newKey).get(0).width : fbSide
     const onScreenW = texW * dispScale
     // строй: боссы выходят вплотную; обычные — колонной у правого края арены.
     const spawnX = isBoss ? (this.arenaW - 130) : (atX !== null ? atX : this.arenaW - 90 - i * 96)
@@ -350,7 +431,7 @@ export default class BattleScene extends Phaser.Scene {
       if (def.flip) sprite.setFlipX(true) // смотрящих вправо зеркалим на героя (влево)
       if (this.anims.exists(`${defId}-walk`)) sprite.play(`${defId}-walk`)
     } else {
-      sprite = this.add.image(spawnX, yPos, `tex-e-${defId}`).setScale(dispScale).setAlpha(0).setDepth(10 - (i % 2))
+      sprite = this.add.image(spawnX, yPos, fbKey).setScale(dispScale).setAlpha(0).setDepth(10 - (i % 2))
       addRim(sprite, isBoss ? 0xff5a2a : lighten(def.tint, 0.28), isBoss ? 6 : 3, 0.08, isBoss ? 20 : 11)
     }
     this.tweens.add({ targets: sprite, alpha: 1, duration: 200 })
@@ -401,7 +482,12 @@ export default class BattleScene extends Phaser.Scene {
     let best = null, bd = Infinity
     for (const e of this.enemies) {
       if (skip && skip.has(e)) continue
-      const hw = e.onScreenH * 0.34 // половина ширины хитбокса
+      // Хитбокс считаем от РЕАЛЬНЫХ размеров спрайта. Раньше ширина бралась от
+      // высоты — это осталось от квадратных процедурных текстур 72×72, а на
+      // нарисованном арте вытянутые враги (ползун, клещ, червь-босс) шире, чем
+      // выше: пуля проходила сквозь голову и хвост, засчитывая попадание только
+      // в среднюю треть туши.
+      const hw = e.onScreenW * 0.34 // половина ширины хитбокса
       const hh = e.onScreenH * 0.52 // половина высоты (покрывает голову и ноги)
       const dx = x - e.sprite.x, dy = y - e.sprite.y
       if (Math.abs(dx) <= hw && Math.abs(dy) <= hh) {
@@ -420,6 +506,7 @@ export default class BattleScene extends Phaser.Scene {
 
   // ---------------- Стрельба ----------------
   shoot(tx, ty) {
+    this.clearTutorial() // выстрелил — подсказка больше не нужна
     Sfx.resume(); Sfx.shoot()
     const ws = State.weaponStyle() // визуал выстрела зависит от надетого оружия
     const b = this.add.image(this.muzzle.x, this.muzzle.y, TEX.BULLET).setScale(ws.scale / TEX_SS).setTint(ws.tint).setBlendMode('ADD').setDepth(30)
@@ -534,7 +621,7 @@ export default class BattleScene extends Phaser.Scene {
       const item = rollItem(Math.random, Math.floor(State.enemyLevel()), State.lootLuck())
       State.addItem(item)
       const rar = RARITY_BY_ID[item.rarity]
-      this.floatText(e.sprite.x, e.sprite.y - 40, `🎁 ${item.name}`, rar.css, 18)
+      this.floatText(e.sprite.x, e.sprite.y - 40, `🎁 ${itemName(item.name)}`, rar.css, 18)
     }
 
     this.deathFx(e)
@@ -743,6 +830,8 @@ export default class BattleScene extends Phaser.Scene {
 
     if (State.combo > 0 && time - this.lastHitTime > BAL.comboTimeout) State.combo = 0
 
+    this.updateTutorial()
+    this.maybeUltHint()
     this.updateHud()
   }
 

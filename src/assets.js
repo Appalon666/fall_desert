@@ -3,12 +3,15 @@
 //
 //  1. CORE   — нужно, чтобы показать меню/выбор класса (~2.5 МБ): плашка кнопки,
 //              фон меню, спрайты героев, иконки, арт оружия.
-//  2. BATTLE — спрайтшиты врагов и фоны зон (~4 МБ). Грузятся в BattleScene.preload
+//  2. BATTLE — спрайтшиты врагов и фоны зон (~6 МБ). Грузятся в BattleScene.preload
 //              с видимым прогресс-баром — до первого «Похода» они не нужны.
-//  3. MUSIC  — два ogg-трека (~3.6 МБ). Догружаются фоном уже во время игры;
+//  3. BOSSES — девять листов боссов (~2.5 МБ). Догружаются фоном уже в бою: босс
+//              приходит только после zoneKills убийств, времени вагон.
+//  4. MUSIC  — два ogg-трека (~3.6 МБ). Догружаются фоном уже во время игры;
 //              когда готовы, Music сам включит нужный трек (Music.retry()).
 
 import { ENEMY_IDS } from './data/enemies.js'
+import { BOSS_IDS } from './data/bosses.js'
 
 // Иконки ресурсов нужны сразу (крышки/металлолом/ядра видны в лагере).
 const RES_ICONS = ['res-caps', 'res-scrap', 'res-core']
@@ -115,41 +118,62 @@ export function loadBattle(load) {
   for (const k of ZONE_BGS) load.image(`bg-${k}`, `bg/${k}.jpg`)
 }
 
-// Режем листы врагов: сетка 2×2, четыре кадра ходьбы.
-export function buildEnemySheets(scene) {
-  for (const id of ENEMY_IDS) {
-    const key = `enemy-${id}`
-    const srcKey = `${key}-src`
-    if (scene.textures.exists(key) || !scene.textures.exists(srcKey)) continue
-    const image = scene.textures.get(srcKey).getSourceImage()
-    if (!image || !image.width) continue
-    try {
-      scene.textures.addSpriteSheet(key, image, {
-        frameWidth: Math.floor(image.width / 2),
-        frameHeight: Math.floor(image.height / 2),
-      })
-    } catch (e) { /* битый файл — останется процедурный фолбэк */ }
-  }
+// Режем один лист: сетка 2×2, четыре кадра ходьбы.
+function sliceSheet(scene, key) {
+  const srcKey = `${key}-src`
+  if (scene.textures.exists(key) || !scene.textures.exists(srcKey)) return
+  const image = scene.textures.get(srcKey).getSourceImage()
+  if (!image || !image.width) return
+  try {
+    scene.textures.addSpriteSheet(key, image, {
+      frameWidth: Math.floor(image.width / 2),
+      frameHeight: Math.floor(image.height / 2),
+    })
+  } catch (e) { /* битый файл — останется процедурный фолбэк */ }
 }
 
-// Цикл ходьбы врага: 4 кадра по кругу. Отдельной анимации смерти больше нет —
+// Цикл ходьбы: 4 кадра по кругу. Отдельной анимации смерти больше нет —
 // вместо неё сцена играет процедурный взрыв (он и раньше был запасным путём).
+// Боссы шагают заметно медленнее — они тяжёлые.
+function walkAnim(scene, key, animKey, frameRate) {
+  if (!scene.textures.exists(key) || scene.textures.get(key).frameTotal - 1 < 4) return
+  if (scene.anims.exists(animKey)) return
+  scene.anims.create({
+    key: animKey,
+    frames: scene.anims.generateFrameNumbers(key, { start: 0, end: 3 }),
+    frameRate,
+    repeat: -1,
+  })
+}
+
+export function buildEnemySheets(scene) {
+  for (const id of ENEMY_IDS) sliceSheet(scene, `enemy-${id}`)
+}
+
 export function buildEnemyAnims(scene) {
-  for (const id of ENEMY_IDS) {
-    const key = `enemy-${id}`
-    if (!scene.textures.exists(key) || scene.textures.get(key).frameTotal - 1 < 4) continue
-    if (!scene.anims.exists(`${id}-walk`)) {
-      scene.anims.create({
-        key: `${id}-walk`,
-        frames: scene.anims.generateFrameNumbers(key, { start: 0, end: 3 }),
-        frameRate: 8,
-        repeat: -1,
-      })
-    }
+  for (const id of ENEMY_IDS) walkAnim(scene, `enemy-${id}`, `${id}-walk`, 8)
+}
+
+// --- 3. Боссы (фоновая догрузка из BattleScene) ---
+export function bossAssetsReady(scene) {
+  for (const id of BOSS_IDS) {
+    if (!scene.textures.exists(`boss-${id}-src`)) return false
+  }
+  return true
+}
+
+export function loadBosses(load) {
+  for (const id of BOSS_IDS) load.image(`boss-${id}-src`, `sprites/boss-${id}.png`)
+}
+
+export function buildBossSheets(scene) {
+  for (const id of BOSS_IDS) {
+    sliceSheet(scene, `boss-${id}`)
+    walkAnim(scene, `boss-${id}`, `${id}-walk`, 5)
   }
 }
 
-// --- 3. Музыка (фоновая догрузка из BootScene) ---
+// --- 4. Музыка (фоновая догрузка из BootScene) ---
 export function loadMusic(load) {
   load.audio('bgm_menu', ['music/menu.ogg', 'music/menu.mp3'])
   load.audio('bgm_battle', ['music/battle.ogg', 'music/battle.mp3'])
