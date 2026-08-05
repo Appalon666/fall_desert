@@ -11,6 +11,11 @@
 
 Запуск:
   python tools/mob-cut.py art-in/mobs/ghoul.jpg public/sprites/enemy-ghoul.png
+  python tools/mob-cut.py art-in/mobs/slug.jpg out.png mirror nogrid
+
+Флаг nogrid запрещает резать по квадрантам. Нужен, когда фигур на листе больше
+четырёх (слизняк нарисован в шесть поз): их центры случайно проходят проверку
+на ровную сетку 2x2, и в каждый квадрант попадает полторы фигуры.
 """
 import sys
 import numpy as np
@@ -196,7 +201,9 @@ def is_clean_grid(figs, shape):
 
 def main():
     src, dst = sys.argv[1], sys.argv[2]
-    mirror = len(sys.argv) > 3 and sys.argv[3] == 'mirror'
+    flags = sys.argv[3:]
+    mirror = 'mirror' in flags
+    nogrid = 'nogrid' in flags
     im = Image.open(src).convert('RGB')
     a = np.asarray(im)
     bg = bg_color(a)
@@ -214,7 +221,7 @@ def main():
     rgba = np.dstack([rgb, alpha])
 
     H, W = alpha.shape
-    if is_clean_grid(figs, (H, W)):
+    if is_clean_grid(figs, (H, W)) and not nogrid:
         # ровная сетка: режем квадранты и обрезаем их одинаково —
         # так сохраняется подпрыгивание/приседание между кадрами
         fh, fw = H // 2, W // 2
