@@ -76,7 +76,7 @@ export default class ForgeScene extends Phaser.Scene {
     c.add([bg, name, cost, odds])
 
     const btn = createButton(this, 0, h / 2 - 26, {
-      label: afford ? t('Ковать') : t('Мало 🔩'), width: w - 50, height: 40, fontSize: 18,
+      label: afford ? t('Ковать') : t('Мало 🔩'), width: w - 50, height: 52, fontSize: 19,
       color: afford ? COLORS.rust : COLORS.steelDark, hover: COLORS.rustLight, enabled: afford,
       onClick: () => this.doCraft(tier.id),
     })

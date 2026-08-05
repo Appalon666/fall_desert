@@ -7,6 +7,10 @@
 //   lifesteal   — доля нанесённого урона, возвращаемая в HP (Бугай)
 //   offlineBonus— +доля к офлайн-доходу (Механик)
 //   lootLuck    — бонус к качеству лута (Мародёр)
+//
+// tex/footY/muzzle — визуал: ключ спрайт-листа, якорь по ногам (доля высоты
+// кадра) и точка вылета пули (доли ширины/высоты кадра от центра-низа).
+// Всё в долях, а не в пикселях, — чтобы смена арта не ломала позиционирование.
 export const CLASSES = [
   {
     id: 'gunner', name: 'Стрелок', icon: '🔫',
@@ -16,7 +20,8 @@ export const CLASSES = [
     pierce: 2,
     startStats: { str: 2, vit: 0, luck: 1 },
     startAllies: {}, lootLuck: 0,
-    tex: 'hero-gunner', color: 0xd88a3a, footY: 0.99,
+    tex: 'hero-gunner', color: 0xd88a3a, footY: 0.988,
+    muzzle: { x: 0.459, y: 0.853 }, // ствол винтовки
   },
   {
     id: 'brute', name: 'Бугай', icon: '🛡️',
@@ -26,7 +31,8 @@ export const CLASSES = [
     lifesteal: 0.045,
     startStats: { str: 1, vit: 3, luck: 0 },
     startAllies: {}, lootLuck: 0,
-    tex: 'hero-brute', color: 0xc23b3b, footY: 0.958,
+    tex: 'hero-brute', color: 0xc23b3b, footY: 0.986,
+    muzzle: { x: 0.447, y: 0.715 }, // кулак в точке удара
   },
   {
     id: 'mechanic', name: 'Механик', icon: '🤖',
@@ -36,7 +42,8 @@ export const CLASSES = [
     offlineBonus: 0.6,
     startStats: { str: 0, vit: 1, luck: 1 },
     startAllies: { dog: 1 }, lootLuck: 0,
-    tex: 'hero-mechanic', color: 0x8fa2b8, footY: 0.98,
+    tex: 'hero-mechanic', color: 0x8fa2b8, footY: 0.988,
+    muzzle: { x: 0.391, y: 0.777 }, // дуло плазмомёта
   },
   {
     id: 'scavenger', name: 'Мародёр', icon: '🍀',
@@ -45,7 +52,8 @@ export const CLASSES = [
     bonus: { capsMul: 0.18, critChance: 0.02 },
     startStats: { str: 0, vit: 0, luck: 3 },
     startAllies: {}, lootLuck: 0.7,
-    tex: 'hero-scavenger', color: 0x8fbf3f, footY: 0.997,
+    tex: 'hero-scavenger', color: 0x8fbf3f, footY: 0.988,
+    muzzle: { x: 0.466, y: 0.453 }, // ствол самопала
   },
 ]
 

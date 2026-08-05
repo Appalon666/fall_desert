@@ -8,6 +8,7 @@ import { State } from '../state/GameState.js'
 import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue, weaponTexKey } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX, resIcon } from '../ui/scenery.js'
+import { heroScaleFor } from '../assets.js'
 import { Sfx } from '../audio/sfx.js'
 import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
@@ -44,7 +45,7 @@ export default class InventoryScene extends Phaser.Scene {
     this.add.text(GAME.WIDTH * 0.72, 74, t('ДОБЫЧА'), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
     // Массовый разбор хлама (серое+зелёное) в металлолом
     createButton(this, GAME.WIDTH * 0.72, GAME.HEIGHT - 40, {
-      label: t('🔩 Разобрать хлам'), width: 260, height: 44, fontSize: 16, color: COLORS.steelDark, hover: COLORS.steel,
+      label: t('🔩 Разобрать хлам'), width: 260, height: 52, fontSize: 18, color: COLORS.steelDark, hover: COLORS.steel,
       onClick: () => { const r = State.scrapAllUpTo(1); if (r.count) Sfx.click(); this.safeRender() },
     })
 
@@ -75,17 +76,19 @@ export default class InventoryScene extends Phaser.Scene {
     const cls = State.classDef()
     const heroTex = (cls && cls.tex) || TEX.HERO
     const footY = (cls && cls.footY) || 0.98 // ноги на одной линии для всех классов
-    const heroImg = this.add.image(hx, hy + 85, heroTex, 0).setOrigin(0.5, footY).setScale(0.62)
-    const clsLabel = this.add.text(hx, hy + 150, cls ? t(cls.name) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
+    // Кукла чуть уже: карточки слотов подросли под крупный шрифт (п.1.8),
+    // и герой не должен на них наезжать.
+    const heroImg = this.add.image(hx, hy + 85, heroTex, 0).setOrigin(0.5, footY).setScale(heroScaleFor(this, heroTex, 130))
+    const clsLabel = this.add.text(hx, hy + 148, cls ? t(cls.name) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
     this.uiObjs.push(heroImg, clsLabel)
 
     const slotPos = {
-      helmet: [hx, hy - 175],
-      weapon: [hx - 185, hy - 40],
-      armor: [hx + 185, hy - 40],
-      acc1: [hx - 185, hy + 80],
-      acc2: [hx + 185, hy + 80],
-      boots: [hx, hy + 205],
+      helmet: [hx, hy - 180],
+      weapon: [hx - 205, hy - 40],
+      armor: [hx + 205, hy - 40],
+      acc1: [hx - 205, hy + 80],
+      acc2: [hx + 205, hy + 80],
+      boots: [hx, hy + 210],
     }
     for (const key of Object.keys(SLOT_META)) {
       const [x, y] = slotPos[key]
@@ -93,7 +96,7 @@ export default class InventoryScene extends Phaser.Scene {
     }
 
     // Сводка бонусов экипировки
-    const sum = this.add.text(hx, hy + 240, this.equipSummary(), { fontFamily: 'monospace', fontSize: '14px', color: '#ddd2b4', align: 'center', lineSpacing: 4 }).setOrigin(0.5, 0)
+    const sum = this.add.text(hx, hy + 272, this.equipSummary(), { fontFamily: 'monospace', fontSize: '16px', color: '#ddd2b4', align: 'center', lineSpacing: 4 }).setOrigin(0.5, 0)
     this.uiObjs.push(sum)
 
     // --- Список добычи ---
@@ -127,7 +130,7 @@ export default class InventoryScene extends Phaser.Scene {
   }
 
   makeSlot(key, x, y) {
-    const w = 176, h = 66
+    const w = 210, h = 96
     const raw = State.equipment[key]
     const it = (raw && RARITY_BY_ID[raw.rarity] && SLOT_BY_ID[raw.slot]) ? raw : null
     const rar = it ? RARITY_BY_ID[it.rarity] : null
@@ -136,13 +139,13 @@ export default class InventoryScene extends Phaser.Scene {
     const bg = this.add.graphics()
     bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(-w / 2, -h / 2, w, h, 8)
     bg.lineStyle(2, rar ? rar.color : COLORS.ink, 0.9); bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8)
-    const icon = this.slotIcon(-w / 2 + 12, 0, it, meta.icon, 34, key)
-    const head = this.add.text(-w / 2 + 46, -16, t(meta.name), { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#c4b998' }).setOrigin(0, 0.5)
-    const body = this.add.text(-w / 2 + 46, 4, it ? it.name : t('— пусто —'), {
-      fontFamily: 'Rubik, sans-serif', fontSize: it ? '13px' : '14px',
-      color: it ? rar.css : '#9a9078', fontStyle: 'bold', wordWrap: { width: w - 52 },
+    const icon = this.slotIcon(-w / 2 + 10, 0, it, meta.icon, 36, key)
+    const head = this.add.text(-w / 2 + 52, -34, t(meta.name), { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: '#c4b998' }).setOrigin(0, 0.5)
+    const body = this.add.text(-w / 2 + 52, -4, it ? it.name : t('— пусто —'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '16px',
+      color: it ? rar.css : '#9a9078', fontStyle: 'bold', wordWrap: { width: w - 62 },
     }).setOrigin(0, 0.5)
-    const st = this.add.text(-w / 2 + 46, 20, it ? statText(it) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '12px', color: CSS.toxic }).setOrigin(0, 0.5)
+    const st = this.add.text(-w / 2 + 52, 32, it ? statText(it) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.toxic }).setOrigin(0, 0.5)
     c.add([bg, icon, head, body, st])
     if (it) {
       const z = this.add.zone(-w / 2, -h / 2, w, h).setOrigin(0).setInteractive({ useHandCursor: true })

@@ -2,8 +2,12 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Ядрён-Пустошь</title>
+  <!-- Яндекс.Игры SDK (п.1.19.1): подключается отдельным тегом в <head> ДО кода
+       игры, как требует документация https://yandex.ru/dev/games/doc/ru/sdk/sdk-about#install
+       Игра стартует независимо от результата загрузки скрипта (см. platform/yandex.js). -->
+  <script src="https://yandex.ru/games/sdk/v2?days=180"></script>
   <link rel="preload" href="fonts/rubik-cyrillic.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="fonts/rubik-latin.woff2" as="font" type="font/woff2" crossorigin />
   <style>
@@ -43,22 +47,130 @@
       /* Мягкая тень по краю холста — отделяет игру от фона */
       box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
     }
-    /* Экран загрузки до старта Phaser */
+    /* Экран загрузки до старта Phaser: крупный заголовок + видимый прогресс-бар.
+       Яндекс 1.14: игрок всегда должен понимать, что игра грузится, а не «висит». */
     #preloader {
       position: fixed;
       inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: #c9a227;
-      font-size: 18px;
-      letter-spacing: 1px;
+      gap: 22px;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+      background: radial-gradient(ellipse at 50% 40%, #2a2013 0%, #140f0a 70%, #0b0806 100%);
+      z-index: 50;
     }
+    #preloader .pl-title {
+      color: #e8bf3a;
+      font-size: clamp(28px, 7vw, 56px);
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-shadow: 0 3px 0 #1a1206, 0 0 26px rgba(201, 162, 39, 0.35);
+    }
+    #preloader .pl-hint {
+      color: #cbb98e;
+      font-size: clamp(15px, 2.6vw, 20px);
+    }
+    #pl-track {
+      width: min(560px, 78vw);
+      height: 20px;
+      border-radius: 10px;
+      background: #1a1206;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+    }
+    #pl-fill {
+      width: 4%;
+      height: 100%;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #5a7a26, #b6f24a);
+      transition: width 0.25s ease-out;
+    }
+    #pl-pct { color: #e8bf3a; font-size: clamp(15px, 2.6vw, 20px); font-weight: 700; }
+    /* Просьба повернуть телефон (Яндекс 1.8): в портрете игровое поле сжимается
+       в узкую полосу — кнопки и текст становятся мелкими. Игра — ландшафтная. */
+    #rotate {
+      position: fixed;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 24px;
+      box-sizing: border-box;
+      text-align: center;
+      background: radial-gradient(ellipse at 50% 40%, #2a2013 0%, #0b0806 80%);
+      color: #fbf3df;
+      z-index: 60;
+    }
+    #rotate .rot-icon {
+      font-size: clamp(56px, 16vw, 110px);
+      animation: rot-tilt 2s ease-in-out infinite;
+    }
+    #rotate .rot-text { font-size: clamp(18px, 5vw, 28px); font-weight: 700; color: #e8bf3a; }
+    #rotate .rot-sub { font-size: clamp(14px, 3.6vw, 19px); color: #cbb98e; }
+    @keyframes rot-tilt {
+      0%, 45% { transform: rotate(0deg); }
+      70%, 100% { transform: rotate(90deg); }
+    }
+    body.portrait-lock #rotate { display: flex; }
   </style>
 </head>
 <body>
   <div id="game"></div>
-  <div id="preloader">Ядрён-Пустошь · разогреваем дробовик…</div>
+  <div id="preloader">
+    <div class="pl-title">Ядрён-Пустошь</div>
+    <div id="pl-track"><div id="pl-fill"></div></div>
+    <div id="pl-pct">0%</div>
+    <div class="pl-hint">Разогреваем дробовик…</div>
+  </div>
+  <div id="rotate">
+    <div class="rot-icon">📱</div>
+    <div class="rot-text">Поверни устройство</div>
+    <div class="rot-sub">Игра рассчитана на горизонтальный экран —<br />так кнопки и враги крупные и удобные.</div>
+  </div>
+  <!-- Страховка от «вечного экрана загрузки» (Яндекс 1.14): если модуль игры не
+       выполнился (ошибка сети/JS), показываем понятное сообщение с перезагрузкой,
+       а не бесконечный прогресс-бар. Инлайн — потому что должно работать даже
+       когда основной бандл не загрузился. -->
+  <script>
+    (function () {
+      var shown = false
+      function fail(msg) {
+        if (shown) return
+        shown = true
+        var pre = document.getElementById('preloader')
+        if (!pre) return
+        pre.innerHTML = '<div class="pl-title">Ядрён-Пустошь</div>' +
+          '<div class="pl-hint">' + msg + '</div>' +
+          '<button id="pl-retry" style="margin-top:8px;padding:14px 28px;' +
+          'font:700 18px Rubik,sans-serif;color:#fbf3df;background:#8a4b2a;' +
+          'border:2px solid #120d09;border-radius:10px;cursor:pointer">' +
+          'Перезагрузить</button>'
+        var b = document.getElementById('pl-retry')
+        if (b) b.onclick = function () { location.reload() }
+      }
+      window.addEventListener('error', function (e) {
+        var el = e && e.target
+        if (!el || el.tagName !== 'SCRIPT') return
+        // Упавший SDK Яндекса не фатален — без него игра работает локально.
+        if (String(el.src || '').indexOf('yandex.ru/games/sdk') !== -1) return
+        fail('Не удалось загрузить игру. Проверь соединение.')
+      }, true)
+      // Медленная сеть — это нормально, прогресс-бар всё расскажет сам. Ругаемся
+      // только если код игры вообще не запустился (window.__ypBooted не выставлен).
+      setTimeout(function () {
+        var pre = document.getElementById('preloader')
+        if (pre && pre.style.display !== 'none' && !window.__ypBooted) {
+          fail('Не удалось запустить игру. Попробуй перезагрузить.')
+        }
+      }, 20000)
+    })()
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

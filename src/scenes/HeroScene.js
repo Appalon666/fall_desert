@@ -5,6 +5,7 @@ import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
+import { heroScaleFor } from '../assets.js'
 import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
 
@@ -24,14 +25,14 @@ export default class HeroScene extends Phaser.Scene {
     const cls = State.classDef()
     const heroTex = (cls && cls.tex) || TEX.HERO
     const footY = (cls && cls.footY) || 0.98 // ноги на одной линии для всех классов
-    this.add.image(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2 + 126, heroTex, 0).setOrigin(0.5, footY).setScale(0.92)
+    this.add.image(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2 + 126, heroTex, 0).setOrigin(0.5, footY).setScale(heroScaleFor(this, heroTex, 218))
     if (cls) this.add.text(GAME.WIDTH / 2 - 360, GAME.HEIGHT / 2 + 172, t(cls.name), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0.5)
 
     createButton(this, GAME.WIDTH / 2, GAME.HEIGHT - 44, { label: t('⟵ В лагерь'), width: 300, height: 52, onClick: () => this.scene.start(SCENES.HUB) })
 
     // Сброс прогресса (для тестов и смены класса).
     createButton(this, GAME.WIDTH - 130, GAME.HEIGHT - 40, {
-      label: t('⟲ Сброс'), width: 180, height: 40, fontSize: 16,
+      label: t('⟲ Сброс'), width: 180, height: 52, fontSize: 18,
       color: COLORS.blood, hover: 0xc23b3b,
       onClick: () => this.confirmWipe(),
     })

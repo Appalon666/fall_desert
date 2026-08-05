@@ -60,14 +60,15 @@ export default class PrestigeScene extends Phaser.Scene {
     // Престиж-апгрейды
     this.add.text(GAME.WIDTH / 2, 250, t('ВЕЧНЫЕ БОНУСЫ (за Ядра)'), { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
     PRESTIGE.forEach((p, i) => {
-      const x = i % 2 === 0 ? GAME.WIDTH / 2 - 300 : GAME.WIDTH / 2 + 20
-      const y = 290 + Math.floor(i / 2) * 96
-      this.makeRow(x, y, 280, p)
+      // Карточки шире и выше: описание набрано крупнее (п.1.8) и в две строки.
+      const x = i % 2 === 0 ? GAME.WIDTH / 2 - 410 : GAME.WIDTH / 2 + 30
+      const y = 286 + Math.floor(i / 2) * 128
+      this.makeRow(x, y, 380, p)
     })
   }
 
   makeRow(x, y, w, p) {
-    const h = 82
+    const h = 116
     const level = State.prestige[p.id] || 0
     const cost = State.prestigeCost(p.id)
     const afford = State.cores >= cost
@@ -80,8 +81,9 @@ export default class PrestigeScene extends Phaser.Scene {
     }
     paint(false)
     const icon = this.add.text(16, h / 2, p.icon, { fontSize: '30px' }).setOrigin(0, 0.5)
-    const title = this.add.text(58, 16, `${t(p.name)}  ${t('ур.')}${level}`, { fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
-    const desc = this.add.text(58, 40, t(p.desc), { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#ddd2b4', wordWrap: { width: w - 66 } }).setOrigin(0)
+    const title = this.add.text(62, 18, `${t(p.name)}  ${t('ур.')}${level}`, { fontFamily: 'Rubik, sans-serif', fontSize: '19px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0)
+    // Ширину переноса режем под колонку цены справа, иначе текст лезет на неё.
+    const desc = this.add.text(62, 48, t(p.desc), { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: '#ddd2b4', lineSpacing: 2, wordWrap: { width: w - 160 } }).setOrigin(0)
     const cost1 = this.add.text(w - 14, h / 2, `${fmt(cost)} ☢`, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: afford ? '#b6ff5a' : '#ab9e80', fontStyle: 'bold' }).setOrigin(1, 0.5)
     c.add([bg, icon, title, desc, cost1])
     const z = this.add.zone(0, 0, w, h).setOrigin(0).setInteractive({ useHandCursor: afford })

@@ -3,7 +3,7 @@
 // localStorage (через GameState), лидерборды — заглушка. На Яндексе —
 // облачные сейвы, реклама, таблицы рекордов.
 
-import { Sfx } from '../audio/sfx.js'
+import { Pause, PAUSE } from '../util/pause.js'
 
 export const LEADERBOARD = 'Leaderboard'
 
@@ -25,17 +25,38 @@ class YandexPlatform {
 
   async _doInit() {
     try {
-      await this._loadScript('https://yandex.ru/games/sdk/v2?days=180')
+      // SDK подключён тегом <script> в index.html (п.1.19.1). Обычно к этому
+      // моменту window.YaGames уже готов; на всякий случай коротко ждём, а если
+      // тега нет вовсе (локальный запуск) — подгружаем скрипт вручную.
+      await this._waitForSdk(3000)
+      if (!window.YaGames) {
+        try { await this._loadScript('https://yandex.ru/games/sdk/v2?days=180') } catch (e) { /* */ }
+      }
       if (!window.YaGames) return false
       this.ya = await window.YaGames.init()
       this.available = true
       try { this.player = await this.ya.getPlayer({ scopes: false }) } catch (e) { this.player = null }
-      try { this.lb = await this.ya.getLeaderboards() } catch (e) { this.lb = null }
+      // Новый API — ysdk.leaderboards; getLeaderboards() оставлен как запасной.
+      try { this.lb = this.ya.leaderboards || await this.ya.getLeaderboards() } catch (e) { this.lb = null }
       return true
     } catch (e) {
       this.available = false
       return false
     }
+  }
+
+  // Ждём, пока тег из index.html выполнится и объявит window.YaGames.
+  _waitForSdk(timeoutMs) {
+    if (window.YaGames) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      const t0 = Date.now()
+      const tick = () => {
+        if (window.YaGames) return resolve(true)
+        if (Date.now() - t0 >= timeoutMs) return resolve(false)
+        setTimeout(tick, 50)
+      }
+      tick()
+    })
   }
 
   _loadScript(src) {
@@ -77,62 +98,75 @@ class YandexPlatform {
     try { return await this.player.getData() } catch (e) { return null }
   }
 
-  // Реклама за награду. Гарантирует РОВНО один вызов onReward (успех/ошибка),
-  // ставит геймплей на паузу на время ролика и всегда снимает её в onClose.
-  // Ссылка на Phaser.Game — чтобы паузить активные сцены на время рекламы
-  // (Яндекс 4.7: и звук, и игровой процесс должны стоять под fullscreen-рекламой).
-  attachGame(game) { this.game = game }
-  _pauseGame() {
-    try {
-      Sfx.suspend()
-      if (!this.game) return
-      this._paused = this.game.scene.getScenes(true)
-      for (const s of this._paused) s.scene.pause()
-    } catch (e) { /* */ }
+  // Ссылка на Phaser.Game нужна паузе (Яндекс 4.7: под полноэкранной рекламой
+  // должны молчать И звук, И игровой процесс).
+  attachGame(game) { this.game = game; Pause.attach(game) }
+
+  // Пауза на время ролика. Сторож нужен на случай, если SDK не вызовет ни один
+  // колбэк (реклама не открылась): иначе игра осталась бы висеть на паузе.
+  // Срок намеренно большой: снять паузу раньше, чем реклама успела открыться,
+  // хуже — тогда под роликом заиграет музыка (нарушение п.4.7).
+  _adStart() {
+    Pause.add(PAUSE.AD)
+    this._adOpened = false // хвост от прошлого показа не должен глушить сторожа
+    if (this._adGuard) clearTimeout(this._adGuard)
+    this._adGuard = setTimeout(() => { if (!this._adOpened) this._adEnd() }, 15000)
   }
-  _resumeGame() {
-    try {
-      Sfx.resume()
-      if (this._paused) { for (const s of this._paused) s.scene.resume() }
-    } catch (e) { /* */ }
-    this._paused = null
+  _adOpen() {
+    this._adOpened = true
+    if (this._adGuard) { clearTimeout(this._adGuard); this._adGuard = null }
+    Pause.add(PAUSE.AD) // на случай, если ролик стартовал без нашего _adStart
+  }
+  _adEnd() {
+    this._adOpened = false
+    if (this._adGuard) { clearTimeout(this._adGuard); this._adGuard = null }
+    Pause.remove(PAUSE.AD)
   }
 
+  // Реклама за награду. Гарантирует РОВНО один вызов onReward (успех/ошибка).
   // Локально (без SDK) — сразу выдаём награду.
   showRewarded(onReward, onClose) {
     let settled = false
     const reward = () => { if (settled) return; settled = true; try { onReward && onReward() } catch (e) { /* */ } }
     const closed = () => { try { onClose && onClose() } catch (e) { /* */ } }
     if (!this.available || !this.ya?.adv) { reward(); closed(); return }
-    this.gameplayStop(); this._pauseGame()
+    const finish = () => { this._adEnd(); reward(); closed() }
+    this._adStart()
     try {
       this.ya.adv.showRewardedVideo({
         callbacks: {
+          onOpen: () => this._adOpen(),
           onRewarded: () => reward(),
           // Досмотрели/закрыли: не наказываем игрока — если награды не было, выдаём.
-          onClose: () => { this._resumeGame(); this.gameplayStart(); reward(); closed() },
-          onError: () => { this._resumeGame(); this.gameplayStart(); reward(); closed() },
+          onClose: finish,
+          onError: finish,
         },
       })
-    } catch (e) { this._resumeGame(); this.gameplayStart(); reward(); closed() }
+    } catch (e) { finish() }
   }
 
   // Межстраничная реклама. Клиентский троттлинг ≥75с (Яндекс требует ≥60с и
-  // не одобряет частый показ; зоны могут сменяться чаще). Пауза геймплея.
+  // не одобряет частый показ; зоны могут сменяться чаще).
   showInterstitial() {
     if (!this.available || !this.ya?.adv) return
     const now = Date.now()
     if (now - this._lastAd < 75000) return
+    // Отдельный троттл на ПОПЫТКИ: если реклама не показалась (нет инвентаря),
+    // _lastAd не обновится, и без этого мы дёргали бы SDK на каждой смерти.
+    if (now - (this._lastAdTry || 0) < 20000) return
+    this._lastAdTry = now
+    // Глушим звук и геймплей ДО вызова: ролик может стартовать раньше onOpen.
+    this._adStart()
     try {
       this.ya.adv.showFullscreenAdv({
         callbacks: {
           // Троттл сбрасываем только когда реклама реально открылась (onOpen).
-          onOpen: () => { this._lastAd = Date.now(); this.gameplayStop(); this._pauseGame() },
-          onClose: () => { this._resumeGame(); this.gameplayStart() },
-          onError: () => { this._resumeGame(); this.gameplayStart() },
+          onOpen: () => { this._lastAd = Date.now(); this._adOpen() },
+          onClose: () => this._adEnd(),
+          onError: () => this._adEnd(),
         },
       })
-    } catch (e) { this._resumeGame(); this.gameplayStart() }
+    } catch (e) { this._adEnd() }
   }
 
   // Лидерборды.

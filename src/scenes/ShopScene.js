@@ -41,7 +41,7 @@ export default class ShopScene extends Phaser.Scene {
     MODES.forEach((m, i) => {
       const active = this.buyMode === m.id
       const btn = createButton(this, cx - 60 + i * 66, y, {
-        label: m.label, width: 60, height: 34, fontSize: 16,
+        label: m.label, width: 60, height: 46, fontSize: 18,
         color: active ? COLORS.toxicDark : COLORS.steelDark, hover: COLORS.toxic,
         onClick: () => { this.buyMode = m.id; this.render() },
       })

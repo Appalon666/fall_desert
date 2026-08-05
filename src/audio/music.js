@@ -23,17 +23,20 @@ class MusicEngine {
     if (this.sound) { try { this.sound.setVolume(this.effVol()) } catch (e) { /* */ } }
   }
 
-  // Очередь загрузки в BootScene.preload(). Отсутствующие файлы дают loaderror
-  // (перехвачен в Boot) и просто не воспроизводятся.
-  queue(loader) {
-    loader.audio('bgm_menu', ['music/menu.ogg', 'music/menu.mp3'])
-    loader.audio('bgm_battle', ['music/battle.ogg', 'music/battle.mp3'])
-  }
-
   has(scene, key) { try { return scene.sound && scene.cache.audio.exists(key) } catch (e) { return false } }
+
+  // Треки догружаются фоном (см. assets.js): когда файлы приехали, включаем тот
+  // трек, который сцена уже просила.
+  retry() {
+    const s = this.wantScene, k = this.wantKey
+    if (!s || !k) return
+    try { if (!s.scene || !s.scene.isActive()) return } catch (e) { return }
+    this.play(s, k)
+  }
 
   // Включить трек key (если он загружен). Тот же трек уже играет — ничего.
   play(scene, key) {
+    this.wantScene = scene; this.wantKey = key
     if (this.currentKey === key && this.sound && this.sound.isPlaying) return
     if (!this.has(scene, key)) return
     // Аудио заблокировано до первого жеста — дождёмся разблокировки.

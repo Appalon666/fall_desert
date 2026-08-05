@@ -14,6 +14,7 @@ import { getZone } from '../data/zones.js'
 import { enemiesInWave, bossDue } from '../data/progression.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
+import { loadBattle, battleAssetsReady, buildEnemySheets, buildEnemyAnims, heroScaleFor, buildHeroAnim } from '../assets.js'
 import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX, resIcon } from '../ui/scenery.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
@@ -23,11 +24,47 @@ import { fmt } from '../util/format.js'
 
 const PANEL_W = 320
 const TEX_H = 72
+// Высота ФИГУРЫ героя на экране в пикселях дизайн-разрешения. Раньше была
+// зашита множителем 0.95 к кадру 341×279; теперь задаём результат, а не множитель.
+const HERO_ON_SCREEN_H = 225
+// Высота врага на экране = ENEMY_H_PER_SCALE × scale из enemies.js.
+// Гуль (scale 2.1) выходит ~210 px — как и было на старом арте.
+const ENEMY_H_PER_SCALE = 100
 
 export default class BattleScene extends Phaser.Scene {
   constructor() { super(SCENES.BATTLE) }
 
+  // Спрайтшиты врагов и фоны зон (~4 МБ) грузим здесь, а не на старте игры:
+  // до первого «Похода» они не нужны, зато меню открывается мгновенно (п.1.14).
+  // Показываем понятный прогресс-бар, чтобы экран не выглядел «зависшим».
+  preload() {
+    if (battleAssetsReady(this)) return
+    this.buildLoadingBar()
+    this.load.on('loaderror', () => { /* нет ассета — останется процедурный фолбэк */ })
+    loadBattle(this.load)
+  }
+
+  buildLoadingBar() {
+    const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
+    const W = 520, H = 26
+    const label = this.add.text(cx, cy - 56, t('Готовим вылазку…'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '28px', color: CSS.cap, fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(100)
+    const bg = this.add.rectangle(cx, cy, W, H, COLORS.ink).setDepth(100)
+    const fill = this.add.rectangle(cx - W / 2 + 3, cy, 10, H - 6, COLORS.toxic).setOrigin(0, 0.5).setDepth(101)
+    const pct = this.add.text(cx, cy + 44, '0%', {
+      fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.paper, fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(100)
+    this.load.on('progress', (v) => {
+      fill.width = Math.max(10, (W - 6) * v)
+      pct.setText(`${Math.round(v * 100)}%`)
+    })
+    this.load.once('complete', () => { [label, bg, fill, pct].forEach(o => o.destroy()) })
+  }
+
   create() {
+    buildEnemySheets(this) // режем листы врагов по их раскладке
+    buildEnemyAnims(this)  // и заводим цикл ходьбы
     this.arenaW = GAME.WIDTH - PANEL_W
     this.groundY = GAME.HEIGHT - 130
     this.bullets = []
@@ -47,10 +84,15 @@ export default class BattleScene extends Phaser.Scene {
     // Новый арт = спрайтшит (6 кадров). Если не загрузился — процедурный fallback.
     this.heroNew = this.textures.exists(heroKey) && this.textures.get(heroKey).frameTotal > 1
     if (this.heroNew) {
-      const HS = 0.95 // ← масштаб героя (кадр 341×279); подстрой при желании
+      // Масштаб считаем от кадра — у нового арта размер листа свой у каждого класса.
+      const HS = heroScaleFor(this, heroKey, HERO_ON_SCREEN_H)
       const footY = (cls && cls.footY) || 0.98 // якорь по ногам: все классы на одной линии
       this.hero = this.add.sprite(hx, this.groundY + 18, heroKey, 0).setOrigin(0.5, footY).setScale(HS)
-      this.muzzle = { x: hx + 138 * HS, y: this.hero.y - 160 * HS }
+      this.heroAnim = buildHeroAnim(this, heroKey)
+      // Дуло — в долях от кадра, а не в пикселях: иначе при смене арта уезжает.
+      const fw = this.hero.width, fh = this.hero.height
+      const m = (cls && cls.muzzle) || { x: 0.42, y: 0.60 }
+      this.muzzle = { x: hx + fw * m.x * HS, y: this.hero.y - fh * m.y * HS }
     } else {
       const fk = (cls && `tex-${cls.tex}`) || TEX.HERO
       const HS = 2.1
@@ -117,11 +159,11 @@ export default class BattleScene extends Phaser.Scene {
     addVignette(this)
 
     this.zoneLabel = this.add.text(W / 2, 34, '', {
-      fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.sand, fontStyle: 'bold',
+      fontFamily: 'Rubik, sans-serif', fontSize: '26px', color: CSS.sand, fontStyle: 'bold',
       stroke: '#120d09', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(60)
-    this.progressLabel = this.add.text(W / 2, 62, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#e6d2a4',
+    this.progressLabel = this.add.text(W / 2, 66, '', {
+      fontFamily: 'monospace', fontSize: '17px', color: '#e6d2a4',
       stroke: '#120d09', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(60)
   }
@@ -166,34 +208,34 @@ export default class BattleScene extends Phaser.Scene {
 
     this.add.image(px + 34, 40, TEX.GLOW).setTint(COLORS.cap).setScale(1.2).setAlpha(0.5).setBlendMode('ADD')
     resIcon(this, px + 34, 40, 'caps', 34)
-    this.capsText = this.add.text(px + 54, 40, '0', {
-      fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: CSS.cap, fontStyle: 'bold',
+    this.capsText = this.add.text(px + 56, 40, '0', {
+      fontFamily: 'Rubik, sans-serif', fontSize: '28px', color: CSS.cap, fontStyle: 'bold',
     }).setOrigin(0, 0.5)
 
-    this.comboText = this.add.text(cx, 78, '', {
-      fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.toxic, fontStyle: 'bold',
+    this.comboText = this.add.text(cx, 80, '', {
+      fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold',
     }).setOrigin(0.5)
 
-    this.add.text(px + 22, 108, t('HP героя'), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
+    this.add.text(px + 22, 106, t('HP героя'), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0)
     this.hpBarW = PANEL_W - 48
-    this.add.rectangle(px + 24, 130, this.hpBarW, 22, COLORS.ink).setOrigin(0)
-    this.hpFill = this.add.rectangle(px + 26, 132, this.hpBarW - 4, 18, COLORS.blood).setOrigin(0)
-    this.hpText = this.add.text(cx, 141, '', { fontFamily: 'monospace', fontSize: '13px', color: '#fff' }).setOrigin(0.5)
+    this.add.rectangle(px + 24, 132, this.hpBarW, 26, COLORS.ink).setOrigin(0)
+    this.hpFill = this.add.rectangle(px + 26, 134, this.hpBarW - 4, 22, COLORS.blood).setOrigin(0)
+    this.hpText = this.add.text(cx, 145, '', { fontFamily: 'monospace', fontSize: '16px', color: '#fff' }).setOrigin(0.5)
 
-    this.add.text(px + 22, 172, t('Заряд ульты'), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.paper }).setOrigin(0)
-    this.add.rectangle(px + 24, 194, this.hpBarW, 22, COLORS.ink).setOrigin(0)
-    this.ultFill = this.add.rectangle(px + 26, 196, 1, 18, COLORS.toxicDark).setOrigin(0)
-    createButton(this, cx, 250, {
-      label: t('☢  УЛЬТА (Space)'), width: PANEL_W - 60, height: 46, fontSize: 18,
+    this.add.text(px + 22, 174, t('Заряд ульты'), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0)
+    this.add.rectangle(px + 24, 200, this.hpBarW, 26, COLORS.ink).setOrigin(0)
+    this.ultFill = this.add.rectangle(px + 26, 202, 1, 22, COLORS.toxicDark).setOrigin(0)
+    createButton(this, cx, 262, {
+      label: t('☢  УЛЬТА (Space)'), width: PANEL_W - 44, height: 58, fontSize: 21,
       color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => this.tryUlt(),
     })
 
-    this.statsText = this.add.text(px + 24, 300, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#e8ddc0', lineSpacing: 6,
+    this.statsText = this.add.text(px + 24, 312, '', {
+      fontFamily: 'monospace', fontSize: '17px', color: '#e8ddc0', lineSpacing: 8,
     }).setOrigin(0)
 
-    createButton(this, cx, GAME.HEIGHT - 50, {
-      label: t('⟵ В лагерь'), width: PANEL_W - 60, height: 50, fontSize: 20,
+    createButton(this, cx, GAME.HEIGHT - 52, {
+      label: t('⟵ В лагерь'), width: PANEL_W - 44, height: 60, fontSize: 22,
       onClick: () => { State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.bestScore); this.scene.start(SCENES.HUB) },
     })
   }
@@ -253,14 +295,19 @@ export default class BattleScene extends Phaser.Scene {
     }
     const n = enemiesInWave(State.zoneIndex, State.killsInZone)
     const pool = this.zone.enemies
+    // Разводим строй по РЕАЛЬНОЙ ширине спрайтов: у нового арта она разная
+    // (ползун вытянутый, оса компактная), и фиксированный шаг их слепляет.
+    let x = this.arenaW - 90
     for (let i = 0; i < n; i++) {
       const defId = pool[Math.floor(Math.random() * pool.length)]
-      this.enemies.push(this.makeEnemy(defId, false, i, n))
+      const e = this.makeEnemy(defId, false, i, n, x)
+      this.enemies.push(e)
+      x -= Math.max(72, e.onScreenW * 0.52)
     }
   }
 
   // Создать один враг-объект (спрайт, полоска HP, имя, стат).
-  makeEnemy(defId, isBoss, i, n) {
+  makeEnemy(defId, isBoss, i, n, atX = null) {
     const def = ENEMIES[defId]
     const af = this.zone.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
     const base = enemyStats(def, State.totalKills, isBoss)
@@ -276,14 +323,18 @@ export default class BattleScene extends Phaser.Scene {
     const dmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave)
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd
     const baseScale = isBoss ? BAL.bossScale : def.scale
-    // Новый арт = спрайтшит (18 кадров: idle/walk/death). Иначе процедурный fallback.
+    // Новый арт = спрайтшит 2×2 (цикл ходьбы). Иначе процедурный fallback.
     const newKey = `enemy-${defId}`
-    const useNew = this.textures.exists(newKey) && this.textures.get(newKey).frameTotal > 1
-    const texH = useNew ? 186 : TEX_H
-    const dispScale = useNew ? baseScale * 0.62 : baseScale / TEX_SS
+    const useNew = this.textures.exists(newKey) && this.textures.get(newKey).frameTotal - 1 >= 4
+    // Кадр у каждого врага свой, поэтому задаём ВЫСОТУ НА ЭКРАНЕ, а не множитель:
+    // ENEMY_H_PER_SCALE × scale из enemies.js. Так баланс размеров не зависит от арта.
+    const texH = useNew ? this.textures.get(newKey).get(0).height : TEX_H
+    const dispScale = useNew ? (ENEMY_H_PER_SCALE * baseScale) / texH : baseScale / TEX_SS
     const onScreenH = texH * dispScale
+    const texW = useNew ? this.textures.get(newKey).get(0).width : TEX_H
+    const onScreenW = texW * dispScale
     // строй: боссы выходят вплотную; обычные — колонной у правого края арены.
-    const spawnX = isBoss ? (this.arenaW - 130) : (this.arenaW - 70 - i * 56)
+    const spawnX = isBoss ? (this.arenaW - 130) : (atX !== null ? atX : this.arenaW - 90 - i * 96)
     const rowLift = isBoss ? 0 : (i % 2) * 46
     const yPos = this.groundY - onScreenH * 0.42 - rowLift
 
@@ -309,13 +360,13 @@ export default class BattleScene extends Phaser.Scene {
     const bg = this.add.rectangle(spawnX, 0, barW + 4, isBoss ? 12 : 8, COLORS.ink).setOrigin(0.5).setDepth(40)
     const fill = this.add.rectangle(spawnX, 0, barW, isBoss ? 8 : 5, COLORS.toxic).setOrigin(0.5).setDepth(41)
     const nameLabel = this.add.text(spawnX, 0, isBoss ? `☠ ${t(def.name)}` : t(def.name), {
-      fontFamily: 'Rubik, sans-serif', fontSize: isBoss ? '18px' : '13px',
+      fontFamily: 'Rubik, sans-serif', fontSize: isBoss ? '20px' : '16px',
       color: isBoss ? '#ff8a6a' : CSS.paper, fontStyle: 'bold', stroke: '#120d09', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(41)
 
     return {
       sprite, aura, bg, fill, nameLabel, barW, def, defId, isBoss, useNew, flip: !!def.flip,
-      maxHp: hp, hp, reward, dmg, speed, scale: baseScale, dispScale, texH, onScreenH, baseY: yPos,
+      maxHp: hp, hp, reward, dmg, speed, scale: baseScale, dispScale, texH, onScreenH, onScreenW, baseY: yPos,
       attackTimer: 0,
     }
   }
@@ -387,9 +438,17 @@ export default class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 130, onComplete: () => flash.destroy() })
     this.tweens.add({ targets: this.hero, x: this.hero.x - 5, duration: 45, yoyo: true })
     if (this.heroNew) {
-      this.hero.setFrame(1) // кадр выстрела
-      if (this._fireReset) this._fireReset.remove()
-      this._fireReset = this.time.delayedCall(120, () => { if (this.hero && this.hero.active) this.hero.setFrame(0) })
+      if (this.heroAnim) {
+        // Полная 4-кадровая анимация атаки; новый клик перезапускает её с начала.
+        this.hero.play({ key: this.heroAnim, startFrame: 0 }, true)
+        this.hero.once('animationcomplete', () => {
+          if (this.hero && this.hero.active) this.hero.setFrame(0)
+        })
+      } else {
+        this.hero.setFrame(1) // старый лист: просто кадр выстрела
+        if (this._fireReset) this._fireReset.remove()
+        this._fireReset = this.time.delayedCall(120, () => { if (this.hero && this.hero.active) this.hero.setFrame(0) })
+      }
     }
   }
 
@@ -550,7 +609,8 @@ export default class BattleScene extends Phaser.Scene {
     const ov = this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.72).setOrigin(0).setDepth(85).setInteractive()
     const title = this.add.text(cx, cy - 90, t('Ты пал на пустоши'), { fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: '#ff5a5a', fontStyle: 'bold', stroke: '#120d09', strokeThickness: 4 }).setOrigin(0.5).setDepth(86)
     const revive = createButton(this, cx, cy - 6, {
-      label: t('📺 Возродиться (реклама)'), width: 340, height: 56, fontSize: 20,
+      // Яндекс 4.5.1: текст кнопки прямо говорит, что будет реклама за награду.
+      label: t('📺 Реклама: возродиться'), width: 380, height: 60, fontSize: 21,
       color: COLORS.toxicDark, hover: COLORS.toxic,
       onClick: () => Platform.showRewarded(() => {
         if (!this._deathModal) return
@@ -560,7 +620,7 @@ export default class BattleScene extends Phaser.Scene {
       }),
     })
     const give = createButton(this, cx, cy + 66, {
-      label: t('Смириться (откат зоны)'), width: 340, height: 50, fontSize: 18,
+      label: t('Смириться (откат зоны)'), width: 380, height: 54, fontSize: 19,
       // Смерть без возрождения → межстраничная реклама Яндекса (сама троттлит ≥60с).
       onClick: () => { this.closeDeathModal(); Platform.showInterstitial(); State.onHeroDeath(); this.spawnWave() },
     })

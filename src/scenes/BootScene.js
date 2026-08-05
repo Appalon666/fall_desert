@@ -1,14 +1,33 @@
-// Boot: генерируем процедурные текстуры и уходим в хаб.
-// Позже сюда добавится загрузка звуков и инициализация SDK.
+// Boot: грузим только критичные ассеты, генерируем процедурные текстуры и
+// уходим в меню. Тяжёлое (враги/фоны зон — в BattleScene, музыка — фоном отсюда)
+// не задерживает первый экран: Яндекс 1.14 требует, чтобы игра запускалась, а не
+// висела на чёрном экране, пока качается всё сразу.
 
 import Phaser from 'phaser'
 import { SCENES } from '../config.js'
 import { generateTextures } from '../gfx/textures.js'
-import { ENEMY_IDS } from '../data/enemies.js'
+import { loadCore, loadDeferredUi, loadMusic, buildHeroSheets } from '../assets.js'
 import { State } from '../state/GameState.js'
 import { Platform } from '../platform/yandex.js'
 import { Music } from '../audio/music.js'
 import { setLang } from '../i18n.js'
+
+// HTML-прелоадер из index.html: показываем реальный прогресс загрузки.
+function setPreloaderProgress(frac) {
+  try {
+    const fill = document.getElementById('pl-fill')
+    const pct = document.getElementById('pl-pct')
+    const p = Math.round(Math.min(1, Math.max(0, frac)) * 100)
+    if (fill) fill.style.width = `${Math.max(4, p)}%`
+    if (pct) pct.textContent = `${p}%`
+  } catch (e) { /* */ }
+}
+function hidePreloader() {
+  try {
+    const pre = document.getElementById('preloader')
+    if (pre) pre.style.display = 'none'
+  } catch (e) { /* */ }
+}
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -16,42 +35,17 @@ export default class BootScene extends Phaser.Scene {
   }
 
   preload() {
-    // Опциональная фоновая музыка (public/music/*). Нет файлов — тихо пропускаем.
-    this.load.on('loaderror', () => { /* нет ассета — не страшно, есть фолбэк */ })
-    Music.queue(this.load)
-    // Спрайтшиты героев (6 кадров 3×2, кадр 341×279). Есть — используются вместо
-    // процедурных; нет — остаётся процедурный fallback (tex-hero-*).
-    for (const c of ['gunner', 'brute', 'mechanic', 'scavenger']) {
-      this.load.spritesheet(`hero-${c}`, `sprites/hero-${c}.png`, { frameWidth: 341, frameHeight: 279 })
-    }
-    // Спрайтшиты врагов (18 кадров 6×3: idle/walk/death, кадр 170×186).
-    for (const id of ENEMY_IDS) {
-      this.load.spritesheet(`enemy-${id}`, `sprites/enemy-${id}.png`, { frameWidth: 170, frameHeight: 186 })
-    }
-    // Фоны зон + меню (нарисованные). Нет файла — процедурный fallback.
-    for (const k of ['rust', 'city', 'bunker', 'lair', 'menu']) {
-      this.load.image(`bg-${k}`, `bg/${k}.jpg`)
-    }
-    // Нарисованная плашка кнопки (9-slice). Нет — рисуем графикой.
-    this.load.image('ui-button', 'ui/button.png')
-    // Арт оружия (по wtype 0..4) — иконка слота оружия. Нет — эмодзи-фолбэк.
-    for (let i = 0; i < 5; i++) this.load.image(`weapon-${i}`, `weapons/w${i}.png`)
-    // Иконки апгрейдов / союзников / слотов инвентаря. Нет — эмодзи-фолбэк.
-    for (const k of ['up-damage', 'up-hp', 'up-allyPower', 'up-multishot', 'up-crit',
-      'ally-dog', 'ally-gunner', 'ally-turret', 'ally-sniper', 'ally-mech',
-      'slot-weapon', 'slot-helmet', 'slot-armor', 'slot-boots', 'slot-accessory',
-      'res-caps', 'res-scrap', 'res-core']) {
-      this.load.image(k, `icons/${k}.png`)
-    }
+    // Отсутствующий ассет — не повод падать: у всего есть процедурный фолбэк.
+    this.load.on('loaderror', () => { /* */ })
+    // Прогресс критичной загрузки → в HTML-прелоадер (0…90%, хвост — шрифты/SDK).
+    this.load.on('progress', (v) => setPreloaderProgress(v * 0.9))
+    loadCore(this.load)
   }
 
   create() {
     generateTextures(this)
-    this.buildEnemyAnims()
-
-    // Прячем HTML-прелоадер — движок готов.
-    const pre = document.getElementById('preloader')
-    if (pre) pre.style.display = 'none'
+    buildHeroSheets(this) // режем листы героев по их собственной раскладке
+    setPreloaderProgress(0.93)
 
     // Ждём шрифт Rubik ДО старта сцен, иначе Phaser отрисует текст запасным
     // шрифтом и не обновит его после загрузки. Локальный woff2 грузится быстро.
@@ -68,34 +62,53 @@ export default class BootScene extends Phaser.Scene {
     } catch (e) { return Promise.resolve() }
   }
 
-  // Анимации врагов из спрайтшитов (если загрузились): idle/walk/death.
-  buildEnemyAnims() {
-    for (const id of ENEMY_IDS) {
-      const key = `enemy-${id}`
-      if (!this.textures.exists(key) || this.textures.get(key).frameTotal <= 1) continue
-      if (!this.anims.exists(`${id}-idle`)) this.anims.create({ key: `${id}-idle`, frames: this.anims.generateFrameNumbers(key, { start: 0, end: 5 }), frameRate: 7, repeat: -1 })
-      if (!this.anims.exists(`${id}-walk`)) this.anims.create({ key: `${id}-walk`, frames: this.anims.generateFrameNumbers(key, { start: 6, end: 11 }), frameRate: 11, repeat: -1 })
-      if (!this.anims.exists(`${id}-death`)) this.anims.create({ key: `${id}-death`, frames: this.anims.generateFrameNumbers(key, { start: 12, end: 17 }), frameRate: 11, repeat: 0 })
-    }
-  }
-
   // Инициализация платформы (Яндекс), загрузка облачного сейва, старт игры.
   boot() {
     let done = false
     const proceed = () => {
       if (done) return
       done = true
+      setPreloaderProgress(1)
+      hidePreloader()
       setLang(Platform.lang()) // язык из Яндекс SDK (или браузера) до старта сцен
       State._started = true // с этого момента позднее облако не затирает сессию
       Platform.ready()
       // Первый вход без класса — на экран выбора класса, иначе в лагерь.
-      this.scene.start(State.heroClass ? SCENES.HUB : SCENES.CLASS_SELECT)
+      // launch (а не start): BootScene остаётся жить и догружает музыку фоном.
+      this.scene.launch(State.heroClass ? SCENES.HUB : SCENES.CLASS_SELECT)
+      this.backgroundLoadMusic()
     }
-    const safety = this.time.delayedCall(3500, proceed) // не зависаем, если SDK молчит
+    // Сторож на setTimeout, а не на таймере сцены: сцена может стоять на паузе
+    // (вкладка свёрнута), и тогда таймер сцены не тикает, а игра не стартует.
+    const safety = setTimeout(proceed, 3500) // не зависаем, если SDK молчит
     Platform.init()
       .then(() => Platform.loadCloud())
       .then((cloud) => { if (cloud) State.applyCloud(cloud) })
       .catch(() => { /* нет SDK — работаем локально */ })
-      .finally(() => { safety.remove(); proceed() })
+      .finally(() => { clearTimeout(safety); proceed() })
+  }
+
+  // Иконки разделов и музыка (~4 МБ) догружаются уже во время игры: до первого
+  // экрана они не нужны, а без них работают эмодзи-фолбэки и тишина.
+  backgroundLoadMusic() {
+    try {
+      this.load.removeAllListeners('progress')
+      this.loadChain([loadDeferredUi, loadMusic], () => {
+        try { Music.retry() } catch (e) { /* */ }
+        this.scene.stop() // всё догружено — Boot больше не нужен
+      })
+    } catch (e) { /* без иконок и музыки игра работает */ }
+  }
+
+  // Последовательная фоновая догрузка: следующая пачка стартует, когда
+  // предыдущая доехала. Так музыка (самая тяжёлая) не мешает иконкам.
+  loadChain(steps, done) {
+    const next = (i) => {
+      if (i >= steps.length) { try { done() } catch (e) { /* */ } return }
+      this.load.once('complete', () => next(i + 1))
+      steps[i](this.load)
+      this.load.start()
+    }
+    next(0)
   }
 }

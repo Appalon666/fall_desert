@@ -65,7 +65,10 @@ export function createButton(scene, x, y, opts = {}) {
 
   if (enabled) {
     // Невидимая зона-хиттест поверх содержимого — надёжный приём событий.
-    const zone = scene.add.zone(0, 0, width, height).setOrigin(0.5)
+    // Яндекс 1.8: даже у маленькой кнопки область нажатия не меньше MIN_TAP —
+    // так по ней легко попасть пальцем и труднее промахнуться мимо.
+    const MIN_TAP = 52
+    const zone = scene.add.zone(0, 0, Math.max(width, MIN_TAP), Math.max(height, MIN_TAP)).setOrigin(0.5)
     zone.setInteractive({ useHandCursor: true })
     container.add(zone)
 
