@@ -63,9 +63,24 @@ export function buildHeroSheets(scene) {
 }
 
 // --- 1б. Иконки разделов (догружаются фоном сразу после первого экрана) ---
+
+// Пара настоящих мобов для окна «Как играть». Раньше там стояли процедурные
+// заглушки — окно показывается на первом входе, когда листы боя ещё не
+// загружены, и новичок видел не тех врагов, с которыми встретится. Эти два
+// листа лёгкие (гуль ~62 КБ, крысиный король ~98 КБ) и едут фоном вместе с
+// иконками разделов, то есть вход в игру не задерживают.
+export const HOWTO_SHEETS = [['enemy', 'ghoul'], ['boss', 'ratking']]
+
 export function loadDeferredUi(load) {
   for (let i = 0; i < 5; i++) load.image(`weapon-${i}`, `weapons/w${i}.png`)
   for (const k of UI_ICONS) load.image(k, `icons/${k}.png`)
+  for (const [kind, id] of HOWTO_SHEETS) load.image(`${kind}-${id}-src`, `sprites/${kind}-${id}.png`)
+}
+
+// Нарезка тех же двух листов. Вызывается из лагеря; если файлы ещё не доехали,
+// молча ничего не делает — окно останется на процедурных заглушках.
+export function buildHowToSheets(scene) {
+  for (const [kind, id] of HOWTO_SHEETS) sliceSheet(scene, `${kind}-${id}`)
 }
 
 // Доля кадра, занятая персонажем на СТАРЫХ листах 3×2 (там вокруг фигуры

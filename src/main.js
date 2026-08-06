@@ -90,6 +90,14 @@ try {
   applyOrientation()
 } catch (e) { /* */ }
 
+// Страховка от зависания на рекламе: см. Platform.wakeFromStuckAd. Слушаем на
+// уровне документа, а не сцены, — при паузе сцены ввод Phaser не обрабатывает.
+try {
+  const wake = () => { try { Platform.wakeFromStuckAd() } catch (e) { /* */ } }
+  document.addEventListener('pointerdown', wake, true)
+  document.addEventListener('keydown', wake, true)
+} catch (e) { /* */ }
+
 // Жизненный цикл вкладки (Яндекс 1.3): при сворачивании окна, переключении
 // вкладки и уходе страницы в фон на Android звука быть не должно вообще.
 // visibilitychange закрывает оба случая в Chromium/Firefox; pagehide/freeze —

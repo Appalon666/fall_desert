@@ -5,7 +5,7 @@ import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS, APP_VERSION } from '../config.j
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, panel, applyPostFX, resIcon } from '../ui/scenery.js'
-import { heroScaleFor } from '../assets.js'
+import { heroScaleFor, buildHowToSheets } from '../assets.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
@@ -106,6 +106,9 @@ export default class HubScene extends Phaser.Scene {
     // перехватчик кликов, и верхнее наглухо блокирует кнопки нижнего (игрок
     // видел награду за офлайн и не мог нажать «Забрать»). Поэтому «Как играть»
     // ждёт, пока игрок закроет награду.
+    // Листы для «Как играть» могли доехать фоном уже после старта лагеря.
+    buildHowToSheets(this)
+
     this.showOfflineReward(() => {
       let seenHow = false
       try { seenHow = localStorage.getItem('yp_howto') === '1' } catch (e) { /* */ }
@@ -113,6 +116,18 @@ export default class HubScene extends Phaser.Scene {
       try { localStorage.setItem('yp_howto', '1') } catch (e) { /* */ }
       this.showHowTo()
     })
+  }
+
+  // Картинка моба для «Как играть»: настоящий спрайт, если лист доехал, иначе
+  // процедурная заглушка. Первый кадр листа — поза стойки.
+  mobIcon(x, y, sheetKey, fallbackTex, targetH, fallbackFrameH) {
+    if (this.textures.exists(sheetKey)) {
+      const img = this.add.image(x, y, sheetKey, 0)
+      const frame = this.textures.get(sheetKey).get(0)
+      if (frame && frame.height) img.setScale(targetH / frame.height)
+      return img
+    }
+    return this.add.image(x, y, fallbackTex).setScale(targetH / (fallbackFrameH * TEX_SS))
   }
 
   // «Как играть». Раньше здесь была стена из 14 строк мелким шрифтом — новичок
@@ -130,7 +145,14 @@ export default class HubScene extends Phaser.Scene {
 
     const base = [ov, g, title]
     let page = []
-    const clear = () => { page.forEach(o => o.destroy()); page = [] }
+    // Твины Phaser НЕ умирают вместе с объектом (GameObject.destroy их не
+    // трогает), а иконки карточек покачиваются бесконечным твином. Без явного
+    // killTweensOf при листании страниц оставались твины на уничтоженных
+    // объектах.
+    const clear = () => {
+      page.forEach(o => { try { this.tweens.killTweensOf(o) } catch (e) { /* */ } o.destroy() })
+      page = []
+    }
     const closeAll = () => { clear(); base.forEach(o => o.destroy()) }
 
     // Карточка: крупная картинка, короткий заголовок, одна строка пояснения.
@@ -163,11 +185,11 @@ export default class HubScene extends Phaser.Scene {
     const page1 = () => {
       clear()
       card(cx - 292, 'Кликай по врагу', 'Пуля летит в точку клика',
-        (x, y) => this.add.image(x, y, TEX.ENEMY).setScale(104 / (72 * TEX_SS)))
+        (x, y) => this.mobIcon(x, y, 'enemy-ghoul', TEX.ENEMY, 132, 72))
       card(cx, 'Крышки — в силу', 'Апгрейды, союзники, снаряга',
         (x, y) => resIcon(this, x, y, 'caps', 100))
       card(cx + 292, 'Босс — ворота зоны', 'Пробей его, чтобы идти дальше',
-        (x, y) => this.add.image(x, y, TEX.BOSS).setScale(112 / (100 * TEX_SS)))
+        (x, y) => this.mobIcon(x, y, 'boss-ratking', TEX.BOSS, 132, 100))
       const hint = this.add.text(cx, cy + h / 2 - 84, t('☢  SPACE — залп по всей волне'), {
         fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.toxic, fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(92)
@@ -177,15 +199,19 @@ export default class HubScene extends Phaser.Scene {
 
     const page2 = () => {
       clear()
+      // Иконки берём игровые (те же, что игрок увидит в инвентаре, на верстаке
+      // и в престиже) — эмодзи оставлены только там, где своей картинки нет.
       const rows = [
-        ['🎁', 'С врагов падает снаряга — надевай в «Инвентаре»'],
-        ['⚒', 'Лишнее разбирай в металлолом и куй новое на «Верстаке»'],
-        ['🦸', 'За уровни дают очки: Сила, Живучесть, Удача'],
-        ['☢', 'После 4-й локации откроется Перерождение — вечные бонусы'],
+        ['slot-weapon', '🎁', 'С врагов падает снаряга — надевай в «Инвентаре»'],
+        ['res-scrap', '⚒', 'Лишнее разбирай в металлолом и куй новое на «Верстаке»'],
+        ['up-damage', '🦸', 'За уровни дают очки: Сила, Живучесть, Удача'],
+        ['res-core', '☢', 'После 4-й локации откроется Перерождение — вечные бонусы'],
       ]
       let y = cy - h / 2 + 110
-      for (const [icon, text] of rows) {
-        const em = this.add.text(cx - 330, y, icon, { fontSize: '30px' }).setOrigin(0.5).setDepth(92)
+      for (const [iconKey, emoji, text] of rows) {
+        const em = this.textures.exists(iconKey)
+          ? this.add.image(cx - 330, y, iconKey).setDisplaySize(40, 40).setOrigin(0.5).setDepth(92)
+          : this.add.text(cx - 330, y, emoji, { fontSize: '30px' }).setOrigin(0.5).setDepth(92)
         const tx = this.add.text(cx - 288, y, t(text), {
           fontFamily: 'Rubik, sans-serif', fontSize: '19px', color: CSS.paper, wordWrap: { width: 600 },
         }).setOrigin(0, 0.5).setDepth(92)
@@ -288,7 +314,10 @@ export default class HubScene extends Phaser.Scene {
     // написано, что за награду покажут рекламу — одной иконки 📺 недостаточно.
     const dbl = createButton(this, cx + 145, cy + 105, {
       label: t('📺 Реклама: ×2'), width: 240, height: 56, fontSize: 20, color: COLORS.toxicDark, hover: COLORS.toxic,
-      onClick: () => { Platform.showRewarded(() => State.addCaps(res.caps)); close() },
+      // Сначала close(), потом реклама. В обратном порядке showRewarded ставит
+      // игру на паузу, и следом за ним close() открывал «Как играть» — окно
+      // рождалось уже в паузе, с мёртвыми кнопками.
+      onClick: () => { close(); Platform.showRewarded(() => State.addCaps(res.caps)) },
     }).setDepth(92)
   }
 }
