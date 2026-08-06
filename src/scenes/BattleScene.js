@@ -39,6 +39,9 @@ const ALLY_ON_SCREEN_H = 86
 // На сколько правее края арены рождается враг: он должен ВОЙТИ в кадр, а не
 // возникнуть в нём.
 const ENEMY_SPAWN_MARGIN = 70
+// Каждые столько выпущенных врагов считаем «волной» — только ради нарастания
+// сложности внутри зоны (State.bumpWave, +1%).
+const WAVE_EVERY = 5
 
 export default class BattleScene extends Phaser.Scene {
   constructor() { super(SCENES.BATTLE) }
@@ -97,10 +100,8 @@ export default class BattleScene extends Phaser.Scene {
     this.groundY = GAME.HEIGHT - 130
     this.bullets = []
     this.enemies = []
-    this.spawnQueue = 0   // сколько врагов волны ещё не вышло
-    this.spawnIndex = 0   // порядковый номер в волне (ряд и слой спрайта)
+    this.spawnIndex = 0   // сколько врагов выпущено за бой (ряд и слой спрайта)
     this.spawnTimer = null
-    this.wavePending = false
     this.lastHitTime = 0
     State.hp = State.heroMaxHp() // полное лечение в начале вылазки
     // Флаг «идёт бой с боссом» живёт только внутри одной вылазки. Если игрок
@@ -152,7 +153,7 @@ export default class BattleScene extends Phaser.Scene {
 
     this.buildAllies()
     this.applyZoneVisuals()
-    this.spawnWave()
+    this.spawnTick()
     this.maybeTutorial()
 
     // Яндекс: активный геймплей начался; на выходе из сцены — остановить.
@@ -376,57 +377,62 @@ export default class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: b, x: front.sprite.x, y: front.sprite.y, duration: 170, ease: 'Quad.in', onComplete: () => b.destroy() })
   }
 
-  // ---------------- Спавн волны ----------------
-  spawnWave() {
-    this.wavePending = false
-    State.bumpWave() // +1% к врагам за каждую выпущенную волну
-    // Босс-ворота: набрали норму убийств в зоне → один жирный босс.
-    const isBoss = !State.bossActive && bossDue(State.killsInZone)
-    if (isBoss) {
-      State.bossActive = true
-      // У зоны свой пул боссов; на старых сейвах/самопальных зонах его может не
-      // быть — тогда, как раньше, ворота держит раздутый обычный враг.
-      const pool = (this.zone.bosses && this.zone.bosses.length) ? this.zone.bosses : this.zone.enemies
-      const defId = pool[Math.floor(Math.random() * pool.length)]
-      this.enemies.push(this.makeEnemy(defId, true, 0, 1))
-      this.cameras.main.flash(220, 60, 0, 0)
-      this.cameras.main.shake(200, 0.006)
-      this.showBossBanner(defOf(defId).name)
-      Sfx.boss()
-      return
-    }
-    // Волна выходит НЕ строем, а по одному из-за правого края (BAL.spawnGapMin/
-    // Max). Строй разом означал, что на поздних локациях, где врагов до восьми,
-    // хвост появлялся вплотную к герою.
-    this.spawnQueue = enemiesInWave(State.zoneIndex, State.killsInZone)
-    this.spawnIndex = 0
-    this.spawnNextEnemy()
-  }
-
-  // Очередной враг волны: рождается ЗА краем арены и заходит пешком.
-  spawnNextEnemy() {
+  // ---------------- Поток врагов ----------------
+  // Врагов больше не «выдают волнами»: они идут ровным потоком из-за правого
+  // края арены с интервалом BAL.spawnGapMin/Max. Раньше следующая волна
+  // приходила только после зачистки предыдущей — это давало простой на пустой
+  // арене и заставляло ждать вместо того, чтобы драться.
+  //
+  // Сколько врагов копится одновременно, ограничивает enemiesInWave(): не
+  // успеваешь — арена заполняется до потолка и поток ждёт; успеваешь — идёт
+  // ровно с интервалом.
+  spawnTick() {
     this.spawnTimer = null
-    // Проверку scene.isActive() здесь делать НЕЛЬЗЯ: первая волна выпускается
-    // из create(), где сцена ещё не помечена активной, — враги просто не
-    // выходили. Отложенные вызовы и так не срабатывают на погашенной сцене.
-    if (this.spawnQueue <= 0 || State.hp <= 0) return
-    const pool = this.zone.enemies
-    const defId = pool[Math.floor(Math.random() * pool.length)]
-    this.enemies.push(this.makeEnemy(defId, false, this.spawnIndex, 1, this.arenaW + ENEMY_SPAWN_MARGIN))
-    this.spawnIndex++
-    this.spawnQueue--
-    if (this.spawnQueue > 0) {
-      const gap = Phaser.Math.Between(BAL.spawnGapMin, BAL.spawnGapMax)
-      this.spawnTimer = this.time.delayedCall(gap, () => {
-        if (this.scene.isActive()) this.spawnNextEnemy()
-      })
+    if (State.hp <= 0) return
+    // Норма зоны добита → ворота. Поток встаёт до конца боя с боссом.
+    if (!State.bossActive && bossDue(State.killsInZone)) { this.spawnBoss(); return }
+    if (!State.bossActive) {
+      const cap = enemiesInWave(State.zoneIndex, State.killsInZone)
+      if (this.enemies.length < cap) {
+        const pool = this.zone.enemies
+        const defId = pool[Math.floor(Math.random() * pool.length)]
+        this.enemies.push(this.makeEnemy(defId, false, this.spawnIndex, 1, this.arenaW + ENEMY_SPAWN_MARGIN))
+        this.spawnIndex++
+        // «Волна» осталась только как единица нарастания сложности внутри зоны
+        // (+1% за волну): считаем её каждые WAVE_EVERY выпущенных врагов.
+        if (this.spawnIndex % WAVE_EVERY === 0) State.bumpWave()
+      }
+      this.scheduleSpawn()
     }
   }
 
-  // Отменить недовыпущенных врагов волны (смерть героя, выход из боя).
+  scheduleSpawn() {
+    if (this.spawnTimer) return
+    const gap = Phaser.Math.Between(BAL.spawnGapMin, BAL.spawnGapMax)
+    // Проверку scene.isActive() делаем ЗДЕСЬ, а не в spawnTick: первый враг
+    // выпускается из create(), где сцена ещё не помечена активной.
+    this.spawnTimer = this.time.delayedCall(gap, () => {
+      if (this.scene.isActive()) this.spawnTick()
+    })
+  }
+
+  // Босс-ворота: один жирный враг, поток обычных на это время выключен.
+  spawnBoss() {
+    State.bossActive = true
+    // У зоны свой пул боссов; на старых сейвах/самопальных зонах его может не
+    // быть — тогда, как раньше, ворота держит раздутый обычный враг.
+    const pool = (this.zone.bosses && this.zone.bosses.length) ? this.zone.bosses : this.zone.enemies
+    const defId = pool[Math.floor(Math.random() * pool.length)]
+    this.enemies.push(this.makeEnemy(defId, true, 0, 1))
+    this.cameras.main.flash(220, 60, 0, 0)
+    this.cameras.main.shake(200, 0.006)
+    this.showBossBanner(defOf(defId).name)
+    Sfx.boss()
+  }
+
+  // Остановить поток (смерть героя, выход из боя).
   cancelSpawns() {
     if (this.spawnTimer) { this.spawnTimer.remove(false); this.spawnTimer = null }
-    this.spawnQueue = 0
   }
 
   // Создать один враг-объект (спрайт, полоска HP, имя, стат).
@@ -681,18 +687,21 @@ export default class BattleScene extends Phaser.Scene {
     if (e.isBoss) {
       State.registerBossKill()
       this.applyZoneVisuals()
+      this.spawnIndex = 0
+      this.scheduleSpawn() // новая локация — поток обычных врагов снова идёт
       this.cameras.main.flash(300, 40, 60, 20)
       Platform.showInterstitial()
     } else {
       State.registerKill()
     }
 
-    // Волна зачищена → следующая (или босс-ворота). Ждём и опустевшую арену,
-    // и исчерпанную очередь спавна: иначе следующая волна пошла бы поверх
-    // недовыпущенной текущей.
-    if (this.enemies.length === 0 && this.spawnQueue === 0 && !this.wavePending) {
-      this.wavePending = true
-      this.time.delayedCall(240, () => { if (this.scene.isActive()) this.spawnWave() })
+    // Норму зоны добили — ворота выходят сразу, не дожидаясь тика потока.
+    if (!State.bossActive && bossDue(State.killsInZone)) {
+      this.cancelSpawns()
+      this.time.delayedCall(240, () => { if (this.scene.isActive() && !State.bossActive) this.spawnBoss() })
+    } else if (!this.spawnTimer && !State.bossActive) {
+      // Арена опустела раньше тика — не заставляем игрока ждать впустую.
+      if (this.enemies.length === 0) this.spawnTick()
     }
   }
 
@@ -785,13 +794,13 @@ export default class BattleScene extends Phaser.Scene {
         if (!this._deathModal) return
         // Сбрасываем bossActive: если пали в бою с боссом, иначе он больше не
         // заспавнится (bossDue гейтится bossActive) и зона застрянет навсегда.
-        this.closeDeathModal(); State.cancelDeath(); this.spawnWave()
+        this.closeDeathModal(); State.cancelDeath(); this.spawnTick()
       }),
     })
     const give = createButton(this, cx, cy + 66, {
       label: t('Смириться и продолжить'), width: 380, height: 54, fontSize: 19,
       // Смерть без возрождения → межстраничная реклама Яндекса (сама троттлит ≥60с).
-      onClick: () => { this.closeDeathModal(); Platform.showInterstitial(); State.onHeroDeath(); this.spawnWave() },
+      onClick: () => { this.closeDeathModal(); Platform.showInterstitial(); State.onHeroDeath(); this.spawnTick() },
     })
     revive.setDepth(86); give.setDepth(86)
     this._deathModal = [ov, title, revive, give]
