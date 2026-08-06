@@ -15,6 +15,7 @@ $mirror = @{
   'new-tick' = $true; 'new-vulture' = $false; 'new-slug' = $true
   'new-butcher' = $true; 'new-roller' = $true; 'new-leech' = $true
   'new-drowned' = $true; 'new-shard' = $true
+  'new-zombie' = $true; 'new-hellhound' = $true
   'boss-ratking' = $false; 'boss-sledge' = $true; 'boss-mother' = $true
   'boss-tyrant' = $true; 'boss-crane' = $false; 'boss-toad' = $false
   'boss-worm' = $true; 'boss-colossus' = $true; 'boss-furnace' = $true
@@ -48,6 +49,7 @@ foreach ($k in $mirror.Keys | Sort-Object) {
   if ($flips.ContainsKey($k)) { python tools/flip-frames.py $dst @($flips[$k]) }
 }
 
-"`nГотовые листы: art-out\mobs. Разложить по игре:"
+"`nГотовые листы: art-out\mobs. Разложить по игре и сжать:"
 "  Get-ChildItem art-out\mobs\new-*.png  | %% { Copy-Item `$_ (`"public\sprites\`" + (`$_.Name -replace '^new-','enemy-')) -Force }"
 "  Get-ChildItem art-out\mobs\boss-*.png | %% { Copy-Item `$_ `"public\sprites\`$(`$_.Name)`" -Force }"
+"  python tools/png8.py `"public/sprites/*.png`"   # обязательно: без этого лист весит вчетверо больше"
