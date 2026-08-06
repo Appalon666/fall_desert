@@ -36,6 +36,9 @@ const HERO_ON_SCREEN_H = 225
 const ENEMY_H_PER_SCALE = 100
 // Высота нарисованного союзника на экране (герой — 225 px, пёс ему по колено).
 const ALLY_ON_SCREEN_H = 86
+// На сколько правее края арены рождается враг: он должен ВОЙТИ в кадр, а не
+// возникнуть в нём.
+const ENEMY_SPAWN_MARGIN = 70
 
 export default class BattleScene extends Phaser.Scene {
   constructor() { super(SCENES.BATTLE) }
@@ -94,6 +97,9 @@ export default class BattleScene extends Phaser.Scene {
     this.groundY = GAME.HEIGHT - 130
     this.bullets = []
     this.enemies = []
+    this.spawnQueue = 0   // сколько врагов волны ещё не вышло
+    this.spawnIndex = 0   // порядковый номер в волне (ряд и слой спрайта)
+    this.spawnTimer = null
     this.wavePending = false
     this.lastHitTime = 0
     State.hp = State.heroMaxHp() // полное лечение в начале вылазки
@@ -389,17 +395,38 @@ export default class BattleScene extends Phaser.Scene {
       Sfx.boss()
       return
     }
-    const n = enemiesInWave(State.zoneIndex, State.killsInZone)
+    // Волна выходит НЕ строем, а по одному из-за правого края (BAL.spawnGapMin/
+    // Max). Строй разом означал, что на поздних локациях, где врагов до восьми,
+    // хвост появлялся вплотную к герою.
+    this.spawnQueue = enemiesInWave(State.zoneIndex, State.killsInZone)
+    this.spawnIndex = 0
+    this.spawnNextEnemy()
+  }
+
+  // Очередной враг волны: рождается ЗА краем арены и заходит пешком.
+  spawnNextEnemy() {
+    this.spawnTimer = null
+    // Проверку scene.isActive() здесь делать НЕЛЬЗЯ: первая волна выпускается
+    // из create(), где сцена ещё не помечена активной, — враги просто не
+    // выходили. Отложенные вызовы и так не срабатывают на погашенной сцене.
+    if (this.spawnQueue <= 0 || State.hp <= 0) return
     const pool = this.zone.enemies
-    // Разводим строй по РЕАЛЬНОЙ ширине спрайтов: у нового арта она разная
-    // (ползун вытянутый, оса компактная), и фиксированный шаг их слепляет.
-    let x = this.arenaW - 90
-    for (let i = 0; i < n; i++) {
-      const defId = pool[Math.floor(Math.random() * pool.length)]
-      const e = this.makeEnemy(defId, false, i, n, x)
-      this.enemies.push(e)
-      x -= Math.max(72, e.onScreenW * 0.52)
+    const defId = pool[Math.floor(Math.random() * pool.length)]
+    this.enemies.push(this.makeEnemy(defId, false, this.spawnIndex, 1, this.arenaW + ENEMY_SPAWN_MARGIN))
+    this.spawnIndex++
+    this.spawnQueue--
+    if (this.spawnQueue > 0) {
+      const gap = Phaser.Math.Between(BAL.spawnGapMin, BAL.spawnGapMax)
+      this.spawnTimer = this.time.delayedCall(gap, () => {
+        if (this.scene.isActive()) this.spawnNextEnemy()
+      })
     }
+  }
+
+  // Отменить недовыпущенных врагов волны (смерть героя, выход из боя).
+  cancelSpawns() {
+    if (this.spawnTimer) { this.spawnTimer.remove(false); this.spawnTimer = null }
+    this.spawnQueue = 0
   }
 
   // Создать один враг-объект (спрайт, полоска HP, имя, стат).
@@ -660,8 +687,10 @@ export default class BattleScene extends Phaser.Scene {
       State.registerKill()
     }
 
-    // Волна зачищена → следующая (или босс-ворота).
-    if (this.enemies.length === 0 && !this.wavePending) {
+    // Волна зачищена → следующая (или босс-ворота). Ждём и опустевшую арену,
+    // и исчерпанную очередь спавна: иначе следующая волна пошла бы поверх
+    // недовыпущенной текущей.
+    if (this.enemies.length === 0 && this.spawnQueue === 0 && !this.wavePending) {
       this.wavePending = true
       this.time.delayedCall(240, () => { if (this.scene.isActive()) this.spawnWave() })
     }
@@ -730,6 +759,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   clearEnemies() {
+    this.cancelSpawns()
     for (const e of this.enemies) this.destroyEnemy(e)
     this.enemies = []
   }

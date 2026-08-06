@@ -80,12 +80,19 @@ function runOne(classId, rng) {
   }
 
   let wave = []
-  function spawnWave() {
+  let waveT0 = 0
+  const nLive = (t) => { let k = 0; while (k < wave.length && wave[k].spawnT <= t - waveT0) k++; return k }
+  function spawnWave(now) {
     st.waveCount++
     const boss = !st.bossActive && bossDue(st.killsInZone)
     if (boss) st.bossActive = true
     const count = boss ? 1 : enemiesInWave(st.zoneIndex, st.killsInZone)
     const z = getZone(st.zoneIndex); const pool = boss ? z.bosses : z.enemies; const af = z.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
+    // Враги волны выходят по одному из-за края арены (BAL.spawnGapMin/Max) —
+    // так же, как в бою. Без этого симулятор считал, что вся волна доступна
+    // сразу, и завышал темп: урон по площади бил бы по ещё не вышедшим.
+    const gapSec = (BAL.spawnGapMin + BAL.spawnGapMax) / 2000
+    waveT0 = now
     wave = []
     for (let i = 0; i < count; i++) {
       const def = defOf(pool[Math.floor(rng() * pool.length)])
@@ -100,7 +107,7 @@ function runOne(classId, rng) {
       const hp = b.hp * af.hp * mHp * prog * wv, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg * wv
       const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
       const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed) + i * 0.6
-      wave.push({ hp, reward, dmg, approach, attackAccum: 0, boss })
+      wave.push({ hp, reward, dmg, approach, attackAccum: 0, boss, spawnT: boss ? 0 : i * gapSec })
     }
   }
   function killFront(e) {
@@ -118,23 +125,26 @@ function runOne(classId, rng) {
   const prestigeTimes = []; const prestigeZones = []; let maxZone = 0
   let lastZoneT = 0 // когда в последний раз взяли НОВУЮ зону
   let firstCoreT = null // когда впервые стал доступен престиж (coresFromRun>=1)
-  spawnWave()
+  spawnWave(0)
 
   for (let t = 0; t < SESSION; t += DT) {
-    if (wave.length === 0) spawnWave()
+    if (wave.length === 0) spawnWave(t)
     const zoneBefore = st.zoneIndex
     clickAccum += cps * acc * DT
     while (clickAccum >= 1 && wave.length) {
       clickAccum -= 1; st.combo++
+      const live = nLive(t)
+      if (live === 0) { clickAccum = 0; break }
       const hit = clickHit(); wave[0].hp -= hit
       const sp = uA('splash') // Картечь: разлёт по нескольким врагам сзади
-      if (sp > 0) for (let k = 1; k < wave.length && k <= 3; k++) wave[k].hp -= hit * sp
+      if (sp > 0) for (let k = 1; k < live && k <= 3; k++) wave[k].hp -= hit * sp
       for (let k = wave.length - 1; k >= 0; k--) if (wave[k].hp <= 0) { killFront(wave[k]); wave.splice(k, 1) }
     }
-    if (wave.length) { wave[0].hp -= allyDps() * DT; if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() } }
+    if (nLive(t) > 0) { wave[0].hp -= allyDps() * DT; if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() } }
     if (st.zoneIndex > zoneBefore) lastZoneT = t
     if (wave.length) {
       for (const e of wave) {
+        if (e.spawnT > t - waveT0) continue
         e.approach -= DT
         if (e.approach <= 0) { e.attackAccum += DT; const rate = BAL.enemyAttackRate / 1000; while (e.attackAccum >= rate) { e.attackAccum -= rate; st.hp -= e.dmg; if (st.hp <= 0) { heroDie(); break } } }
         if (st.hp <= 0) break

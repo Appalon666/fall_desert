@@ -132,12 +132,21 @@ function runOne(classId, rng) {
 
   // ---- волна из нескольких врагов / босс-ворота ----
   let wave = []          // живые враги текущей волны
-  function spawnWave() {
+  let waveT0 = 0         // когда волна начала выходить (см. spawnT у врага)
+  // Сколько врагов волны УЖЕ на арене: волна выходит по одному, и урон по
+  // площади не должен доставать тех, кто ещё за краем.
+  const nLive = (t) => { let k = 0; while (k < wave.length && wave[k].spawnT <= t - waveT0) k++; return k }
+  function spawnWave(now) {
     st.waveCount++ // +1% к врагам за волну
     const boss = !st.bossActive && bossDue(st.killsInZone)
     if (boss) st.bossActive = true
     const count = boss ? 1 : enemiesInWave(st.zoneIndex, st.killsInZone)
     const z = getZone(st.zoneIndex); const pool = boss ? z.bosses : z.enemies; const af = z.affix || { hp: 1, dmg: 1, rew: 1, spd: 1 }
+    // Враги волны выходят по одному из-за края арены (BAL.spawnGapMin/Max) —
+    // так же, как в бою. Без этого симулятор считал, что вся волна доступна
+    // сразу, и завышал темп: урон по площади бил бы по ещё не вышедшим.
+    const gapSec = (BAL.spawnGapMin + BAL.spawnGapMax) / 2000
+    waveT0 = now
     wave = []
     for (let i = 0; i < count; i++) {
       const def = defOf(pool[Math.floor(rng() * pool.length)])
@@ -147,7 +156,7 @@ function runOne(classId, rng) {
       const hp = b.hp * af.hp * prog * wv, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * wv
       const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
       const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed) + i * 0.6
-      wave.push({ hp, maxHp: hp, reward, dmg, approach, attackAccum: 0, boss })
+      wave.push({ hp, maxHp: hp, reward, dmg, approach, attackAccum: 0, boss, spawnT: boss ? 0 : i * gapSec })
     }
   }
   function killFront(front) {
@@ -167,36 +176,39 @@ function runOne(classId, rng) {
   const durations = []; let curStart = 0
   const checkpoints = {}
   doAllocate(); doSpend()
-  spawnWave(); curStart = 0
+  spawnWave(0); curStart = 0
 
   for (let t = 0; t < SESSION; t += DT) {
-    if (wave.length === 0) { spawnWave(); curStart = t }
+    if (wave.length === 0) { spawnWave(t); curStart = t }
     // фокус-огонь по переднему живому (wave[0] — он же цель пробития ниже)
     clickAccum += cps * acc * DT
     while (clickAccum >= 1 && wave.length) {
       clickAccum -= 1; st.combo++
       st.ult = Math.min(BAL.ultMax, st.ult + BAL.ultChargePerHit)
       const dmg = clickHit()
+      const live = nLive(t)
+      if (live === 0) { clickAccum = 0; break } // все ещё за краем — бить некого
       if (lifesteal > 0 && st.hp < heroMaxHp()) st.hp = Math.min(heroMaxHp(), st.hp + dmg * lifesteal)
       // пробитие: урон по нескольким передним врагам
-      for (let p = 0; p < pierce && p < wave.length; p++) wave[p].hp -= dmg
+      for (let p = 0; p < pierce && p < live; p++) wave[p].hp -= dmg
       // Картечь: разлёт части урона по врагам сзади
       const sp = upgAdd('splash')
-      if (sp > 0) for (let k = pierce; k < wave.length && k < pierce + 3; k++) wave[k].hp -= dmg * sp
+      if (sp > 0) for (let k = pierce; k < live && k < pierce + 3; k++) wave[k].hp -= dmg * sp
       for (let k = 0; k < wave.length;) { if (wave[k].hp <= 0) { killFront(wave[k]); wave.splice(k, 1) } else k++ }
     }
     // союзники — тоже по переднему
-    if (wave.length) { wave[0].hp -= allyDps() * DT; if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() } }
+    if (nLive(t) > 0) { wave[0].hp -= allyDps() * DT; if (wave[0].hp <= 0) { killFront(wave[0]); wave.shift() } }
     // ульта — AoE по всем, когда заряжена (разумный игрок жмёт сразу)
-    if (st.ult >= BAL.ultMax && wave.length) {
+    if (st.ult >= BAL.ultMax && nLive(t) > 0) {
       st.ult = 0
       const dmg = clickHit() / comboMult() * BAL.ultDamageMul
-      for (const e of wave) e.hp -= dmg
+      for (let k = 0; k < nLive(t); k++) wave[k].hp -= dmg
       for (let i = wave.length - 1; i >= 0; i--) if (wave[i].hp <= 0) { killFront(wave[i]); wave.splice(i, 1) }
     }
     if (wave.length === 0) { durations.push(t - curStart); continue }
-    // угроза: каждый подошедший враг бьёт
+    // угроза: бьют только те, кто уже вышел и дошёл
     for (const e of wave) {
+      if (e.spawnT > t - waveT0) continue
       e.approach -= DT
       if (e.approach <= 0) {
         e.attackAccum += DT
@@ -279,7 +291,7 @@ const gbttk = median(all.map(r => r.bossTtkEnd))
 const early = median(all.map(r => r.earlyRate))
 const late = median(all.map(r => r.lateRate))
 console.log('\n--- Диагностика ---')
-console.log(`Медиана зон достигнуто за 20 мин: ${gz}   (цель: 8-12 — десять локаций примерно за 20 минут, дальше endless и мета-петля)`)
+console.log(`Медиана зон достигнуто за 20 мин: ${gz}   (цель зависит от BAL.spawnGapMin/Max: враги выходят по одному, и темп упирается в интервал их выхода, а не в силу героя)`)
 console.log(`Медиана смертей: ${gd}   (цель: 1-5, риск есть, но не спираль)`)
 console.log(`TTK обычного врага в конце: ${gttk.toFixed(1)}s   (цель: 0.6-3s)`)
 console.log(`TTK босса зоны в конце: ${gbttk.toFixed(1)}s   (цель: 4-15s)`)
