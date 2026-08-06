@@ -12,7 +12,7 @@ import { getZone, zoneHpMul } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
-import { enemiesInWave, bossDue, xpFromKill } from '../src/data/progression.js'
+import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../src/data/progression.js'
 
 const SESSION = process.env.SIM_SECONDS ? +process.env.SIM_SECONDS : 7200 // 2 часа (env: SIM_SECONDS)
 const DT = 0.2
@@ -110,7 +110,7 @@ function runOne(classId, rng) {
     if (e.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
     else { st.totalKills++; st.killsInZone++ }
   }
-  function heroDie() { st.killsInZone = Math.floor(st.killsInZone / 2); st.waveCount = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
+  function heroDie() { if (!st.bossActive) st.killsInZone = Math.max(0, st.killsInZone - Math.ceil(zoneKillsFor() * BAL.deathZoneLoss)); st.waveCount = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
 
   freshRun()
   const cps = 4, acc = 0.9

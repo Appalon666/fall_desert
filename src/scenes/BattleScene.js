@@ -750,7 +750,7 @@ export default class BattleScene extends Phaser.Scene {
       }),
     })
     const give = createButton(this, cx, cy + 66, {
-      label: t('Смириться (откат зоны)'), width: 380, height: 54, fontSize: 19,
+      label: t('Смириться и продолжить'), width: 380, height: 54, fontSize: 19,
       // Смерть без возрождения → межстраничная реклама Яндекса (сама троттлит ≥60с).
       onClick: () => { this.closeDeathModal(); Platform.showInterstitial(); State.onHeroDeath(); this.spawnWave() },
     })

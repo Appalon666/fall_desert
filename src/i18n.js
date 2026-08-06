@@ -91,7 +91,7 @@ const EN = {
   // п.4.5.1 — на кнопках rewarded video текст прямо называет рекламу.
   '📺 Реклама: возродиться': '📺 Watch ad: revive',
   '📺 Реклама: ×2': '📺 Watch ad: ×2',
-  'Смириться (откат зоны)': 'Give up (zone reset)',
+  'Смириться и продолжить': 'Accept it and go on',
   '☢  УЛЬТА (Space)': '☢  ULT (Space)',
   'HP героя': 'Hero HP',
   'Заряд ульты': 'Ult charge',

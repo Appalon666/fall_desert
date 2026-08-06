@@ -12,7 +12,7 @@ import { getZone, zoneHpMul } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
-import { enemiesInWave, bossDue, xpFromKill } from '../src/data/progression.js'
+import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../src/data/progression.js'
 import { pathToFileURL } from 'node:url'
 
 const SESSION = process.env.SIM_SECONDS ? +process.env.SIM_SECONDS : 1200 // сек за прогон (env: SIM_SECONDS)
@@ -158,7 +158,7 @@ function runOne(classId, rng) {
     if (front.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
     else { st.totalKills++; st.killsInZone++ }
   }
-  function heroDie() { st.deaths++; st.killsInZone = Math.floor(st.killsInZone / 2); st.waveCount = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
+  function heroDie() { st.deaths++; if (!st.bossActive) st.killsInZone = Math.max(0, st.killsInZone - Math.ceil(zoneKillsFor() * BAL.deathZoneLoss)); st.waveCount = 0; st.bossActive = false; st.hp = heroMaxHp(); st.combo = 0; wave = [] }
 
   const pierce = cls.pierce || 1
   const lifesteal = cls.lifesteal || 0

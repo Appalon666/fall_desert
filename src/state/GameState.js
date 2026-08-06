@@ -10,6 +10,7 @@ import { CLASS_BY_ID } from '../data/classes.js'
 import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, CRAFT_TIERS, weaponStyleFor, itemPower, ITEM_LEVEL_CAP } from '../data/loot.js'
 import { RELIC_PART_IDS, RELIC_PART_BY_ID, RELIC_DUPE_SCRAP } from '../data/relics.js'
 import { zoneHpMul } from '../data/zones.js'
+import { zoneKillsFor } from '../data/progression.js'
 import { Platform } from '../platform/yandex.js'
 
 const SAVE_KEY = 'wasteland_save_v1'
@@ -464,12 +465,20 @@ export class GameState extends Emitter {
     this.emit('zone')
     return true
   }
-  // Смерть героя: откатываем прогресс зоны НАПОЛОВИНУ (не в ноль — иначе при
-  // частых смертях игрок вечно перегринживает и не лезет выше; но и не бесплатно
-  // — иначе бесконечно долбится в непробиваемую стену). Теряем комбо/волну/ваве-
-  // рамп; HP восстанавливается. Рекламу показывает сцена.
+  // Смерть героя: откатываем ЧАСТЬ прогресса зоны (не в ноль — иначе при
+  // частых смертях игрок вечно перегринживает и не лезет выше; но и не
+  // бесплатно — иначе бесконечно долбится в непробиваемую стену). Теряем
+  // комбо/волну/ваве-рамп; HP восстанавливается. Рекламу показывает сцена.
+  //
+  // Смерть В БОЮ С ВОРОТАМИ прогресс зоны не трогает вовсе: игрок просто бьёт
+  // босса заново, с полным HP и сброшенным ваве-рампом. Раньше здесь резалось
+  // пополам, и провал на боссе отбрасывал к середине зоны — двести убийств,
+  // чтобы вернуться к тому же бою.
   onHeroDeath() {
-    this.killsInZone = Math.floor(this.killsInZone / 2)
+    if (!this.bossActive) {
+      const loss = Math.ceil(zoneKillsFor() * BAL.deathZoneLoss)
+      this.killsInZone = Math.max(0, this.killsInZone - loss)
+    }
     this.waveCount = 0
     this.bossActive = false
     this.hp = this.heroMaxHp()
