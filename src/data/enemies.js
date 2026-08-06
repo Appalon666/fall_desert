@@ -24,6 +24,9 @@ export const ENEMIES = {
   slug:     { name: 'Слизняк',    tint: 0x7a8f3a, scale: 2.3, hpMul: 1.8, rewardMul: 1.6, dmgMul: 0.9, speedMul: 0.55 },
   shard:    { name: 'Стеклокраб', tint: 0xa8c4d4, scale: 2.2, hpMul: 1.5, rewardMul: 1.5, dmgMul: 1.3, speedMul: 0.85 },
   butcher:  { name: 'Мясник',     tint: 0xc98a8a, scale: 2.6, hpMul: 1.9, rewardMul: 2.0, dmgMul: 1.9, speedMul: 0.8 },
+  // — третья волна арта —
+  zombie:   { name: 'Светяк',     tint: 0x8fd94a, scale: 2.1, hpMul: 1.1, rewardMul: 1.2, dmgMul: 1.0, speedMul: 0.85 },
+  hellhound:{ name: 'Пекло-пёс',  tint: 0xff7a2a, scale: 1.9, hpMul: 1.4, rewardMul: 1.5, dmgMul: 1.5, speedMul: 1.8 },
 }
 
 export const ENEMY_IDS = Object.keys(ENEMIES)

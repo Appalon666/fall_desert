@@ -16,9 +16,10 @@ import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import {
   loadBattle, battleAssetsReady, buildEnemySheets, buildEnemyAnims, heroScaleFor, buildHeroAnim,
-  loadBosses, bossAssetsReady, buildBossSheets,
+  loadBosses, bossAssetsReady, buildBossSheets, buildAllySheets,
 } from '../assets.js'
 import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX, resIcon } from '../ui/scenery.js'
+import { floatText, hitSpark, capsBurst, explode, impactRing } from '../gfx/fx.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
@@ -33,6 +34,8 @@ const HERO_ON_SCREEN_H = 225
 // Высота врага на экране = ENEMY_H_PER_SCALE × scale из enemies.js.
 // Гуль (scale 2.1) выходит ~210 px — как и было на старом арте.
 const ENEMY_H_PER_SCALE = 100
+// Высота нарисованного союзника на экране (герой — 225 px, пёс ему по колено).
+const ALLY_ON_SCREEN_H = 86
 
 export default class BattleScene extends Phaser.Scene {
   constructor() { super(SCENES.BATTLE) }
@@ -85,6 +88,7 @@ export default class BattleScene extends Phaser.Scene {
   create() {
     buildEnemySheets(this) // режем листы врагов по их раскладке
     buildEnemyAnims(this)  // и заводим цикл ходьбы
+    buildAllySheets(this)  // нарисованные союзники (пёс)
     this.ensureBossAssets() // листы боссов — фоном, они нужны только к воротам
     this.arenaW = GAME.WIDTH - PANEL_W
     this.groundY = GAME.HEIGHT - 130
@@ -321,8 +325,18 @@ export default class BattleScene extends Phaser.Scene {
       const col = i % 3
       const x = this.hero.x - 34 + col * 36
       const y = this.groundY - 18 - Math.floor(i / 3) * 42 + (i % 2) * 6
-      const s = this.add.image(x, y, TEX.ALLY).setScale(0.95 / TEX_SS).setTint(a.color).setDepth(6)
-      addRim(s, lighten(a.color, 0.3), 2, 0.08, 8)
+      // Нарисованный союзник (пока только пёс) — спрайт-лист с циклом ходьбы;
+      // у остальных остаётся процедурная турель, покрашенная в цвет отряда.
+      const sheet = `ally-${a.id}-sheet`
+      let s
+      if (this.textures.exists(sheet) && this.textures.get(sheet).frameTotal - 1 >= 4) {
+        const frameH = this.textures.get(sheet).get(0).height
+        s = this.add.sprite(x, y + 6, sheet, 0).setScale(ALLY_ON_SCREEN_H / frameH).setDepth(6)
+        if (this.anims.exists(`ally-${a.id}-walk`)) s.play(`ally-${a.id}-walk`)
+      } else {
+        s = this.add.image(x, y, TEX.ALLY).setScale(0.95 / TEX_SS).setTint(a.color).setDepth(6)
+        addRim(s, lighten(a.color, 0.3), 2, 0.08, 8)
+      }
       this.tweens.add({ targets: s, y: y - 4, duration: 1300 + i * 130, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
       const badge = this.add.text(x + 14, y + 14, `×${fmt(n)}`, {
         fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: CSS.paper, fontStyle: 'bold',
@@ -387,8 +401,10 @@ export default class BattleScene extends Phaser.Scene {
     const base = enemyStats(def, State.totalKills, isBoss)
     const mHp = State.enemyMetaHpMul(), mDmg = State.enemyMetaDmgMul()
     const wave = State.waveScaleMul() // +1% за волну (HP и урон)
-    // боссам прогрессию даём мягче (^0.6), иначе бой с воротами затягивается
-    const prog = isBoss ? Math.pow(State.enemyProgMul(), 0.6) : State.enemyProgMul()
+    // Прогрессия у босса такая же, как у рядового: его «жирность» задаёт только
+    // BAL.bossHpMul. Мягчение корнем ^0.6 на глубоких зонах делало боссов слабее
+    // обычных врагов — ворота проходились быстрее рядовой волны.
+    const prog = State.enemyProgMul()
     // Кэпим ИТОГ (base уже закэплен, но множители могут пробить MAX_SAFE → Infinity
     // → неубиваемый враг). Держим числа конечными.
     const MAX = Number.MAX_SAFE_INTEGER
@@ -598,11 +614,6 @@ export default class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: e.sprite, scaleX: e.dispScale * 1.14, scaleY: e.dispScale * 0.86, duration: 55, yoyo: true, ease: 'Quad.out' })
   }
 
-  impactRing(x, y, crit) {
-    const ring = this.add.circle(x, y, 6, 0xffffff, 0).setStrokeStyle(3, crit ? 0xffd23c : 0xffffff, 0.9).setDepth(45).setBlendMode('ADD')
-    this.tweens.add({ targets: ring, scale: crit ? 4.2 : 2.6, alpha: 0, duration: 300, ease: 'Cubic.out', onComplete: () => ring.destroy() })
-  }
-
   // ---------------- Смерть врага ----------------
   killEnemy(e) {
     const idx = this.enemies.indexOf(e)
@@ -719,43 +730,13 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // ---------------- Эффекты ----------------
-  floatText(x, y, text, color, size = 22) {
-    const t = this.add.text(x, y, text, {
-      fontFamily: 'Rubik, sans-serif', fontSize: `${size}px`, color, fontStyle: 'bold',
-      stroke: '#000', strokeThickness: 3,
-    }).setOrigin(0.5)
-    this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 800, ease: 'Cubic.out', onComplete: () => t.destroy() })
-  }
-
-  spawnHitSpark(x, y) {
-    for (let i = 0; i < 4; i++) {
-      const p = this.add.rectangle(x, y, 5, 5, COLORS.gold).setOrigin(0.5)
-      const a = Math.random() * Math.PI * 2
-      this.tweens.add({ targets: p, x: x + Math.cos(a) * 30, y: y + Math.sin(a) * 30, alpha: 0, duration: 260, onComplete: () => p.destroy() })
-    }
-  }
-
-  capsBurst(x, y, n) {
-    for (let i = 0; i < n; i++) {
-      const c = resIcon(this, x, y, 'caps', 26)
-      const a = Math.random() * Math.PI * 2
-      const d = 30 + Math.random() * 50
-      this.tweens.add({ targets: c, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d - 20, alpha: 0, angle: 180, duration: 500 + Math.random() * 200, ease: 'Cubic.out', onComplete: () => c.destroy() })
-    }
-  }
-
-  explode(x, y, big) {
-    const flash = this.add.image(x, y, TEX.GLOW).setTint(big ? 0xff8a4a : 0xfff0b0).setScale(big ? 2.2 : 1.2).setDepth(44).setBlendMode('ADD')
-    this.tweens.add({ targets: flash, scale: 0, alpha: 0, duration: big ? 380 : 240, onComplete: () => flash.destroy() })
-    const n = big ? 16 : 8
-    for (let i = 0; i < n; i++) {
-      const col = [COLORS.toxic, COLORS.rustLight, COLORS.gold][i % 3]
-      const chunk = this.add.rectangle(x, y, 6 + Math.random() * 5, 6 + Math.random() * 5, col).setDepth(43)
-      const a = Math.random() * Math.PI * 2
-      const d = 40 + Math.random() * (big ? 120 : 60)
-      this.tweens.add({ targets: chunk, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d + 30, angle: Math.random() * 360, alpha: 0, duration: 400 + Math.random() * 300, ease: 'Quad.out', onComplete: () => chunk.destroy() })
-    }
-  }
+  // Сами эффекты живут в gfx/fx.js — они не знают про состояние боя. Здесь
+  // остаются только тонкие обёртки, чтобы вызовы по сцене читались как раньше.
+  floatText(x, y, text, color, size = 22) { return floatText(this, x, y, text, color, size) }
+  spawnHitSpark(x, y) { hitSpark(this, x, y) }
+  capsBurst(x, y, n) { capsBurst(this, x, y, n) }
+  explode(x, y, big) { explode(this, x, y, big) }
+  impactRing(x, y, crit) { impactRing(this, x, y, crit) }
 
   showBossBanner(name) {
     const cx = this.arenaW / 2

@@ -8,7 +8,7 @@
 import { BAL } from '../src/data/balance.js'
 import { defOf } from '../src/data/bosses.js'
 import { enemyStats } from '../src/data/scaling.js'
-import { getZone, ZONES } from '../src/data/zones.js'
+import { getZone } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
@@ -16,7 +16,6 @@ import { enemiesInWave, bossDue } from '../src/data/progression.js'
 
 const SESSION = 7200 // 2 часа
 const DT = 0.2
-const RUNS = 10
 
 function mulberry32(a) {
   return function () {
@@ -56,7 +55,8 @@ function runOne(classId, rng) {
   const allyDps = () => { let b = 0; for (const a of ALLIES) b += (st.allies[a.id] || 0) * a.dps; return b * (1 + uA('allyMul') + cb('allyMul')) * uP('allyPow') }
   const capsBonus = () => cb('capsMul') + pCaps()
   const xpNeed = () => Math.floor(BAL.baseXpToLevel * Math.pow(BAL.xpGrowth, st.hero.level - 1))
-  const coresFromRun = () => (st.zoneIndex >= 4 ? 4 : 0)
+  // как в GameState.coresFromRun: базовые 4 на гейте + по одному за зону дальше
+  const coresFromRun = () => (st.zoneIndex >= 4 ? 4 + (st.zoneIndex - 4) : 0)
 
   function spend() {
     let bought = true

@@ -23,7 +23,9 @@ const UI_ICONS = [
   'slot-weapon', 'slot-helmet', 'slot-armor', 'slot-boots', 'slot-accessory',
 ]
 
-const ZONE_BGS = ['rust', 'city', 'bunker', 'lair']
+// Фоны зон (см. ZONES в data/zones.js). Каждый ~60-95 КБ, грузятся пачкой
+// вместе со спрайтшитами врагов перед первым «Походом».
+const ZONE_BGS = ['rust', 'junkyard', 'city', 'swamp', 'metro', 'bunker', 'crater', 'foundry', 'glass', 'lair']
 
 export const HERO_CLASSES = ['gunner', 'brute', 'mechanic', 'scavenger']
 
@@ -112,10 +114,24 @@ export function battleAssetsReady(scene) {
   return true
 }
 
+// У союзников нарисованный арт есть пока только у пса; остальные рисуются
+// процедурной турелью с тинтом (см. BattleScene.buildAllies).
+// Ключ листа намеренно с суффиксом -sheet: под `ally-dog` уже занята иконка
+// раздела «Апгрейды», и совпадение ключей затёрло бы её.
+const ALLY_SHEETS = ['dog']
+
 export function loadBattle(load) {
   // Как и у героев — грузим картинкой, режем потом по её собственной раскладке.
   for (const id of ENEMY_IDS) load.image(`enemy-${id}-src`, `sprites/enemy-${id}.png`)
   for (const k of ZONE_BGS) load.image(`bg-${k}`, `bg/${k}.jpg`)
+  for (const id of ALLY_SHEETS) load.image(`ally-${id}-sheet-src`, `sprites/ally-${id}-sheet.png`)
+}
+
+export function buildAllySheets(scene) {
+  for (const id of ALLY_SHEETS) {
+    sliceSheet(scene, `ally-${id}-sheet`)
+    walkAnim(scene, `ally-${id}-sheet`, `ally-${id}-walk`, 7)
+  }
 }
 
 // Режем один лист: сетка 2×2, четыре кадра ходьбы.

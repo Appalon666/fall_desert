@@ -11,6 +11,8 @@ import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, CRAFT_TIERS
 import { Platform } from '../platform/yandex.js'
 
 const SAVE_KEY = 'wasteland_save_v1'
+// С какой пройденной зоны открывается перерождение (см. canPrestige/coresFromRun).
+const PRESTIGE_GATE_ZONE = 4
 const CAPS_PER_DPS = 0.12 // перевод idle-DPS в крышки/сек для офлайн-дохода
 
 export class GameState extends Emitter {
@@ -125,9 +127,13 @@ export class GameState extends Emitter {
   prestigeDamageMul() { return 1 + this.prestige.legacy * 0.12 }
   prestigeHpMul() { return this.prestige.vitality * 0.10 }
   prestigeCapsMul() { return this.prestige.stash * 0.12 }
-  // Фиксированная награда: каждое перерождение даёт 4 ядра (гейт — 4-я локация).
+  // Награда за перерождение: базовые 4 ядра на гейте (4-я локация) и по одному
+  // за каждую следующую пройденную. Пока локаций было четыре, фиксированных
+  // четырёх хватало — гейт совпадал с концом контента. Сейчас их десять, и с
+  // фиксированной наградой дошедший до Логова Босса получал ровно столько же,
+  // сколько остановившийся сразу на гейте: идти вглубь было незачем.
   coresFromRun() {
-    return this.zoneIndex >= 4 ? 4 : 0
+    return this.zoneIndex >= PRESTIGE_GATE_ZONE ? 4 + (this.zoneIndex - PRESTIGE_GATE_ZONE) : 0
   }
   // Масштаб врагов под ПЕРМАНЕНТНУЮ силу героя (мета). Иначе после престижа
   // враги картонные (их HP считается от totalKills, что сброшено, а бонусы меты —
@@ -161,9 +167,11 @@ export class GameState extends Emitter {
   // волна сильнее» ощущается, но не компаундится в абсурд за сотни волн.
   waveScaleMul() { return Math.pow(BAL.enemyWaveRamp, this.waveCount) }
   bumpWave() { this.waveCount++ }
-  // Перерождение открывается только после убийства босса 4-й локации
-  // (zoneIndex доходит до 4 = пройдены все 4 зоны, начался endless).
-  canPrestige() { return this.zoneIndex >= 4 }
+  // Перерождение открывается после босса 4-й локации: zoneIndex доходит до 4,
+  // то есть четыре зоны пройдены. Локаций теперь десять, но гейт оставлен
+  // ранним намеренно — мета-петля не должна ждать полного прохождения; за
+  // остальные шесть локаций игрок получает ядра сверх базовых (coresFromRun).
+  canPrestige() { return this.zoneIndex >= PRESTIGE_GATE_ZONE }
   doPrestige() {
     if (!this.canPrestige()) return 0
     const gain = this.coresFromRun()

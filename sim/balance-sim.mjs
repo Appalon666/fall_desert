@@ -93,7 +93,7 @@ function runOne(classId, rng) {
     for (let i = 0; i < count; i++) {
       const def = defOf(pool[Math.floor(rng() * pool.length)])
       const b = enemyStats(def, st.totalKills, boss)
-      const prog = boss ? Math.pow(progMul(), 0.6) : progMul()
+      const prog = progMul()   // у босса та же прогрессия, жирность — в bossHpMul
       const wv = Math.pow(BAL.enemyWaveRamp, st.waveCount)
       const hp = b.hp * af.hp * prog * wv, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * wv
       const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
@@ -121,8 +121,7 @@ function runOne(classId, rng) {
 
   for (let t = 0; t < SESSION; t += DT) {
     if (wave.length === 0) { spawnWave(); curStart = t }
-    // фокус-огонь по переднему живому
-    const front = wave[0]
+    // фокус-огонь по переднему живому (wave[0] — он же цель пробития ниже)
     clickAccum += cps * acc * DT
     while (clickAccum >= 1 && wave.length) {
       clickAccum -= 1; st.combo++
@@ -167,7 +166,7 @@ function runOne(classId, rng) {
   const wvEnd = Math.pow(BAL.enemyWaveRamp, st.waveCount)
   const typicalHp = enemyStats(avgDef, st.totalKills, false).hp * progMul() * wvEnd
   const ttkEnd = typicalHp / effDps
-  const bossTtkEnd = enemyStats(avgDef, st.totalKills, true).hp * Math.pow(progMul(), 0.6) * wvEnd / effDps
+  const bossTtkEnd = enemyStats(avgDef, st.totalKills, true).hp * progMul() * wvEnd / effDps
   const earlyRate = (checkpoints[120] || st.totalKills) / 120
   const lateRate = (st.totalKills - (checkpoints[1080] || st.totalKills)) / 120
 

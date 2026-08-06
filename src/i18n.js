@@ -132,6 +132,7 @@ const EN = {
   'Радкрыса': 'Radrat', 'Ползун': 'Crawler', 'Радоса': 'Radwasp', 'Гуль': 'Ghoul',
   'Рейдер': 'Raider', 'Пёс-мутант': 'Mutt', 'Тень': 'Lurker', 'Плевун': 'Spitter',
   'Пузырь': 'Bloat', 'Громила': 'Brute',
+  'Светяк': 'Glowrot', 'Пекло-пёс': 'Hellhound',
   'Стервятник': 'Vulture', 'Клещ': 'Tick', 'Катала': 'Wheeler', 'Утопленник': 'Drowned',
   'Пиявка': 'Leech', 'Слизняк': 'Slug', 'Стеклокраб': 'Glass Crab', 'Мясник': 'Butcher',
   // — боссы зон —
@@ -158,6 +159,8 @@ const EN = {
   // — зоны / аффиксы —
   'Ржавый Пустырь': 'Rusty Wastes', 'Руины Города': 'City Ruins',
   'Токсичный Бункер': 'Toxic Bunker', 'Логово Босса': 'Boss Lair',
+  'Автосвалка': 'Scrapyard', 'Мёртвая Топь': 'Dead Marsh', 'Затопленное Метро': 'Flooded Metro',
+  'Зелёный Кратер': 'Green Crater', 'Литейный Цех': 'Foundry', 'Стеклянная Пустошь': 'Glass Waste',
   'Богатая': 'Rich', 'Бронированная': 'Armored', 'Шустрая': 'Swift', 'Ядрёная': 'Nuclear',
   // — характеристики героя —
   'Сила': 'Strength', 'Живучесть': 'Vitality', 'Удача': 'Luck',

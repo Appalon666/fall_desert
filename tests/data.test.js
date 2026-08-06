@@ -8,7 +8,7 @@ import { ENEMIES, ENEMY_IDS } from '../src/data/enemies.js'
 import { BOSSES, BOSS_IDS, defOf, sheetKey, isBossId } from '../src/data/bosses.js'
 import { setLang, t, itemName } from '../src/i18n.js'
 import { readFileSync } from 'node:fs'
-import { RARITIES, SLOTS, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID } from '../src/data/loot.js'
+import { RARITIES, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID } from '../src/data/loot.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { fmt, fmtDuration } from '../src/util/format.js'
 
