@@ -15,6 +15,7 @@
     "sim:stability": "node sim/stability.mjs",
     "sim:gear": "node sim/gear-sim.mjs",
     "shots": "node tools/shots.mjs",
+    "check:audio": "node tools/audio-check.mjs",
     "pack": "vite build && python tools/pack.py"
   },
   "devDependencies": {
