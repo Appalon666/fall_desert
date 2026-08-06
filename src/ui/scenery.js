@@ -1,7 +1,6 @@
 // Общий визуальный слой: атмосферный фон, виньетка, панели, заголовки.
 // Используется всеми сценами для единого «чистового» вида.
 
-import Phaser from 'phaser'
 import { GAME, COLORS, CSS, TEX } from '../config.js'
 
 export function darken(c, f) {

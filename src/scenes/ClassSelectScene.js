@@ -1,7 +1,7 @@
 // ClassSelect — первый экран новой игры. Просторные карточки классов с ховером.
 
 import Phaser from 'phaser'
-import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
+import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
 import { CLASSES } from '../data/classes.js'
 import { createButton } from '../ui/Button.js'

@@ -1,7 +1,7 @@
 // Hub — стартовый лагерь: навигация, крышки, уровень героя, офлайн-доход.
 
 import Phaser from 'phaser'
-import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
+import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS, APP_VERSION } from '../config.js'
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, panel, applyPostFX, resIcon } from '../ui/scenery.js'
@@ -89,7 +89,8 @@ export default class HubScene extends Phaser.Scene {
       onClick: () => this.scene.start(SCENES.PRESTIGE),
     })
 
-    this.add.text(cx, GAME.HEIGHT - 20, 'v0.2.1', { fontFamily: 'monospace', fontSize: '13px', color: '#9a8c70' }).setOrigin(0.5)
+    // Версия одна на весь проект: package.json, этот экран и dock/store-listing.md.
+    this.add.text(cx, GAME.HEIGHT - 20, `v${APP_VERSION}`, { fontFamily: 'monospace', fontSize: '13px', color: '#9a8c70' }).setOrigin(0.5)
 
     // Debug-сброс прогресса — только в dev-сборке (Vite вырежет в проде).
     if (import.meta.env?.DEV) {

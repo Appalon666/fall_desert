@@ -2,7 +2,7 @@
 // Тумблер ×1 / ×10 / MAX задаёт, сколько уровней покупать за клик.
 
 import Phaser from 'phaser'
-import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
+import { GAME, COLORS, CSS, SCENES } from '../config.js'
 import { State } from '../state/GameState.js'
 import { UPGRADES } from '../data/upgrades.js'
 import { ALLIES } from '../data/allies.js'

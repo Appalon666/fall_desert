@@ -5,7 +5,6 @@
 // срабатывают стабильно, а useHandCursor даёт правильный курсор без глобальных
 // setDefaultCursor (которые умеют «залипать» при смене сцены).
 
-import Phaser from 'phaser'
 import { COLORS, CSS } from '../config.js'
 import { Sfx } from '../audio/sfx.js'
 

@@ -57,7 +57,6 @@ const config = {
   scene: [BootScene, ClassSelectScene, HubScene, BattleScene, ShopScene, InventoryScene, HeroScene, PrestigeScene, LeaderboardScene, ForgeScene],
 }
 
-// eslint-disable-next-line no-new
 const game = new Phaser.Game(config)
 Platform.attachGame(game)
 

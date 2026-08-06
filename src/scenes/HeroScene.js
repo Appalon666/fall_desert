@@ -1,7 +1,7 @@
 // Hero — характеристики и распределение очков за уровни (Сила / Живучесть / Удача).
 
 import Phaser from 'phaser'
-import { GAME, COLORS, CSS, SCENES, TEX, TEX_SS } from '../config.js'
+import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX } from '../ui/scenery.js'
