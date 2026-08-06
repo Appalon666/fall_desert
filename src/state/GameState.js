@@ -39,6 +39,10 @@ export class GameState extends Emitter {
     // иначе набор из пяти частей не собрать в принципе.
     this.relicParts = []
     this.relicsCrafted = 0 // сколько реликвий уже сковано (от этого зависят дубли)
+    // Герой пал, но игрок ещё не выбрал «возродиться за рекламу» или «смириться».
+    // Флаг сохраняется: иначе перезагрузка страницы прямо на экране смерти
+    // отменяла штраф целиком — бесплатный способ никогда не терять прогресс.
+    this.pendingDeath = false
     this.zoneIndex = 0
     this.killsInZone = 0
     this.totalKills = 0
@@ -474,7 +478,26 @@ export class GameState extends Emitter {
   // босса заново, с полным HP и сброшенным ваве-рампом. Раньше здесь резалось
   // пополам, и провал на боссе отбрасывал к середине зоны — двести убийств,
   // чтобы вернуться к тому же бою.
+  // Герой упал: фиксируем «смерть в процессе» ДО показа окна выбора и сразу
+  // сохраняемся. Если игрок закроет вкладку или перезагрузит страницу, штраф
+  // всё равно применится на загрузке (см. resolvePendingDeath).
+  beginDeath() { this.pendingDeath = true; this.save(true) }
+  // Возрождение за рекламу: смерть отменяется целиком, прогресс зоны цел.
+  cancelDeath() {
+    this.pendingDeath = false
+    this.bossActive = false
+    this.hp = this.heroMaxHp()
+    this.combo = 0
+    this.save()
+  }
+  // Незакрытая смерть из прошлой сессии — доводим до конца.
+  resolvePendingDeath() {
+    if (!this.pendingDeath) return false
+    this.onHeroDeath()
+    return true
+  }
   onHeroDeath() {
+    this.pendingDeath = false
     if (!this.bossActive) {
       const loss = Math.ceil(zoneKillsFor() * BAL.deathZoneLoss)
       this.killsInZone = Math.max(0, this.killsInZone - loss)
@@ -509,7 +532,7 @@ export class GameState extends Emitter {
       caps: this.caps, heroClass: this.heroClass, hero: this.hero,
       upgrades: this.upgrades, allies: this.allies,
       equipment: this.equipment, inventory: this.inventory, scrap: this.scrap,
-      relicParts: this.relicParts, relicsCrafted: this.relicsCrafted,
+      relicParts: this.relicParts, relicsCrafted: this.relicsCrafted, pendingDeath: this.pendingDeath,
       zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills, waveCount: this.waveCount,
       cores: this.cores, prestige: this.prestige, prestigeCount: this.prestigeCount,
       bestScore: this.bestScore, lastSeen: Date.now(),
@@ -564,6 +587,7 @@ export class GameState extends Emitter {
       // переименованная часть иначе навсегда заняли бы гнездо в наборе.
       relicParts: Array.isArray(d.relicParts) ? d.relicParts.filter(id => RELIC_PART_IDS.includes(id)) : [],
       relicsCrafted: fin(d.relicsCrafted),
+      pendingDeath: !!d.pendingDeath,
       zoneIndex: fin(d.zoneIndex),
       killsInZone: fin(d.killsInZone),
       totalKills: fin(d.totalKills),

@@ -11,7 +11,11 @@
     "test:watch": "vitest",
     "sim": "node sim/balance-sim.mjs",
     "sim:depth": "node sim/depth-sim.mjs",
-    "lint": "eslint src sim tests"
+    "lint": "eslint src sim tests",
+    "sim:stability": "node sim/stability.mjs",
+    "sim:gear": "node sim/gear-sim.mjs",
+    "shots": "node tools/shots.mjs",
+    "pack": "vite build && python tools/pack.py"
   },
   "devDependencies": {
     "eslint": "^10.8.0",

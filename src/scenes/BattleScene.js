@@ -108,6 +108,9 @@ export default class BattleScene extends Phaser.Scene {
     // был покинут с открытым окном, на новом входе управление осталось бы
     // заблокированным навсегда при пустом экране. Начинаем с чистого флага.
     this._deathModal = null
+    // Смерть, оставшаяся незакрытой (игрок перезагрузил страницу прямо на окне
+    // выбора), доводится до конца здесь — штраф не обходится обновлением.
+    State.resolvePendingDeath()
 
     this.buildArena()
     this.buildPanel()
@@ -732,6 +735,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   heroDie() {
+    State.beginDeath() // штраф фиксируется сразу, а не по кнопке — см. GameState
     Sfx.death()
     this.cameras.main.flash(400, 120, 0, 0)
     this.clearEnemies()
@@ -751,7 +755,7 @@ export default class BattleScene extends Phaser.Scene {
         if (!this._deathModal) return
         // Сбрасываем bossActive: если пали в бою с боссом, иначе он больше не
         // заспавнится (bossDue гейтится bossActive) и зона застрянет навсегда.
-        this.closeDeathModal(); State.hp = State.heroMaxHp(); State.bossActive = false; this.spawnWave()
+        this.closeDeathModal(); State.cancelDeath(); this.spawnWave()
       }),
     })
     const give = createButton(this, cx, cy + 66, {

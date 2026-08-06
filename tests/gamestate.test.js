@@ -346,3 +346,29 @@ describe('реликвии: части, дубли, ковка', () => {
     expect(s2.relicsCrafted).toBe(2)
   })
 })
+
+describe('смерть: штраф нельзя обойти перезагрузкой', () => {
+  it('незакрытая смерть доигрывается на загрузке', () => {
+    s.zoneIndex = 2; s.killsInZone = 150; s.bossActive = false
+    s.beginDeath()
+    expect(s.pendingDeath).toBe(true)
+    // игрок перезагрузил страницу — состояние поднимается из сейва
+    const raw = JSON.parse(JSON.stringify(s.toJSON()))
+    const s2 = new GameState()
+    s2._apply(raw)
+    expect(s2.pendingDeath).toBe(true)
+    expect(s2.resolvePendingDeath()).toBe(true)
+    expect(s2.killsInZone).toBe(150 - Math.ceil(zoneKillsFor() * BAL.deathZoneLoss))
+    expect(s2.pendingDeath).toBe(false)
+    expect(s2.resolvePendingDeath()).toBe(false) // второй раз штраф не берётся
+  })
+  it('возрождение за рекламу отменяет штраф целиком', () => {
+    s.zoneIndex = 2; s.killsInZone = 150; s.bossActive = true
+    s.beginDeath()
+    s.cancelDeath()
+    expect(s.pendingDeath).toBe(false)
+    expect(s.killsInZone).toBe(150)
+    expect(s.bossActive).toBe(false)
+    expect(s.hp).toBe(s.heroMaxHp())
+  })
+})

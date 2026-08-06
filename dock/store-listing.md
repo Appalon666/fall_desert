@@ -15,8 +15,16 @@
 | **Рекомендуемые языки перевода** | Русский, Английский |
 | **Игра переведена на** | Русский, Английский |
 | **Возрастной рейтинг** | 12+ |
-| **Категории** | Аркады, Экшен, Симуляторы (кликер/idle), Ролевые |
+| **Категории** | Казуальные, Аркады |
 | **Облачные сохранения** | Включить (да) |
+
+> ⚠️ Категории исправлены после отказа: модерация сняла релиз по п.2.3 («игра не
+> соответствует заявленному жанру») и сама переставила категории на «Казуальные».
+> Не возвращать «Симуляторы» и «Ролевые» — это и было причиной.
+
+> ⚠️ Название в ЛК должно совпадать с игрой ПОБУКВЕННО: **Ядрён-Пустошь** — с «ё»
+> и с заглавной «П». В прошлом черновике стояло «Ядрен-пустошь», за это снимали
+> по п.5.1.3. Проверить во всех полях: название, «Об игре», SEO, промо-материалы.
 
 ### Возрастной рейтинг — обоснование
 Мультяшное фэнтезийное насилие: стрельба по вымышленным мутантам, без реалистичной
@@ -85,11 +93,14 @@ Enemies grow stronger as you do — keep upgrading and don't take hits!
 Что внутри:
 • 4 класса героя с уникальными механиками — пробитие, вампиризм, боевые союзники,
   нюх на добро. Каждый играется по-своему.
-• 10 видов мутантов и жирные босс-ворота в конце каждой зоны.
+• 20 видов мутантов и 9 боссов-ворот со своим артом — по одному в конце
+  каждой из 10 локаций.
 • Idle-союзники, которые бьют сами и приносят доход, пока игра закрыта.
 • Накопительная ульта — залп по всей волне врагов.
 • Лут с редкостями, экипировка и крафт за металлолом.
 • Мета-прогрессия: перерождение ради Ядер и вечных бонусов.
+• Реликвии: с боссов десятой локации падают части набора, из пяти частей
+  куётся случайная реликвия — высший тир снаряжения.
 • Бесконечный режим с аффиксами зон и гонкой за рекордом.
 
 Числа растут, враги крепнут вместе с тобой, а «ещё чуть-чуть прокачаю» затягивает
@@ -127,11 +138,14 @@ first.
 What's inside:
 • 4 hero classes with unique mechanics — piercing shots, lifesteal, battle allies,
   a nose for loot. Each plays differently.
-• 10 mutant types and fat boss gates at the end of every zone.
+• 20 mutant types and 9 hand-drawn boss gates — one at the end of each of
+  the 10 locations.
 • Idle allies that fight on their own and earn caps while the game is closed.
 • A charge-up Ultimate — one blast over the entire wave.
 • Loot with rarities, gear and crafting from scrap.
 • Meta progression: prestige for Cores and permanent bonuses.
+• Relics: the zone-10 boss drops set pieces; five pieces forge a random relic,
+  the top gear tier.
 • Endless mode with zone affixes and a race for the high score.
 
 Numbers climb, enemies grow with you, and "just one more upgrade" keeps you hooked
