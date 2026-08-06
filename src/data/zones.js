@@ -95,6 +95,43 @@ export const AFFIXES = [
   { id: 'toxic', name: 'Ядрёная', tag: '☢', hp: 1.1, dmg: 1.4, rew: 1.3, spd: 1 },
 ]
 
+// ШАГ СЛОЖНОСТИ ЛОКАЦИИ: во сколько раз враги этой локации крепче врагов
+// предыдущей. У каждой свой — от ×1.10 до ×1.30 с шагом 0.05, чтобы переходы
+// не были одинаковыми: после лёгкой топи «литейка ×1.30» читается как событие.
+//
+// Раньше здесь был один плоский множитель на все зоны (enemyZoneRamp 1.06), а
+// весь накал сложности сидел в росте HP за каждое убийство — то есть был
+// незаметным: враг крепчал на 0.29% за моба, игрок этого не видел, просто в
+// какой-то момент переставал справляться. Теперь внутри локации сложность
+// ровная, а на входе в новую — честная ступенька.
+//
+// В endless список циклится: локации идут по кругу вместе с их картинками.
+const ZONE_STEPS = [1.10, 1.20, 1.15, 1.30, 1.25, 1.10, 1.30, 1.15, 1.25, 1.20]
+
+export function zoneStep(zoneIndex) {
+  const n = ZONE_STEPS.length
+  return ZONE_STEPS[(((zoneIndex % n) + n) % n)]
+}
+
+// Накопленный множитель HP к началу зоны: произведение шагов всех предыдущих.
+// Считаем через полные циклы, а не циклом по всем зонам, — в endless индекс
+// зоны неограничен, и наивный цикл рос бы вместе с ним.
+const CYCLE_PRODUCT = ZONE_STEPS.reduce((p, v) => p * v, 1)
+export function zoneHpMul(zoneIndex) {
+  const z = Math.max(0, Math.floor(zoneIndex) || 0)
+  const n = ZONE_STEPS.length
+  let m = Math.pow(CYCLE_PRODUCT, Math.floor(z / n))
+  for (let i = 0; i < z % n; i++) m *= ZONE_STEPS[i]
+  return m
+}
+
+// Десятая локация — та, с чьего босса падают части реликвии. В endless картинки
+// локаций идут по кругу (см. getZone: bg берётся по index % ZONES.length),
+// поэтому «десятая» повторяется каждые ZONES.length зон: 9, 19, 29…
+export function isRelicZone(zoneIndex) {
+  return zoneIndex >= 0 && (zoneIndex % ZONES.length) === ZONES.length - 1
+}
+
 // Аффикс для номера петли (1..) endless-режима.
 export function affixForLoop(loop) {
   return AFFIXES[(loop - 1) % AFFIXES.length]

@@ -10,8 +10,8 @@ import { BAL } from '../data/balance.js'
 import { defOf, sheetKey } from '../data/bosses.js'
 import { ALLIES } from '../data/allies.js'
 import { enemyStats } from '../data/scaling.js'
-import { getZone } from '../data/zones.js'
-import { enemiesInWave, bossDue } from '../data/progression.js'
+import { getZone, isRelicZone } from '../data/zones.js'
+import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../data/progression.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import {
@@ -69,7 +69,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // Листы боссов (~2.5 МБ) не держат вход в бой: босс приходит только после
-  // BAL.zoneKills убийств. Догружаем их фоном и режем, когда приехали; если не
+  // zoneKillsFor(зона) убийств. Догружаем их фоном и режем, когда приехали; если не
   // успели (или файла нет) — босс выйдет на процедурном фолбэке, бой не встанет.
   ensureBossAssets() {
     try {
@@ -621,7 +621,7 @@ export default class BattleScene extends Phaser.Scene {
     this.enemies.splice(idx, 1)
 
     State.addCaps(Math.ceil(e.reward * (1 + State.capsBonus())))
-    if (State.addXp(Math.ceil(e.reward * 0.55))) Sfx.levelup()
+    if (State.addXp(xpFromKill(State.totalKills))) Sfx.levelup()
     State.ult = Math.min(BAL.ultMax, State.ult + BAL.ultChargePerKill)
     Sfx.kill(); Sfx.cap()
     this.capsBurst(e.sprite.x, e.sprite.y, e.isBoss ? 14 : 6)
@@ -634,6 +634,11 @@ export default class BattleScene extends Phaser.Scene {
       const rar = RARITY_BY_ID[item.rarity]
       this.floatText(e.sprite.x, e.sprite.y - 40, `🎁 ${itemName(item.name)}`, rar.css, 18)
     }
+    // Босс десятой локации (и её повторов в endless) — сверх обычного дропа даёт
+    // свои два броска: гарантированный эпик и часть реликвии. zoneIndex здесь
+    // ещё ДО продвижения зоны (registerBossKill ниже), то есть это та зона, в
+    // которой босса и убили.
+    if (e.isBoss && isRelicZone(State.zoneIndex)) this.rollRelicRewards(e)
 
     this.deathFx(e)
 
@@ -651,6 +656,33 @@ export default class BattleScene extends Phaser.Scene {
     if (this.enemies.length === 0 && !this.wavePending) {
       this.wavePending = true
       this.time.delayedCall(240, () => { if (this.scene.isActive()) this.spawnWave() })
+    }
+  }
+
+  // Награда с босса десятой локации: фиолетовый предмет и часть реликвии.
+  // Всплывашки разводим по времени, иначе три строки лягут друг на друга.
+  rollRelicRewards(e) {
+    const x = e.sprite.x, y = e.sprite.y
+    if (Math.random() < BAL.finalBossEpicChance) {
+      const item = rollItem(Math.random, Math.floor(State.enemyLevel()), State.lootLuck(), 'epic')
+      State.addItem(item)
+      this.floatText(x, y - 80, `💜 ${itemName(item.name)}`, RARITY_BY_ID.epic.css, 20)
+    }
+    if (Math.random() < BAL.finalBossPartChance) {
+      const res = State.rollRelicPart()
+      this.time.delayedCall(420, () => {
+        if (!this.scene.isActive()) return
+        const label = res.dupe
+          ? t('🔩 {part} (повтор) +{n}', { part: t(res.part.name), n: res.scrap })
+          : `${res.part.icon} ${t(res.part.name)}`
+        this.floatText(x, y - 120, label, res.dupe ? '#c8c8d2' : RARITY_BY_ID.relic.css, 22)
+        if (!res.dupe && State.canCraftRelic()) {
+          this.time.delayedCall(420, () => {
+            if (!this.scene.isActive()) return
+            this.floatText(x, y - 160, t('НАБОР СОБРАН! Кузни реликвию в инвентаре'), RARITY_BY_ID.relic.css, 22)
+          })
+        }
+      })
     }
   }
 
@@ -840,7 +872,7 @@ export default class BattleScene extends Phaser.Scene {
     this.ultFill.setAlpha(full ? 0.55 + 0.45 * Math.abs(Math.sin(this.time.now / 180)) : 1)
 
     this.zoneLabel.setText(t('ЗОНА {z} · {name}', { z: State.zoneIndex + 1, name: t(this.zone.name).toUpperCase() }))
-    const prog = State.bossActive ? t('БОСС-ВОРОТА!') : t('Зачистка: {a}/{b}', { a: State.killsInZone, b: BAL.zoneKills })
+    const prog = State.bossActive ? t('БОСС-ВОРОТА!') : t('Зачистка: {a}/{b}', { a: State.killsInZone, b: zoneKillsFor() })
     this.progressLabel.setText(t('{prog}   ·   Всего убито: {t}', { prog, t: State.totalKills }))
 
     this.statsText.setText([

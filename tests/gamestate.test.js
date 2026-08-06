@@ -2,8 +2,10 @@
 // классовые механики, офлайн-доход, инвентарь. GameState развязан от Phaser.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { GameState } from '../src/state/GameState.js'
+import { zoneKillsFor } from '../src/data/progression.js'
 import { BAL } from '../src/data/balance.js'
 import { rollItem } from '../src/data/loot.js'
+import { RELIC_PART_IDS } from '../src/data/relics.js'
 
 const rng = (seed => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)(123)
 const item = (over = {}) => ({ ...rollItem(rng, 5, 0), ...over })
@@ -74,7 +76,7 @@ describe('волны / зоны / босс-ворота', () => {
     expect(s.bestScore).toBe(2)
   })
   it('убийство босса продвигает зону и сбрасывает счётчик', () => {
-    s.killsInZone = BAL.zoneKills
+    s.killsInZone = zoneKillsFor()
     s.bossActive = true
     const z = s.zoneIndex
     s.registerBossKill()
@@ -260,5 +262,75 @@ describe('мультипокупка союзников', () => {
     expect(s.allies.dog).toBe(10)
     expect(s.caps).toBeLessThan(caps0)
     expect(capsEvents).toBeGreaterThan(0)
+  })
+})
+
+describe('реликвии: части, дубли, ковка', () => {
+  it('до первой ковки дубли не падают — набор собирается ровно за 5 бросков', () => {
+    for (let i = 0; i < RELIC_PART_IDS.length; i++) {
+      const res = s.rollRelicPart(rng)
+      expect(res.dupe).toBe(false)
+      expect(s.relicPartsOwned().length).toBe(i + 1)
+    }
+    expect(s.canCraftRelic()).toBe(true)
+  })
+  it('ковка тратит все части, даёт оранжевый предмет и считается', () => {
+    RELIC_PART_IDS.forEach(() => s.rollRelicPart(rng))
+    const before = s.inventory.length
+    const item = s.craftRelic()
+    expect(item).toBeTruthy()
+    expect(item.rarity).toBe('relic')
+    expect(s.inventory.length).toBe(before + 1)
+    expect(s.relicPartsOwned().length).toBe(0)
+    expect(s.relicsCrafted).toBe(1)
+    expect(s.canCraftRelic()).toBe(false)
+  })
+  it('без полного набора ковка не проходит', () => {
+    s.rollRelicPart(rng)
+    expect(s.craftRelic()).toBe(null)
+    expect(s.relicPartsOwned().length).toBe(1)
+  })
+  it('после первой ковки появляются дубли — примерно с заданным шансом', () => {
+    RELIC_PART_IDS.forEach(() => s.rollRelicPart(rng))
+    s.craftRelic()
+    // набор пуст, реликвия сделана: гоняем броски и считаем повторы
+    let dupes = 0, rolls = 0
+    for (let i = 0; i < 4000; i++) {
+      if (s.canCraftRelic()) { s.craftRelic(); continue }
+      const res = s.rollRelicPart(rng)
+      rolls++
+      if (res.dupe) dupes++
+    }
+    const rate = dupes / rolls
+    expect(rate).toBeGreaterThan(BAL.relicDupeChance * 0.6)
+    expect(rate).toBeLessThan(BAL.relicDupeChance * 1.6)
+  })
+  it('дубль идёт в металлолом, а не пропадает', () => {
+    RELIC_PART_IDS.forEach(() => s.rollRelicPart(rng))
+    s.craftRelic()
+    s.rollRelicPart(rng) // одна часть в наборе — есть из чего делать дубль
+    const scrap0 = s.scrap
+    let got = null
+    for (let i = 0; i < 500 && !got; i++) { const r = s.rollRelicPart(rng); if (r.dupe) got = r }
+    if (got) {
+      expect(got.scrap).toBeGreaterThan(0)
+      expect(s.scrap).toBeGreaterThan(scrap0)
+    }
+  })
+  it('части и счётчик реликвий переживают перерождение и сейв', () => {
+    s.rollRelicPart(rng); s.rollRelicPart(rng)
+    s.zoneIndex = 9
+    s.doPrestige()
+    expect(s.relicPartsOwned().length).toBe(2)
+    const raw = JSON.parse(JSON.stringify(s.toJSON()))
+    const s2 = new GameState()
+    s2._apply(raw)
+    expect(s2.relicPartsOwned().length).toBe(2)
+  })
+  it('битые части из старого сейва отбрасываются', () => {
+    const s2 = new GameState()
+    s2._apply({ relicParts: ['gear', 'ерунда', 'gear2'], relicsCrafted: 2 })
+    expect(s2.relicParts).toEqual(['gear'])
+    expect(s2.relicsCrafted).toBe(2)
   })
 })

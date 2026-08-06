@@ -8,11 +8,12 @@
 import { BAL } from '../src/data/balance.js'
 import { defOf } from '../src/data/bosses.js'
 import { enemyStats } from '../src/data/scaling.js'
-import { getZone } from '../src/data/zones.js'
+import { getZone, zoneHpMul } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
-import { enemiesInWave, bossDue } from '../src/data/progression.js'
+import { enemiesInWave, bossDue, xpFromKill } from '../src/data/progression.js'
+import { pathToFileURL } from 'node:url'
 
 const SESSION = process.env.SIM_SECONDS ? +process.env.SIM_SECONDS : 1200 // сек за прогон (env: SIM_SECONDS)
 const DT = 0.1
@@ -52,6 +53,51 @@ function runOne(classId, rng) {
 
   st.hp = heroMaxHp()
 
+  // Модель трат. SIM_PLAYER=dps (по умолчанию) — урон в приоритете; =even —
+  // «всё поровну»: очки веером по трём статам, крышки в самый отстающий
+  // апгрейд. Вторая модель нужна, чтобы проверять крутилки, завязанные на
+  // УРОВЕНЬ героя: при них осмысленный игрок может играть иначе, и вывод про
+  // крутилку не должен зависеть от одной-единственной стратегии.
+  function spendEven() {
+    let bought = true
+    while (bought) {
+      bought = false
+      // самый отстающий апгрейд (при равенстве — самый дешёвый)
+      let pick = null
+      for (const u of UPGRADES) {
+        const c = upgradeCost(u, upgLevel(u.id))
+        if (c > st.caps) continue
+        if (!pick || upgLevel(u.id) < pick.lvl || (upgLevel(u.id) === pick.lvl && c < pick.cost)) {
+          pick = { type: 'u', ref: u, cost: c, lvl: upgLevel(u.id) }
+        }
+      }
+      // союзники тоже часть «всех статов»: берём, если отстают от апгрейдов
+      const allyTotal = ALLIES.reduce((n, a) => n + (st.allies[a.id] || 0), 0)
+      const upgTotal = UPGRADES.reduce((n, u) => n + upgLevel(u.id), 0)
+      if (allyTotal * UPGRADES.length < upgTotal) {
+        for (const a of ALLIES) {
+          const c = allyCost(a, st.allies[a.id] || 0)
+          if (c <= st.caps && (!pick || c < pick.cost)) pick = { type: 'a', ref: a, cost: c, lvl: 0 }
+        }
+      }
+      if (pick) {
+        st.caps -= pick.cost
+        if (pick.type === 'u') st.upgrades[pick.ref.id] = upgLevel(pick.ref.id) + 1
+        else st.allies[pick.ref.id] = (st.allies[pick.ref.id] || 0) + 1
+        bought = true
+      }
+    }
+  }
+  // Очки веером: самый отстающий из трёх статов.
+  function allocateEven() {
+    while (st.hero.points > 0) {
+      const h = st.hero
+      const pick = h.str <= h.vit && h.str <= h.luck ? 'str' : (h.vit <= h.luck ? 'vit' : 'luck')
+      h[pick]++
+      h.points--
+    }
+  }
+
   // Агрессивный DPS-игрок: урон в приоритете, немного HP «на выживание».
   function spend() {
     let bought = true
@@ -73,12 +119,15 @@ function runOne(classId, rng) {
   }
   // Реальный игрок льёт очки в СИЛУ (немного в живучесть, чтобы не спираль).
   function allocate() { while (st.hero.points > 0) { const pick = st.hero.vit < st.hero.str * 0.2 ? 'vit' : 'str'; st.hero[pick]++; st.hero.points-- } }
+  const EVEN = process.env.SIM_PLAYER === 'even'
+  const doSpend = EVEN ? spendEven : spend
+  const doAllocate = EVEN ? allocateEven : allocate
   // Прогрессия HP врагов по уровню/зоне (как в GameState.enemyProgMul).
   const progMul = () => {
     const lv = st.hero.level - 1
     return Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap))
       * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap))
-      * Math.pow(BAL.enemyZoneRamp, st.zoneIndex)
+      * zoneHpMul(st.zoneIndex)
   }
 
   // ---- волна из нескольких врагов / босс-ворота ----
@@ -103,7 +152,7 @@ function runOne(classId, rng) {
   }
   function killFront(front) {
     st.caps += Math.ceil(front.reward * (1 + capsBonus()))
-    st.hero.xp += Math.ceil(front.reward * 0.55)
+    st.hero.xp += xpFromKill(st.totalKills)
     while (st.hero.xp >= xpNeed()) { st.hero.xp -= xpNeed(); st.hero.level++; st.hero.points += BAL.pointsPerLevel }
     st.ult = Math.min(BAL.ultMax, st.ult + BAL.ultChargePerKill)
     if (front.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
@@ -117,6 +166,7 @@ function runOne(classId, rng) {
   let clickAccum = 0, sinceSpend = 0
   const durations = []; let curStart = 0
   const checkpoints = {}
+  doAllocate(); doSpend()
   spawnWave(); curStart = 0
 
   for (let t = 0; t < SESSION; t += DT) {
@@ -156,7 +206,7 @@ function runOne(classId, rng) {
       if (st.hp <= 0) break
     }
     sinceSpend += DT
-    if (sinceSpend >= 1) { sinceSpend = 0; allocate(); spend() }
+    if (sinceSpend >= 1) { sinceSpend = 0; doAllocate(); doSpend() }
     const tc = Math.round(t)
     if (tc % 120 === 0 && !(tc in checkpoints)) checkpoints[tc] = st.totalKills
   }
@@ -166,13 +216,19 @@ function runOne(classId, rng) {
   const wvEnd = Math.pow(BAL.enemyWaveRamp, st.waveCount)
   const typicalHp = enemyStats(avgDef, st.totalKills, false).hp * progMul() * wvEnd
   const ttkEnd = typicalHp / effDps
+  // Попаданий на врага ТОЛЬКО кликами (без союзников и ульты) — это и есть
+  // ощущение «сильный герой, но не ваншотит всех подряд». Секунды сами по себе
+  // врут: одно и то же время убийства при слабом клике и толпе союзников
+  // ощущается как «я ничего не решаю».
+  const hitsEnd = typicalHp / clickHit()
+  const bossHitsEnd = enemyStats(avgDef, st.totalKills, true).hp * progMul() * wvEnd / clickHit()
   const bossTtkEnd = enemyStats(avgDef, st.totalKills, true).hp * progMul() * wvEnd / effDps
   const earlyRate = (checkpoints[120] || st.totalKills) / 120
   const lateRate = (st.totalKills - (checkpoints[1080] || st.totalKills)) / 120
 
   return {
     classId, kills: st.totalKills, zone: st.zoneIndex, deaths: st.deaths, level: st.hero.level,
-    caps: st.caps, clickDmg: clickHit(), allyDps: allyDps(), effDps, ttkEnd, bossTtkEnd, earlyRate, lateRate,
+    caps: st.caps, clickDmg: clickHit(), allyDps: allyDps(), effDps, ttkEnd, bossTtkEnd, hitsEnd, bossHitsEnd, earlyRate, lateRate,
   }
 }
 
@@ -186,11 +242,24 @@ function fmt(n) {
   return `${v.toFixed(1)}${SUF[t]}`
 }
 
-const all = []
-let seed = 12345
-for (const cls of CLASSES) {
-  for (let i = 0; i < RUNS_PER_CLASS; i++) all.push(runOne(cls.id, mulberry32(seed++)))
+// runOne/mulberry32 экспортируем, чтобы развёртки по параметрам (sweep) гоняли
+// ту же самую модель, а не свою копию. Печать таблицы — только при прямом
+// запуске `node sim/balance-sim.mjs`, иначе импорт засорял бы вывод.
+export { runOne, mulberry32 }
+
+export function batch(seedBase = 12345, runsPerClass = RUNS_PER_CLASS) {
+  const out = []
+  let seed = seedBase
+  for (const cls of CLASSES) {
+    for (let i = 0; i < runsPerClass; i++) out.push(runOne(cls.id, mulberry32(seed++)))
+  }
+  return out
 }
+
+const DIRECT = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+if (!DIRECT) { /* импортировали ради runOne/batch — таблицу не печатаем */ } else {
+
+const all = batch()
 
 console.log(`\n=== БАЛАНС: ${all.length} прогонов по ${SESSION / 60} мин активной игры (волновая модель) ===\n`)
 console.log('Класс      | Убийства | Зона | Смертей | Ур. | Крышки | ЛКМ-урон | Idle/с | TTK  | TTKбосс | ранн/поздн kps')
@@ -210,10 +279,14 @@ const gbttk = median(all.map(r => r.bossTtkEnd))
 const early = median(all.map(r => r.earlyRate))
 const late = median(all.map(r => r.lateRate))
 console.log('\n--- Диагностика ---')
-console.log(`Медиана зон достигнуто за 20 мин: ${gz}   (цель: 5-10, контент не должен кончаться за 2 мин)`)
+console.log(`Медиана зон достигнуто за 20 мин: ${gz}   (цель: 4-6 — десять локаций примерно за 40 минут, дальше мета-петля)`)
 console.log(`Медиана смертей: ${gd}   (цель: 1-5, риск есть, но не спираль)`)
 console.log(`TTK обычного врага в конце: ${gttk.toFixed(1)}s   (цель: 0.6-3s)`)
 console.log(`TTK босса зоны в конце: ${gbttk.toFixed(1)}s   (цель: 4-15s)`)
+console.log(`Попаданий кликом на рядового врага: ${median(all.map(r => r.hitsEnd)).toFixed(1)}   (цель: 3-8 — сильный герой, но не ваншот)`)
+console.log(`Попаданий кликом на босса: ${median(all.map(r => r.bossHitsEnd)).toFixed(0)}   (цель: 15-45)`)
 console.log(`Темп ранний/поздний (kills/сек): ${early.toFixed(2)} / ${late.toFixed(2)}`)
 console.log(`Стагнация: ${late < early * 0.4 ? '⚠️ ДА' : 'нет'}`)
 console.log(`Макс. крышки (читаемость чисел): ${fmt(Math.max(...all.map(r => r.caps)))}   (не должно быть ∞/e+30)`)
+
+}

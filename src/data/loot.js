@@ -41,6 +41,22 @@ const NOUN = {
   accessory: ['зуб', 'амулет', 'подкова', 'жетон', 'крышка-талисман'],
 }
 
+// ПОТОЛОК ВКЛАДА УРОВНЯ. Уровень предмета = enemyLevel() и растёт ЛИНЕЙНО от
+// числа убийств, а HP врагов — ЭКСПОНЕНЦИАЛЬНО. Из-за этого экипировка ломалась
+// с обоих концов: через 20 минут игры полный серый комплект давал ×9 к урону
+// клика (ваншот всего подряд), синий ×26, фиолетовый ×42 — а к 5000 убийств
+// тот же комплект становился мусором, потому что враги уходили в отрыв.
+// С потолком гир — сильный, но соразмерный множитель: полный комплект даёт
+// примерно ×2-4 и остаётся осмысленным на любой глубине.
+// Замерять: node sim/gear-sim.mjs
+export const ITEM_LEVEL_CAP = 50
+
+// Сила одного предмета (доля бонуса к стату) по редкости и уровню.
+export function itemPower(rarityMul, level, isCrit = false) {
+  const lv = Math.min(Math.max(1, level || 1), ITEM_LEVEL_CAP)
+  return +((isCrit ? 0.01 : 0.05) * rarityMul * (1 + lv * (isCrit ? 0.03 : 0.04))).toFixed(3)
+}
+
 function pickRarity(rng, luckBonus = 0) {
   const table = RARITIES.map((r, i) => ({ r, w: r.weight * (i >= 2 ? 1 + luckBonus : 1) }))
   const total = table.reduce((s, t) => s + t.w, 0)
@@ -50,17 +66,14 @@ function pickRarity(rng, luckBonus = 0) {
 }
 function choose(rng, arr) { return arr[Math.floor(rng() * arr.length)] }
 
-export function rollItem(rng, level = 1, luckBonus = 0) {
+// forceRarityId — выдать предмет заданной редкости вместо броска по таблице
+// (ковка реликвии из частей, гарантированный эпик с босса десятой локации).
+export function rollItem(rng, level = 1, luckBonus = 0, forceRarityId = null) {
   const slotDef = choose(rng, SLOTS)
-  const rarity = pickRarity(rng, luckBonus)
+  const rarity = (forceRarityId && RARITY_BY_ID[forceRarityId]) || pickRarity(rng, luckBonus)
   const stat = slotDef.stat === 'any' ? choose(rng, ANY_STATS) : slotDef.stat
 
-  let value
-  if (stat === 'critChance') {
-    value = +(0.01 * rarity.mul * (1 + level * 0.03)).toFixed(3)
-  } else {
-    value = +(0.05 * rarity.mul * (1 + level * 0.04)).toFixed(3)
-  }
+  const value = itemPower(rarity.mul, level, stat === 'critChance')
   const nouns = NOUN[slotDef.id]
   const nounIdx = Math.floor(rng() * nouns.length)
   const name = `${choose(rng, PREFIX)} ${nouns[nounIdx]}`

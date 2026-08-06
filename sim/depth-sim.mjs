@@ -8,13 +8,13 @@
 import { BAL } from '../src/data/balance.js'
 import { defOf } from '../src/data/bosses.js'
 import { enemyStats } from '../src/data/scaling.js'
-import { getZone } from '../src/data/zones.js'
+import { getZone, zoneHpMul } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
-import { enemiesInWave, bossDue } from '../src/data/progression.js'
+import { enemiesInWave, bossDue, xpFromKill } from '../src/data/progression.js'
 
-const SESSION = 7200 // 2 часа
+const SESSION = process.env.SIM_SECONDS ? +process.env.SIM_SECONDS : 7200 // 2 часа (env: SIM_SECONDS)
 const DT = 0.2
 
 function mulberry32(a) {
@@ -29,10 +29,10 @@ function mulberry32(a) {
 function runOne(classId, rng) {
   const cls = CLASS_BY_ID[classId]
   const meta = { cores: 0, prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0 }, prestigeCount: 0 }
-  const pDmg = () => 1 + meta.prestige.legacy * 0.12
-  const pHp = () => meta.prestige.vitality * 0.10
-  const pCaps = () => meta.prestige.stash * 0.12
-  const pCost = (id) => { const b = { legacy: 3, stash: 3, vitality: 3, quickstart: 5 }; return Math.floor(b[id] * Math.pow(1.5, meta.prestige[id] || 0)) }
+  const pDmg = () => 1 + meta.prestige.legacy * 0.20
+  const pHp = () => meta.prestige.vitality * 0.15
+  const pCaps = () => meta.prestige.stash * 0.20
+  const pCost = (id) => { const b = { legacy: 3, stash: 3, vitality: 3, quickstart: 5 }; return Math.floor(b[id] * Math.pow(BAL.prestigeCostGrowth, meta.prestige[id] || 0)) }
 
   let st
   function freshRun() {
@@ -55,8 +55,8 @@ function runOne(classId, rng) {
   const allyDps = () => { let b = 0; for (const a of ALLIES) b += (st.allies[a.id] || 0) * a.dps; return b * (1 + uA('allyMul') + cb('allyMul')) * uP('allyPow') }
   const capsBonus = () => cb('capsMul') + pCaps()
   const xpNeed = () => Math.floor(BAL.baseXpToLevel * Math.pow(BAL.xpGrowth, st.hero.level - 1))
-  // как в GameState.coresFromRun: базовые 4 на гейте + по одному за зону дальше
-  const coresFromRun = () => (st.zoneIndex >= 4 ? 4 + (st.zoneIndex - 4) : 0)
+  // как в GameState.coresFromRun: 4 ядра на гейте, дальше × coresDepthGrowth за зону
+  const coresFromRun = () => (st.zoneIndex >= 4 ? Math.floor(4 * Math.pow(BAL.coresDepthGrowth, st.zoneIndex - 4)) : 0)
 
   function spend() {
     let bought = true
@@ -89,14 +89,12 @@ function runOne(classId, rng) {
     wave = []
     for (let i = 0; i < count; i++) {
       const def = defOf(pool[Math.floor(rng() * pool.length)])
-      const pEnemy = Math.pow(1.05, meta.prestigeCount) // +5% за каждое перерождение
-      // после 1-го престижа +2.5% за каждый уровень героя выше 10
-      const pLevel = meta.prestigeCount >= 1 ? Math.pow(1.025, Math.max(0, st.hero.level - 10)) : 1
-      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.45) * pEnemy * pLevel
-      const mDmg = (1 + pHp() * 0.45) * pEnemy * pLevel
+      const pEnemy = Math.pow(1.03, meta.prestigeCount) // +3% за каждое перерождение
+      const mHp = Math.pow(pDmg() * Math.pow(1.15, meta.prestige.quickstart), 0.35) * pEnemy
+      const mDmg = (1 + pHp() * 0.45) * pEnemy
       const lv = st.hero.level - 1
-      const progFull = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyZoneRamp, st.zoneIndex)
-      const prog = boss ? Math.pow(progFull, 0.6) : progFull
+      const progFull = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap)) * zoneHpMul(st.zoneIndex)
+      const prog = progFull // жирность босса задаёт только bossHpMul (как в игре)
       const wv = Math.pow(BAL.enemyWaveRamp, st.waveCount)
       const b = enemyStats(def, st.totalKills, boss)
       const hp = b.hp * af.hp * mHp * prog * wv, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg * wv
@@ -107,7 +105,7 @@ function runOne(classId, rng) {
   }
   function killFront(e) {
     st.caps += Math.ceil(e.reward * (1 + capsBonus()))
-    st.hero.xp += Math.ceil(e.reward * 0.55)
+    st.hero.xp += xpFromKill(st.totalKills)
     while (st.hero.xp >= xpNeed()) { st.hero.xp -= xpNeed(); st.hero.level++; st.hero.points += BAL.pointsPerLevel }
     if (e.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
     else { st.totalKills++; st.killsInZone++ }
@@ -147,7 +145,11 @@ function runOne(classId, rng) {
       sinceSpend = 0; allocate(); spend()
       // Разумный игрок пушит до СТЕНЫ (не берёт новую зону ~2 мин = темп рухнул),
       // затем перерождается — так каждый следующий забег уходит глубже.
-      const walled = (t - lastZoneT) > 120 && st.zoneIndex >= 5 && coresFromRun() >= 1
+      // Порог «стены» — 15 минут без новой зоны. Раньше стояло 2 минуты, но
+      // зоны теперь сами по себе идут по 5-8 минут (260+ убийств, растёт на 13%
+      // за зону), и детектор срабатывал на здоровом прогрессе: игрок
+      // «упирался» ровно на пятой зоне каждый забег независимо от меты.
+      const walled = (t - lastZoneT) > 900 && st.zoneIndex >= 5 && coresFromRun() >= 1
       if (walled) {
         meta.cores += coresFromRun(); meta.prestigeCount++
         prestigeTimes.push(t); prestigeZones.push(st.zoneIndex)

@@ -7,7 +7,9 @@ import { BAL } from '../data/balance.js'
 import { UPGRADES, upgradeCost } from '../data/upgrades.js'
 import { ALLIES, allyCost } from '../data/allies.js'
 import { CLASS_BY_ID } from '../data/classes.js'
-import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, CRAFT_TIERS, weaponStyleFor } from '../data/loot.js'
+import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, CRAFT_TIERS, weaponStyleFor, itemPower, ITEM_LEVEL_CAP } from '../data/loot.js'
+import { RELIC_PART_IDS, RELIC_PART_BY_ID, RELIC_DUPE_SCRAP } from '../data/relics.js'
+import { zoneHpMul } from '../data/zones.js'
 import { Platform } from '../platform/yandex.js'
 
 const SAVE_KEY = 'wasteland_save_v1'
@@ -32,6 +34,10 @@ export class GameState extends Emitter {
     this.equipment = { weapon: null, helmet: null, armor: null, boots: null, acc1: null, acc2: null }
     this.inventory = []
     this.scrap = 0 // металлолом (сохраняется между перерождениями)
+    // Части реликвии: id собранных. Как и металлолом, переживают перерождение —
+    // иначе набор из пяти частей не собрать в принципе.
+    this.relicParts = []
+    this.relicsCrafted = 0 // сколько реликвий уже сковано (от этого зависят дубли)
     this.zoneIndex = 0
     this.killsInZone = 0
     this.totalKills = 0
@@ -124,43 +130,51 @@ export class GameState extends Emitter {
   weaponStyle() { return weaponStyleFor(this.equipment.weapon) }
 
   // ---------- престиж ----------
-  prestigeDamageMul() { return 1 + this.prestige.legacy * 0.12 }
-  prestigeHpMul() { return this.prestige.vitality * 0.10 }
-  prestigeCapsMul() { return this.prestige.stash * 0.12 }
-  // Награда за перерождение: базовые 4 ядра на гейте (4-я локация) и по одному
-  // за каждую следующую пройденную. Пока локаций было четыре, фиксированных
-  // четырёх хватало — гейт совпадал с концом контента. Сейчас их десять, и с
-  // фиксированной наградой дошедший до Логова Босса получал ровно столько же,
-  // сколько остановившийся сразу на гейте: идти вглубь было незачем.
+  // Бонусы подняты (было 0.12/0.10/0.12): при мягком множителе врагов от меты
+  // (enemyMetaHpMul, показатель 0.35) чистый прирост с уровня «Наследия» —
+  // 1.2^0.65 ≈ +12%, то есть прежние +12% почти целиком съедались.
+  prestigeDamageMul() { return 1 + this.prestige.legacy * 0.20 }
+  prestigeHpMul() { return this.prestige.vitality * 0.15 }
+  prestigeCapsMul() { return this.prestige.stash * 0.20 }
+  // Награда за перерождение растёт ЭКСПОНЕНЦИАЛЬНО по глубине, потому что цена
+  // вечных бонусов тоже экспоненциальна (3 × 1.5^уровень). При линейной награде
+  // (4 + зона) глубокий забег давал 5-6 ядер — ровно один уровень бонуса, и
+  // метапетля не работала: в симуляции забег за забегом упирался в 5-ю зону.
+  // Показатель — BAL.coresDepthGrowth: идти вглубь выгоднее, чем перерождаться
+  // на гейте, но награда не улетает в тысячи ядер на глубоких зонах.
   coresFromRun() {
-    return this.zoneIndex >= PRESTIGE_GATE_ZONE ? 4 + (this.zoneIndex - PRESTIGE_GATE_ZONE) : 0
+    if (this.zoneIndex < PRESTIGE_GATE_ZONE) return 0
+    return Math.floor(4 * Math.pow(BAL.coresDepthGrowth, this.zoneIndex - PRESTIGE_GATE_ZONE))
   }
   // Масштаб врагов под ПЕРМАНЕНТНУЮ силу героя (мета). Иначе после престижа
   // враги картонные (их HP считается от totalKills, что сброшено, а бонусы меты —
   // нет). Берём ~70% прироста: накал сохраняется, но герой всё равно чуть сильнее
   // → глубина от забега к забегу растёт (компаунд), а не обнуляется.
-  // Перманентное усиление врагов за каждое перерождение: +5% (компаундится).
-  prestigeEnemyMul() { return Math.pow(1.05, this.prestigeCount) }
-  // После 1-го перерождения враги растут на +2.5% за каждый уровень героя выше 10 —
-  // иначе высокоуровневый герой (20-30-40) становится слишком сильным.
-  postPrestigeLevelMul() {
-    if (this.prestigeCount < 1) return 1
-    return Math.pow(1.025, Math.max(0, this.hero.level - 10))
-  }
+  // Перманентное усиление врагов за каждое перерождение: +3% (компаундится).
+  // Было +5%, и вместе с postPrestigeLevelMul (см. ниже) мета уходила в минус:
+  // после престижа забег упирался в ту же зону, что и до него.
+  prestigeEnemyMul() { return Math.pow(1.03, this.prestigeCount) }
   enemyMetaHpMul() {
     // Мягко: основную «не-картонность» после престижа даёт enemyProgMul (уровень),
     // здесь лишь небольшая добавка, чтобы глубина от престижа всё же росла.
+    // Показатель 0.45 → 0.35: престиж должен ОКУПАТЬСЯ глубиной, иначе метапетля
+    // бессмысленна (в симуляции стена стояла на 5-й зоне забег за забегом).
+    //
+    // Убран множитель за уровень героя (1.025^(level-10) после 1-го престижа):
+    // он наказывал за прокачку — при 118 уровнях враги толстели в 14 раз, и
+    // вся выгода перерождения съедалась. Уровень теперь и так редкий
+    // (см. xpFromKill), а сдерживание уровня делает enemyProgMul.
     const power = this.prestigeDamageMul() * Math.pow(1.15, this.prestige.quickstart)
-    return Math.pow(power, 0.45) * this.prestigeEnemyMul() * this.postPrestigeLevelMul()
+    return Math.pow(power, 0.35) * this.prestigeEnemyMul()
   }
-  enemyMetaDmgMul() { return (1 + this.prestigeHpMul() * 0.45) * this.prestigeEnemyMul() * this.postPrestigeLevelMul() }
+  enemyMetaDmgMul() { return (1 + this.prestigeHpMul() * 0.45) * this.prestigeEnemyMul() }
   // Прогрессия HP врагов по уровню героя и зоне — чтобы очки силы от левелапов
   // не превращали мобов в картон. Ранний разгон до cap, затем мягкий хвост.
   enemyProgMul() {
     const lv = this.hero.level - 1
     const ramp = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap))
     const tail = Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap))
-    return ramp * tail * Math.pow(BAL.enemyZoneRamp, this.zoneIndex)
+    return ramp * tail * zoneHpMul(this.zoneIndex)
   }
   // Нарастание за волну ВНУТРИ зоны: каждая волна +1% (к боссу ~+35%),
   // новая зона обнуляет счётчик (но базовая сложность зоны выше). Так «каждая
@@ -184,7 +198,7 @@ export class GameState extends Emitter {
   }
   prestigeCost(id) {
     const bases = { legacy: 3, stash: 3, vitality: 3, quickstart: 5 }
-    return Math.floor(bases[id] * Math.pow(1.5, this.prestige[id] || 0))
+    return Math.floor(bases[id] * Math.pow(BAL.prestigeCostGrowth, this.prestige[id] || 0))
   }
   buyPrestige(id) {
     if (!(id in this.prestige)) return false
@@ -387,6 +401,45 @@ export class GameState extends Emitter {
     return item
   }
 
+  // ---------- реликвии ----------
+  hasRelicPart(id) { return this.relicParts.includes(id) }
+  relicPartsOwned() { return RELIC_PART_IDS.filter(id => this.hasRelicPart(id)) }
+  canCraftRelic() { return this.relicPartsOwned().length >= RELIC_PART_IDS.length }
+  // Бросок части с босса десятой локации. Возвращает описание результата, чтобы
+  // бой мог показать всплывашку: { part, dupe, scrap }.
+  //
+  // Пока ни одной реликвии не сковано, дубли исключены полностью — падает
+  // случайная из НЕДОСТАЮЩИХ. Это делает путь к первой реликвии предсказуемым:
+  // ровно пять успешных бросков. После первой ковки 20% бросков дают повтор,
+  // который идёт в металлолом, — гринд следующих реликвий длиннее.
+  rollRelicPart(rng = Math.random) {
+    const missing = RELIC_PART_IDS.filter(id => !this.hasRelicPart(id))
+    const owned = this.relicPartsOwned()
+    const dupeAllowed = this.relicsCrafted > 0 && owned.length > 0
+    const dupe = missing.length === 0 || (dupeAllowed && rng() < BAL.relicDupeChance)
+    if (dupe) {
+      // Набор уже полон или выпал повтор — металлолом вместо части.
+      const id = owned[Math.floor(rng() * owned.length)]
+      this.scrap += RELIC_DUPE_SCRAP
+      this.emit('scrap'); this.save()
+      return { part: RELIC_PART_BY_ID[id], dupe: true, scrap: RELIC_DUPE_SCRAP }
+    }
+    const id = missing[Math.floor(rng() * missing.length)]
+    this.relicParts.push(id)
+    this.emit('relic'); this.save()
+    return { part: RELIC_PART_BY_ID[id], dupe: false, scrap: 0 }
+  }
+  // Ковка: тратит все пять частей, даёт случайную реликвию (оранжевый тир).
+  craftRelic() {
+    if (!this.canCraftRelic()) return null
+    this.relicParts = this.relicParts.filter(id => !RELIC_PART_IDS.includes(id))
+    this.relicsCrafted++
+    const item = rollItem(Math.random, Math.floor(this.enemyLevel()), this.lootLuck(), 'relic')
+    this.addItem(item)
+    this.emit('relic'); this.save()
+    return item
+  }
+
   // ---------- зоны / убийства ----------
   // Стадия масштабирования = всего убито (само-балансирует TTK). Для лута — та же.
   scaleStage() { return this.totalKills }
@@ -447,6 +500,7 @@ export class GameState extends Emitter {
       caps: this.caps, heroClass: this.heroClass, hero: this.hero,
       upgrades: this.upgrades, allies: this.allies,
       equipment: this.equipment, inventory: this.inventory, scrap: this.scrap,
+      relicParts: this.relicParts, relicsCrafted: this.relicsCrafted,
       zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills, waveCount: this.waveCount,
       cores: this.cores, prestige: this.prestige, prestigeCount: this.prestigeCount,
       bestScore: this.bestScore, lastSeen: Date.now(),
@@ -497,6 +551,10 @@ export class GameState extends Emitter {
       equipment: { weapon: null, helmet: null, armor: null, boots: null, acc1: null, acc2: null, ...(d.equipment || {}) },
       inventory: d.inventory || [],
       scrap: fin(d.scrap),
+      // Части реликвии фильтруем по текущему списку: сейв старой версии или
+      // переименованная часть иначе навсегда заняли бы гнездо в наборе.
+      relicParts: Array.isArray(d.relicParts) ? d.relicParts.filter(id => RELIC_PART_IDS.includes(id)) : [],
+      relicsCrafted: fin(d.relicsCrafted),
       zoneIndex: fin(d.zoneIndex),
       killsInZone: fin(d.killsInZone),
       totalKills: fin(d.totalKills),
@@ -520,6 +578,14 @@ export class GameState extends Emitter {
       if (it && it.slot === 'trinket') it.slot = 'accessory'
       // Нормализуем level: без него sellItem/scrapValue дают NaN-крышки.
       if (it && !Number.isFinite(it.level)) it.level = 1
+      // Срезаем силу предметов из сейвов, сделанных до потолка ITEM_LEVEL_CAP.
+      // Там уровень предмета доходил до тысяч, и один надетый ствол давал
+      // +800% к урону — с такой вещью в инвентаре никакой баланс не читается.
+      const rar = it && RARITY_BY_ID[it.rarity]
+      if (rar && Number.isFinite(it.value)) {
+        const max = itemPower(rar.mul, ITEM_LEVEL_CAP, it.stat === 'critChance')
+        if (it.value > max) it.value = max
+      }
       return it
     }
 

@@ -6,6 +6,7 @@ import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
 import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue, weaponTexKey } from '../data/loot.js'
+import { RELIC_PARTS } from '../data/relics.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX, resIcon } from '../ui/scenery.js'
 import { heroScaleFor } from '../assets.js'
@@ -22,6 +23,10 @@ const SLOT_META = {
   acc1: { name: 'Аксессуар', icon: '📿' },
   acc2: { name: 'Аксессуар', icon: '📿' },
 }
+
+// Панель набора реликвии живёт под списком добычи; список ужат до 6 строк,
+// чтобы они не наезжали друг на друга.
+const RELIC_PANEL_Y = 528
 
 function statText(it) {
   const v = it.value
@@ -101,6 +106,73 @@ export default class InventoryScene extends Phaser.Scene {
 
     // --- Список добычи ---
     this.renderLoot()
+    // --- Набор реликвии ---
+    this.renderRelicPanel()
+  }
+
+  // Панель набора: пять гнёзд под части + ковка, когда собраны все.
+  // Части падают только с босса десятой локации (см. isRelicZone), поэтому до
+  // первой части панель объясняет, куда идти, а не просто светит пустотой.
+  renderRelicPanel() {
+    const x = GAME.WIDTH * 0.72 - 260, y = RELIC_PANEL_Y, w = 520, h = 108
+    const ready = State.canCraftRelic()
+    const relic = RARITY_BY_ID.relic
+    const c = this.add.container(x, y)
+    const bg = this.add.graphics()
+    bg.fillStyle(0x241a12, 0.92); bg.fillRoundedRect(0, 0, w, h, 10)
+    bg.lineStyle(2, relic.color, ready ? 1 : 0.5); bg.strokeRoundedRect(0, 0, w, h, 10)
+    const owned = State.relicPartsOwned().length
+    const head = this.add.text(12, 10, t('НАБОР РЕЛИКВИИ  {a}/{b}', { a: owned, b: RELIC_PARTS.length }), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: relic.css, fontStyle: 'bold',
+    }).setOrigin(0)
+    c.add([bg, head])
+
+    // Гнёзда частей: собранная — своя иконка и оранжевая рамка, недостающая — тусклая.
+    RELIC_PARTS.forEach((p, i) => {
+      const px = 14 + i * 62, py = 42, s = 54
+      const has = State.hasRelicPart(p.id)
+      const box = this.add.graphics()
+      box.fillStyle(has ? 0x3a2410 : COLORS.steelDark, 1); box.fillRoundedRect(px, py, s, s, 8)
+      box.lineStyle(2, has ? relic.color : COLORS.ink, has ? 1 : 0.6); box.strokeRoundedRect(px, py, s, s, 8)
+      const icon = this.add.text(px + s / 2, py + s / 2, has ? p.icon : '·', {
+        fontSize: has ? '26px' : '22px', color: has ? '#ffd8a8' : '#6a6458',
+      }).setOrigin(0.5)
+      const nm = this.add.text(px + s / 2, py + s + 3, has ? t(p.name).split(' ')[0] : '—', {
+        fontFamily: 'Rubik, sans-serif', fontSize: '11px', color: has ? '#ddd2b4' : '#7a7268',
+      }).setOrigin(0.5, 0)
+      c.add([box, icon, nm])
+    })
+
+    if (ready) {
+      const btn = createButton(this, x + w - 130, y + h / 2, {
+        label: t('🔥 Выковать'), width: 220, height: 56, fontSize: 19,
+        color: 0x8a4b10, hover: 0xc06a18,
+        onClick: () => {
+          const item = State.craftRelic()
+          if (!item) return
+          Sfx.levelup()
+          this.safeRender()
+          this.flashRelic(itemName(item.name))
+        },
+      })
+      this.uiObjs.push(btn)
+    } else {
+      const hint = owned === 0
+        ? t('Части падают с босса 10-й локации')
+        : t('Собери все части — выкуешь случайную реликвию')
+      c.add(this.add.text(w - 14, 18, hint, {
+        fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#b8ad9a', align: 'right', wordWrap: { width: 210 },
+      }).setOrigin(1, 0))
+    }
+    this.uiObjs.push(c)
+  }
+
+  // Всплывашка о выкованной реликвии — иначе предмет молча уезжает в список.
+  flashRelic(name) {
+    const txt = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, t('⭐ {name}', { name }), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '34px', color: RARITY_BY_ID.relic.css, fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(100)
+    this.tweens.add({ targets: txt, y: GAME.HEIGHT / 2 - 90, alpha: 0, duration: 1600, ease: 'Cubic.easeOut', onComplete: () => txt.destroy() })
   }
 
   equipSummary() {
@@ -162,7 +234,7 @@ export default class InventoryScene extends Phaser.Scene {
       (RARITY_BY_ID[b.rarity].mul - RARITY_BY_ID[a.rarity].mul) || (b.value - a.value))
     const ix = GAME.WIDTH * 0.72 - 260
     let iy = 108
-    const maxRows = 8
+    const maxRows = 6
 
     if (items.length === 0) {
       this.uiObjs.push(this.add.text(GAME.WIDTH * 0.72, 200, t('Пусто. Иди в поход за лутом!'), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: '#b8ad9a' }).setOrigin(0.5))

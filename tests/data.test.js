@@ -2,8 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { BAL } from '../src/data/balance.js'
 import { enemyStats } from '../src/data/scaling.js'
-import { enemiesInWave, bossDue } from '../src/data/progression.js'
-import { ZONES, getZone, AFFIXES, affixForLoop } from '../src/data/zones.js'
+import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../src/data/progression.js'
+import { ZONES, getZone, AFFIXES, affixForLoop, isRelicZone } from '../src/data/zones.js'
 import { ENEMIES, ENEMY_IDS } from '../src/data/enemies.js'
 import { BOSSES, BOSS_IDS, defOf, sheetKey, isBossId } from '../src/data/bosses.js'
 import { setLang, t, itemName } from '../src/i18n.js'
@@ -54,9 +54,23 @@ describe('progression', () => {
     }
   })
   it('bossDue срабатывает на норме убийств зоны', () => {
-    expect(bossDue(BAL.zoneKills - 1)).toBe(false)
-    expect(bossDue(BAL.zoneKills)).toBe(true)
-    expect(bossDue(BAL.zoneKills + 5)).toBe(true)
+    const norm = zoneKillsFor()
+    expect(bossDue(norm - 1)).toBe(false)
+    expect(bossDue(norm)).toBe(true)
+    expect(bossDue(norm + 5)).toBe(true)
+  })
+  it('норма зоны одна на всех глубинах, а надбавка к волне ограничена', () => {
+    expect(zoneKillsFor()).toBe(BAL.zoneKills)
+    // раньше надбавка «+1 враг за 20 убийств» была без потолка и разгоняла темп
+    expect(enemiesInWave(0, 100000)).toBe(BAL.waveCountBase + BAL.waveKillBonusMax)
+  })
+  it('опыт за килл растёт много медленнее награды', () => {
+    expect(xpFromKill(0)).toBe(BAL.xpPerKill)
+    const xpRatio = xpFromKill(2000) / xpFromKill(0)
+    const rewardRatio = Math.pow(BAL.rewardGrowth, 2000)
+    expect(xpRatio).toBeLessThan(rewardRatio)
+    // экспонента не должна давать Infinity: addXp превратил бы опыт в NaN
+    expect(Number.isFinite(xpFromKill(2e6))).toBe(true)
   })
 })
 
@@ -80,6 +94,15 @@ describe('zones / affixes', () => {
     const loopWithName = AFFIXES.findIndex(a => a.name) // индекс в цикле
     const zone = getZone(ZONES.length + loopWithName) // loop = loopWithName+1
     expect(zone.name).toContain(AFFIXES[loopWithName].name)
+  })
+})
+
+describe('зона реликвий', () => {
+  it('это последняя локация и её повторы в endless', () => {
+    expect(isRelicZone(ZONES.length - 1)).toBe(true)
+    expect(isRelicZone(ZONES.length * 2 - 1)).toBe(true)
+    expect(isRelicZone(ZONES.length * 3 - 1)).toBe(true)
+    for (let z = 0; z < ZONES.length - 1; z++) expect(isRelicZone(z), `зона ${z}`).toBe(false)
   })
 })
 
