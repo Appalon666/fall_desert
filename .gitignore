@@ -4,3 +4,6 @@ art-out/
 .DS_Store
 *.log
 .vite/
+
+# оригиналы музыки до перекодирования (см. dock/music-sources.md)
+.music-src/
