@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser'
 import { GAME, COLORS, SCENES } from './config.js'
+import { State } from './state/GameState.js'
 import BootScene from './scenes/BootScene.js'
 import ClassSelectScene from './scenes/ClassSelectScene.js'
 import HubScene from './scenes/HubScene.js'
@@ -106,7 +107,13 @@ try {
   syncVisibility()
 } catch (e) { /* */ }
 
-// Отладочная ссылка на сцены в консоли браузера.
+// Отладочная ссылка на сцены в консоли браузера. Только в dev-сборке: в
+// production этот блок вырезается целиком, наружу ничего не торчит.
+//
+// window.__yp нужен ещё и для съёмки промо-скриншотов (tools/shots.mjs):
+// он позволяет поставить нужный класс, зону и экипировку и открыть нужную
+// сцену, не проходя игру руками по десять раз на каждый кадр.
 if (import.meta.env?.DEV) {
   console.log('[Пустошь] Каркас запущен. Сцены:', Object.values(SCENES).join(' → '))
+  window.__yp = { game, State, SCENES }
 }

@@ -5,7 +5,10 @@
 
 import { Pause, PAUSE } from '../util/pause.js'
 
-export const LEADERBOARD = 'Leaderboard'
+// Технический id таблицы рекордов. Должен совпадать с тем, что заведён в
+// личном кабинете Яндекса (чек-лист в dock/README.md): пока таблицы с этим id
+// нет, setLeaderboardScore молча ничего не делает.
+export const LEADERBOARD = 'kills'
 
 class YandexPlatform {
   constructor() {
@@ -38,6 +41,8 @@ class YandexPlatform {
       try { this.player = await this.ya.getPlayer({ scopes: false }) } catch (e) { this.player = null }
       // Новый API — ysdk.leaderboards; getLeaderboards() оставлен как запасной.
       try { this.lb = this.ya.leaderboards || await this.ya.getLeaderboards() } catch (e) { this.lb = null }
+      // Догоняем вызовы, сделанные до готовности SDK (см. _flushPlatformState).
+      this._flushPlatformState()
       return true
     } catch (e) {
       this.available = false
@@ -81,9 +86,30 @@ class YandexPlatform {
   }
 
   // Сообщить платформе, что игра загрузилась / началась / приостановилась.
-  ready() { try { this.ya?.features?.LoadingAPI?.ready() } catch (e) { /* */ } }
-  gameplayStart() { try { this.ya?.features?.GameplayAPI?.start() } catch (e) { /* */ } }
-  gameplayStop() { try { this.ya?.features?.GameplayAPI?.stop() } catch (e) { /* */ } }
+  //
+  // Вызовы ЗАПОМИНАЮТСЯ и повторяются, когда SDK доедет. Иначе была дыра под
+  // п.1.19: BootScene стартует игру по сторожевому таймеру через 3.5 секунды,
+  // не дожидаясь SDK, и на медленной сети LoadingAPI.ready() уходил в null —
+  // игра уже игралась, а платформа считала её вечно загружающейся.
+  ready() { this._readyWanted = true; this._flushPlatformState() }
+  gameplayStart() { this._playing = true; this._flushPlatformState() }
+  gameplayStop() { this._playing = false; this._flushPlatformState() }
+
+  _flushPlatformState() {
+    const f = this.ya?.features
+    if (!f) return
+    if (this._readyWanted) {
+      try { f.LoadingAPI?.ready(); this._readyWanted = false } catch (e) { /* */ }
+    }
+    // GameplayAPI повторяем только при смене состояния: start/stop подряд
+    // одинаковыми платформа считает ошибкой интеграции.
+    if (this._playing !== this._playingSent) {
+      try {
+        this._playing ? f.GameplayAPI?.start() : f.GameplayAPI?.stop()
+        this._playingSent = this._playing
+      } catch (e) { /* */ }
+    }
+  }
 
   // Облачный сейв (с троттлингом, чтобы не спамить).
   saveCloud(obj, flush = false) {
