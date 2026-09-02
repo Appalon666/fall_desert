@@ -56,15 +56,18 @@ export default class LeaderboardScene extends Phaser.Scene {
     }
     this.status.destroy()
     const cx = GAME.WIDTH / 2
-    let y = 150
+    // Сетка обязана вмещать 10 строк НАД кнопкой «В лагерь» (её верх — 651px):
+    // на прежних 150 + шаг 52 десятая строка заканчивалась на 664px и налезала.
+    // Сейчас низ десятой строки — 130 + 9×48 + 44 = 606px.
+    let y = 130
     res.entries.slice(0, 10).forEach((e) => {
       const me = e.player && e.player.uniqueID && res.userRank && e.rank === res.userRank
-      panel(this, cx - 320, y, 640, 46, { radius: 8, fill: me ? 0x3a2c16 : COLORS.steelDark, border: me ? COLORS.cap : COLORS.ink })
-      this.add.text(cx - 300, y + 23, `#${e.rank}`, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
+      panel(this, cx - 320, y, 640, 44, { radius: 8, fill: me ? 0x3a2c16 : COLORS.steelDark, border: me ? COLORS.cap : COLORS.ink })
+      this.add.text(cx - 300, y + 22, `#${e.rank}`, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.cap, fontStyle: 'bold' }).setOrigin(0, 0.5)
       const name = (e.player && e.player.publicName) || t('Аноним')
-      this.add.text(cx - 240, y + 23, name, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0, 0.5)
-      this.add.text(cx + 300, y + 23, t('{n} убийств', { n: fmt(e.score) }), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(1, 0.5)
-      y += 52
+      this.add.text(cx - 240, y + 22, name, { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0, 0.5)
+      this.add.text(cx + 300, y + 22, t('{n} убийств', { n: fmt(e.score) }), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(1, 0.5)
+      y += 48
     })
   }
 }

@@ -162,6 +162,7 @@ export default class BattleScene extends Phaser.Scene {
       addRim(this.hero, 0xffe0a8, 3, 0.08, 12)
       this.muzzle = { x: hx + 66, y: this.hero.y - 8 }
     }
+    this.heroBaseX = hx // якорь для отдачи выстрела — см. shoot()
     this.tweens.add({ targets: this.hero, y: this.hero.y - 6, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
 
     this.input.on('pointerdown', (p) => { if (this._deathModal || State.hp <= 0) return; if (p.x < this.arenaW) this.shoot(p.x, p.y) })
@@ -615,7 +616,15 @@ export default class BattleScene extends Phaser.Scene {
 
     const flash = this.add.image(this.muzzle.x, this.muzzle.y, TEX.GLOW).setTint(ws.tint).setScale(0.85).setDepth(20).setBlendMode('ADD')
     this.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 130, onComplete: () => flash.destroy() })
-    this.tweens.add({ targets: this.hero, x: this.hero.x - 5, duration: 45, yoyo: true })
+    // Отдача — строго от базовой точки. Раньше твин шёл от ТЕКУЩЕЙ позиции:
+    // при кликах чаще ~90 мс предыдущий не успевал вернуть героя, и он
+    // шаг за шагом уезжал за левый край экрана (фидбек игроков).
+    if (this._recoil) this._recoil.remove()
+    this.hero.x = this.heroBaseX
+    this._recoil = this.tweens.add({
+      targets: this.hero, x: this.heroBaseX - 5, duration: 45, yoyo: true,
+      onComplete: () => { if (this.hero && this.hero.active) this.hero.x = this.heroBaseX },
+    })
     if (this.heroNew) {
       if (this.heroAnim) {
         // Полная 4-кадровая анимация атаки; новый клик перезапускает её с начала.
@@ -687,7 +696,15 @@ export default class BattleScene extends Phaser.Scene {
     if (!e || !e.sprite.active) return
     e.sprite.setTintFill(0xffffff)
     this.time.delayedCall(45, () => { if (e.sprite.active) e.sprite.clearTint() })
-    this.tweens.add({ targets: e.sprite, scaleX: e.dispScale * 1.14, scaleY: e.dispScale * 0.86, duration: 55, yoyo: true, ease: 'Quad.out' })
+    // Сквош — от базового масштаба: при кликспаме наложение твинов
+    // оставляло врага приплюснутым (та же природа, что дрейф героя от отдачи).
+    if (e.punchTween) e.punchTween.remove()
+    e.sprite.setScale(e.dispScale)
+    e.punchTween = this.tweens.add({
+      targets: e.sprite, scaleX: e.dispScale * 1.14, scaleY: e.dispScale * 0.86,
+      duration: 55, yoyo: true, ease: 'Quad.out',
+      onComplete: () => { if (e.sprite.active) e.sprite.setScale(e.dispScale) },
+    })
   }
 
   // ---------------- Смерть врага ----------------

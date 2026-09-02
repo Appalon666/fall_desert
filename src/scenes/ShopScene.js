@@ -127,6 +127,10 @@ export default class ShopScene extends Phaser.Scene {
   }
 
   flash(obj) {
-    this.tweens.add({ targets: obj, scale: 1.3, duration: 90, yoyo: true })
+    // Не запускаем новый твин, пока идёт старый: при спаме по недоступной
+    // покупке масштаб цены накапливался и текст «застревал» раздутым.
+    if (obj._flashing) return
+    obj._flashing = true
+    this.tweens.add({ targets: obj, scale: 1.3, duration: 90, yoyo: true, onComplete: () => { obj._flashing = false } })
   }
 }

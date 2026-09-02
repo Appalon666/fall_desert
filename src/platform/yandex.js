@@ -211,13 +211,20 @@ class YandexPlatform {
     this._adEnd()
   }
 
+  // На платформе игра всегда живёт в iframe Яндекса. Вне его (localhost,
+  // прямое открытие) SDK подгружается и available=true, но реклама работать
+  // не может: postMessage слать некому («No parent to post message»), колбэки
+  // onOpen/onClose/onError не приходят — и пауза, взятая в _adStart ДО показа,
+  // висела до 15-секундного сторожа. Выглядело как зависание на смене зоны.
+  _embedded() { try { return window.self !== window.top } catch (e) { return true } }
+
   // Реклама за награду. Гарантирует РОВНО один вызов onReward (успех/ошибка).
-  // Локально (без SDK) — сразу выдаём награду.
+  // Локально (без SDK или вне iframe) — сразу выдаём награду.
   showRewarded(onReward, onClose) {
     let settled = false
     const reward = () => { if (settled) return; settled = true; try { onReward && onReward() } catch (e) { /* */ } }
     const closed = () => { try { onClose && onClose() } catch (e) { /* */ } }
-    if (!this.available || !this.ya?.adv) { reward(); closed(); return }
+    if (!this.available || !this.ya?.adv || !this._embedded()) { reward(); closed(); return }
     const finish = () => { this._adEnd(); reward(); closed() }
     this._adStart()
     try {
@@ -236,7 +243,7 @@ class YandexPlatform {
   // Межстраничная реклама. Клиентский троттлинг ≥75с (Яндекс требует ≥60с и
   // не одобряет частый показ; зоны могут сменяться чаще).
   showInterstitial() {
-    if (!this.available || !this.ya?.adv) return
+    if (!this.available || !this.ya?.adv || !this._embedded()) return
     const now = Date.now()
     if (now - this._lastAd < 75000) return
     // Отдельный троттл на ПОПЫТКИ: если реклама не показалась (нет инвентаря),
