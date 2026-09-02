@@ -11,7 +11,7 @@ import { BAL } from './balance.js'
 // плюс небольшая надбавка за зачистку внутри зоны.
 //
 // ПОЧЕМУ НАДБАВКА ОГРАНИЧЕНА. Раньше было «+1 враг за каждые 20 убийств» без
-// потолка: при норме зоны в 340 киллов волна доходила до 23 врагов. А темп
+// потолка: при тогдашней норме зоны в 340 киллов волна доходила до 23 врагов. Темп
 // игры = размер волны / время убийства, и урон по площади (Картечь, пробитие,
 // ульта) бьёт по всей волне сразу. То есть с ростом волны игра не усложнялась,
 // а РАЗГОНЯЛАСЬ: поздний темп был впятеро выше раннего, зоны пролетали за две
@@ -20,6 +20,32 @@ export function enemiesInWave(zoneIndex, killsInZone = 0) {
   const byZone = Math.min(BAL.waveCountMax, BAL.waveCountBase + Math.floor(zoneIndex / 3))
   const byKills = Math.min(BAL.waveKillBonusMax, Math.floor(killsInZone / BAL.waveKillStep))
   return byZone + byKills
+}
+
+// ---- Поток врагов: как часто и сколько выпускать ----
+// Одна формула на бой (BattleScene.spawnTick/scheduleSpawn) и на симуляторы —
+// иначе замеры баланса врут ровно в тот момент, когда поток правят.
+//
+// Раньше поток был «один враг раз в 1.5-2.5 с» и не зависел от локации: арена
+// пустовала, а глубина ощущалась так же, как первая зона. Теперь пачками, чаще,
+// и с локацией и то и другое растёт.
+
+// Интервал между пачками, мс. С каждой локацией короче, но не ниже потолка
+// скорости spawnGapFloor — иначе на глубине поток превращается в сплошную стену,
+// в которой уже ничего не читается.
+export function spawnGap(zoneIndex) {
+  const k = Math.pow(BAL.spawnGapZoneDecay, Math.max(0, Math.floor(zoneIndex) || 0))
+  const min = Math.max(BAL.spawnGapFloor, Math.round(BAL.spawnGapMin * k))
+  const max = Math.max(min, Math.round(BAL.spawnGapMax * k))
+  return { min, max }
+}
+
+// Сколько врагов максимум выпускается за одну пачку на этой локации.
+// Первая локация — по одному (новичку надо разобраться), дальше растёт до
+// BAL.spawnBatchMax. Сам размер пачки бой бросает случайно от base до этого.
+export function spawnBatchMax(zoneIndex) {
+  const z = Math.max(0, Math.floor(zoneIndex) || 0)
+  return Math.min(BAL.spawnBatchMax, BAL.spawnBatchBase + Math.floor(z / BAL.spawnBatchZoneStep))
 }
 
 // Норма убийств в зоне — одна для всех зон и глубин (BAL.zoneKills). Раньше

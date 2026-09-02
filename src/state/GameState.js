@@ -17,6 +17,9 @@ const SAVE_KEY = 'wasteland_save_v1'
 // С какой пройденной зоны открывается перерождение (см. canPrestige/coresFromRun).
 const PRESTIGE_GATE_ZONE = 4
 const CAPS_PER_DPS = 0.12 // перевод idle-DPS в крышки/сек для офлайн-дохода
+// С какой локации игре позволено просить оценку (см. reviewUnlocked).
+// zoneIndex нулевой, поэтому 2 — это третья локация.
+export const REVIEW_MIN_ZONE = 2
 
 export class GameState extends Emitter {
   constructor() {
@@ -65,7 +68,7 @@ export class GameState extends Emitter {
   // но сохраняет ядра, престиж-бонусы, экипировку, рекорд и класс.
   resetRun() {
     const cls = this.classDef()
-    this.caps = this.prestige.quickstart * 300
+    this.caps = this.prestige.quickstart * BAL.prestigeQuickstartCaps
     this.hero = { level: 1, xp: 0, points: 0, str: 0, vit: 0, luck: 0 }
     // «Быстрый старт» даёт бесплатные уровни Калибра — мультипликативный разгон
     // следующего забега (компаунд меты, а не бесполезные стартовые крышки).
@@ -138,9 +141,9 @@ export class GameState extends Emitter {
   // Бонусы подняты (было 0.12/0.10/0.12): при мягком множителе врагов от меты
   // (enemyMetaHpMul, показатель 0.35) чистый прирост с уровня «Наследия» —
   // 1.2^0.65 ≈ +12%, то есть прежние +12% почти целиком съедались.
-  prestigeDamageMul() { return 1 + this.prestige.legacy * 0.20 }
-  prestigeHpMul() { return this.prestige.vitality * 0.15 }
-  prestigeCapsMul() { return this.prestige.stash * 0.20 }
+  prestigeDamageMul() { return 1 + this.prestige.legacy * BAL.prestigeLegacyMul }
+  prestigeHpMul() { return this.prestige.vitality * BAL.prestigeVitalityMul }
+  prestigeCapsMul() { return this.prestige.stash * BAL.prestigeStashMul }
   // Награда за перерождение растёт ЭКСПОНЕНЦИАЛЬНО по глубине, потому что цена
   // вечных бонусов тоже экспоненциальна (3 × 1.5^уровень). При линейной награде
   // (4 + зона) глубокий забег давал 5-6 ядер — ровно один уровень бонуса, и
@@ -469,6 +472,12 @@ export class GameState extends Emitter {
     this.emit('zone')
     return true
   }
+  // Втянулся ли игрок настолько, чтобы просить у него оценку игры. Порог общий
+  // для всех трёх точек запроса (босс, рекорд, кнопка в лагере): новичок первых
+  // двух локаций ещё не понял, во что играет, и ставит звезду наугад — а
+  // переоценить платформа больше не даст, оценка одна на игрока.
+  reviewUnlocked() { return this.zoneIndex >= REVIEW_MIN_ZONE }
+
   // Смерть героя: откатываем ЧАСТЬ прогресса зоны (не в ноль — иначе при
   // частых смертях игрок вечно перегринживает и не лезет выше; но и не
   // бесплатно — иначе бесконечно долбится в непробиваемую стену). Теряем

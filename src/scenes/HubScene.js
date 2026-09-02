@@ -49,6 +49,7 @@ export default class HubScene extends Phaser.Scene {
     createButton(this, GAME.WIDTH - 44, iy, { label: '⚙', width: iw, height: 54, fontSize: 28, onClick: () => this.showSettings() })
     createButton(this, GAME.WIDTH - 44 - ig, iy, { label: '❔', width: iw, height: 54, fontSize: 28, color: COLORS.rust, hover: COLORS.rustLight, onClick: () => this.showHowTo() })
     createButton(this, GAME.WIDTH - 44 - ig * 2, iy, { label: '🏆', width: iw, height: 54, fontSize: 28, onClick: () => this.scene.start(SCENES.LEADERBOARD) })
+    this.addReviewButton(GAME.WIDTH - 44 - ig * 3, iy, iw)
 
     // Герой + полоска опыта
     const heroCls = State.classDef()
@@ -116,6 +117,25 @@ export default class HubScene extends Phaser.Scene {
       try { localStorage.setItem('yp_howto', '1') } catch (e) { /* */ }
       this.showHowTo()
     })
+  }
+
+  // Кнопка «оценить игру» — единственная точка, где оценку просит сам игрок, а
+  // не игра. Мёртвой кнопки быть не должно: рисуем её, только если платформа
+  // прямо сказала, что запрос сейчас пройдёт (игрок авторизован, ещё не оценивал,
+  // запрос за эту сессию не потрачен). Ответ canReview асинхронный, поэтому
+  // кнопка появляется на кадр-другой позже остальных — на глаз незаметно.
+  addReviewButton(x, y, w) {
+    if (!State.reviewUnlocked()) return
+    Platform.canReview().then(({ value }) => {
+      if (!value || !this.scene.isActive()) return
+      const btn = createButton(this, x, y, {
+        label: '⭐', width: w, height: 54, fontSize: 28,
+        color: COLORS.rust, hover: COLORS.rustLight,
+        // Оценка одна на игрока: после запроса кнопке уже нечего делать, чем бы
+        // он ни кончился — оценил, закрыл окно или окно не открылось вовсе.
+        onClick: () => { Platform.requestReview().catch(() => {}).then(() => btn.destroy()) },
+      })
+    }).catch(() => { /* нет SDK — кнопки просто не будет */ })
   }
 
   // Картинка моба для «Как играть»: настоящий спрайт, если лист доехал, иначе

@@ -26,11 +26,32 @@ export default class LeaderboardScene extends Phaser.Scene {
   }
 
   async loadBoard() {
+    // Свой рекорд досылаем при открытии таблицы: если отправка из боя не дошла
+    // (SDK ещё грузился, сеть моргнула), игрок видел свой результат строкой выше
+    // и не находил себя в списке.
+    //
+    // Но ЧТЕНИЕ таблицы на эту отправку не завязано. У SDK нет своего тайм-аута:
+    // стоит `setLeaderboardScore` подвиснуть — и экран навсегда остаётся на
+    // «Загрузка таблицы…». Даём отправке короткую фору и читаем в любом случае;
+    // не успела — рекорд подхватится при следующем открытии.
+    const SEND_GRACE = 1200
+    const sent = Promise.resolve(Platform.submitScore(State.bestScore)).catch(() => {})
+    // Сторож на setTimeout, а не на таймере сцены: сцена может стоять на паузе
+    // (свёрнутая вкладка), и тогда её таймеры не тикают.
+    await Promise.race([sent, new Promise(r => setTimeout(r, SEND_GRACE))])
+    if (!this.scene.isActive()) return
     let res = null
     try { res = await Platform.getEntries() } catch (e) { res = null }
     if (!this.scene.isActive()) return
-    if (!res || !res.entries || !res.entries.length) {
+    // «Таблицы нет» и «таблица пустая» — разные вещи, и путать их нельзя. Раньше
+    // оба случая давали надпись про «версию на Яндекс.Играх», и на опубликованной
+    // странице с рабочей, но ещё пустой таблицей она прямо врала.
+    if (!res) {
       this.status.setText(t('Онлайн-таблица доступна в версии на Яндекс.Играх.\nЗдесь — твой личный рекорд.')).setAlign('center')
+      return
+    }
+    if (!res.entries || !res.entries.length) {
+      this.status.setText(t('В таблице пока пусто.\nТвой рекорд отправлен — загляни позже.')).setAlign('center')
       return
     }
     this.status.destroy()

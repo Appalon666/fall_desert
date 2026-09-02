@@ -39,8 +39,19 @@ class MusicEngine {
     this.wantScene = scene; this.wantKey = key
     if (this.currentKey === key && this.sound && this.sound.isPlaying) return
     if (!this.has(scene, key)) return
-    // Аудио заблокировано до первого жеста — дождёмся разблокировки.
-    if (scene.sound.locked) { scene.sound.once('unlocked', () => this.play(scene, key)); return }
+    // Аудио заблокировано до первого жеста — дождёмся разблокировки. Вешаем
+    // ОДИН слушатель на всё время блокировки и будим через retry(): он играет
+    // последний запрошенный трек и проверяет, что сцена ещё жива. Раньше здесь
+    // подписывался новый once на каждый вызов play, и переход «лагерь → бой →
+    // лагерь» до первого жеста оставлял очередь колбэков с ссылками на уже
+    // уничтоженные сцены.
+    if (scene.sound.locked) {
+      if (!this._waitingUnlock) {
+        this._waitingUnlock = true
+        scene.sound.once('unlocked', () => { this._waitingUnlock = false; this.retry() })
+      }
+      return
+    }
     this.stop()
     this.currentKey = key
     const vol = this.effVol()

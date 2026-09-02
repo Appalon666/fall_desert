@@ -9,9 +9,12 @@ import { heroScaleFor } from '../assets.js'
 import { t } from '../i18n.js'
 import { fmt } from '../util/format.js'
 
+// Числа в desc обязаны совпадать с BAL.perStrength / perVitality / perLuckCrit —
+// их сверяет тест «описания характеристик совпадают с балансом». «+25 к макс. HP»
+// здесь пережило подъём perVitality до 30.
 const STATS = [
   { id: 'str',  name: 'Сила',      icon: '💪', desc: '+2 к урону клика' },
-  { id: 'vit',  name: 'Живучесть', icon: '❤️', desc: '+25 к макс. HP' },
+  { id: 'vit',  name: 'Живучесть', icon: '❤️', desc: '+30 к макс. HP' },
   { id: 'luck', name: 'Удача',     icon: '🍀', desc: '+1% крит и лучше лут' },
 ]
 

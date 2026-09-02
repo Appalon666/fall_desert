@@ -110,10 +110,20 @@ export const RARITY_BY_ID = Object.fromEntries(RARITIES.map(r => [r.id, r]))
 export const SLOT_BY_ID = Object.fromEntries(SLOTS.map(s => [s.id, s]))
 
 // Сколько металлолома даёт разбор предмета (по редкости и уровню).
+//
+// Уровень режем тем же потолком ITEM_LEVEL_CAP, что и силу предмета. Без этого
+// повторялась ровно та поломка, из-за которой потолок и появился: уровень
+// предмета = enemyLevel() и растёт ЛИНЕЙНО от числа убийств, а цены на верстаке
+// (CRAFT_TIERS) фиксированные. К 10 тысячам убийств серый хлам давал по 400
+// металлолома за штуку — «Мастерская ковка» за 1500 окупалась четырьмя
+// подобранными вещами, ковка становилась бесплатной, и реликвию можно было
+// нафармить перебором за минуты в обход набора из пяти частей (см. relics.js).
+// С потолком разбор одного предмета остаётся соразмерным тому, что предмет даёт.
 const SCRAP_BASE = { common: 1, uncommon: 3, rare: 8, epic: 22, relic: 60 }
 export function scrapValue(item) {
   const base = SCRAP_BASE[item.rarity] || 1
-  return Math.ceil(base * (1 + (item.level || 1) * 0.08))
+  const lv = Math.min(Math.max(1, item.level || 1), ITEM_LEVEL_CAP)
+  return Math.ceil(base * (1 + lv * 0.08))
 }
 
 // Тиры крафта: больше металлолома → выше шанс качественного предмета (luck).

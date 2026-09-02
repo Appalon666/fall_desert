@@ -3,6 +3,13 @@
 // Цель — понять реальную длительность/глубину: работает ли мета-петля престижа,
 // растёт ли глубина от забега к забегу, когда наступает потолок.
 //
+// ВАЖНО про длительность. За дефолтные 2 часа перерождение НЕ наступает: забег
+// идёт вглубь без остановки и в стену не упирается. Чтобы увидеть саму мета-петлю,
+// нужен долгий прогон — стена приходит примерно к 3.5 часам:
+//     SIM_SECONDS=28800 node sim/depth-sim.mjs
+// Если перерождений вышло ноль, скрипт скажет об этом отдельной строкой — иначе
+// таблица из нулей читается как «мета-петля в порядке».
+//
 // Запуск: node sim/depth-sim.mjs
 
 import { BAL } from '../src/data/balance.js'
@@ -12,7 +19,7 @@ import { getZone, zoneHpMul } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
-import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../src/data/progression.js'
+import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill, spawnGap, spawnBatchMax } from '../src/data/progression.js'
 
 const SESSION = process.env.SIM_SECONDS ? +process.env.SIM_SECONDS : 7200 // 2 часа (env: SIM_SECONDS)
 const DT = 0.2
@@ -29,15 +36,16 @@ function mulberry32(a) {
 function runOne(classId, rng) {
   const cls = CLASS_BY_ID[classId]
   const meta = { cores: 0, prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0 }, prestigeCount: 0 }
-  const pDmg = () => 1 + meta.prestige.legacy * 0.20
-  const pHp = () => meta.prestige.vitality * 0.15
-  const pCaps = () => meta.prestige.stash * 0.20
+  // Множители берём из BAL, а не копией: копии тут уже разъезжались с игрой.
+  const pDmg = () => 1 + meta.prestige.legacy * BAL.prestigeLegacyMul
+  const pHp = () => meta.prestige.vitality * BAL.prestigeVitalityMul
+  const pCaps = () => meta.prestige.stash * BAL.prestigeStashMul
   const pCost = (id) => { const b = { legacy: 3, stash: 3, vitality: 3, quickstart: 5 }; return Math.floor(b[id] * Math.pow(BAL.prestigeCostGrowth, meta.prestige[id] || 0)) }
 
   let st
   function freshRun() {
     st = {
-      caps: meta.prestige.quickstart * 300,
+      caps: meta.prestige.quickstart * BAL.prestigeQuickstartCaps,
       hero: { level: 1, xp: 0, points: 0, str: cls.startStats.str, vit: cls.startStats.vit, luck: cls.startStats.luck },
       upgrades: meta.prestige.quickstart > 0 ? { damage: meta.prestige.quickstart } : {},
       allies: { ...cls.startAllies },
@@ -81,7 +89,8 @@ function runOne(classId, rng) {
 
   // Непрерывный поток врагов + босс-ворота — как в бою (см. balance-sim).
   let wave = []
-  const GAP = (BAL.spawnGapMin + BAL.spawnGapMax) / 2000
+  // Интервал и пачка — из progression.js, той же формулой, что и бой.
+  const gapSec = () => { const g = spawnGap(st.zoneIndex); return (g.min + g.max) / 2000 }
   let spawned = 0
   const WAVE_EVERY = 5
 
@@ -107,7 +116,10 @@ function runOne(classId, rng) {
   function spawnTick() {
     if (st.bossActive) return
     if (bossDue(st.killsInZone)) { st.bossActive = true; pushEnemy(true); return }
-    if (wave.length < enemiesInWave(st.zoneIndex, st.killsInZone)) pushEnemy(false)
+    const room = enemiesInWave(st.zoneIndex, st.killsInZone) - wave.length
+    const lo = BAL.spawnBatchBase, hi = spawnBatchMax(st.zoneIndex)
+    const want = lo + Math.floor(rng() * (hi - lo + 1))
+    for (let k = 0; k < Math.min(want, room); k++) pushEnemy(false)
   }
 
   function killFront(e) {
@@ -129,8 +141,8 @@ function runOne(classId, rng) {
   spawnTick()
 
   for (let t = 0; t < SESSION; t += DT) {
-    if (t >= nextSpawn) { spawnTick(); nextSpawn = t + GAP }
-    if (wave.length === 0) { spawnTick(); nextSpawn = t + GAP }
+    if (t >= nextSpawn) { spawnTick(); nextSpawn = t + gapSec() }
+    if (wave.length === 0) { spawnTick(); nextSpawn = t + gapSec() }
     const zoneBefore = st.zoneIndex
     clickAccum += cps * acc * DT
     while (clickAccum >= 1 && wave.length) {
@@ -156,8 +168,8 @@ function runOne(classId, rng) {
       // Разумный игрок пушит до СТЕНЫ (не берёт новую зону ~2 мин = темп рухнул),
       // затем перерождается — так каждый следующий забег уходит глубже.
       // Порог «стены» — 15 минут без новой зоны. Раньше стояло 2 минуты, но
-      // зоны теперь сами по себе идут по 5-8 минут (260+ убийств, растёт на 13%
-      // за зону), и детектор срабатывал на здоровом прогрессе: игрок
+      // зона сама по себе идёт минуты (BAL.zoneKills убийств плюс ступенька
+      // сложности локации), и детектор срабатывал на здоровом прогрессе: игрок
       // «упирался» ровно на пятой зоне каждый забег независимо от меты.
       const walled = (t - lastZoneT) > 900 && st.zoneIndex >= 5 && coresFromRun() >= 1
       if (walled) {
@@ -201,3 +213,20 @@ console.log(`Реально переродились хотя бы раз: ${did
 console.log(`Медиана времени до первого Ядра: ${fmtT(med(all.map(r => r.firstCoreT).filter(x => x != null)))}`)
 console.log(`Медиана времени до 1-го престижа: ${fmtT(med(all.map(r => r.prestigeTimes[0]).filter(x => x != null)))}`)
 console.log(`Глубина стены по забегам (пример): ${(byClass.gunner[0].prestigeZones).join(' → ') || '—'}`)
+
+// Инструмент, который «прошёл», ничего при этом не измерив, — хуже отсутствия
+// инструмента. Если за весь прогон не случилось НИ ОДНОГО перерождения, таблица
+// выше состоит из нулей и прочерков, и по ней легко решить, что с мета-петлёй
+// всё в порядке. Причина всегда одна и та же: модель игрока перерождается только
+// упёршись в стену (15 минут без новой зоны), а сейчас забег идёт вглубь без
+// остановки — за 2 часа игрок берёт зону за зоной и стену не встречает.
+if (didPrestige === 0) {
+  const maxZ = Math.max(...all.map(r => r.maxZone))
+  console.log(
+    '\n⚠️ НИ ОДНОГО ПЕРЕРОЖДЕНИЯ ЗА ВЕСЬ ПРОГОН — мета-петля НЕ ПРОВЕРЕНА.\n' +
+    `   Забег уходит до зоны ${maxZ} за ${SESSION / 60} мин, ни разу не застряв на 15 минут,\n` +
+    '   поэтому детектор стены не срабатывает. Числа выше про престиж — пустые.\n' +
+    '   Что делать: либо гонять дольше (SIM_SECONDS=28800 node sim/depth-sim.mjs),\n' +
+    '   либо пересмотреть модель игрока — перерождаться по выгоде, а не по стене.',
+  )
+}

@@ -11,7 +11,7 @@ import { defOf, sheetKey } from '../data/bosses.js'
 import { ALLIES } from '../data/allies.js'
 import { enemyStats } from '../data/scaling.js'
 import { getZone, isRelicZone } from '../data/zones.js'
-import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../data/progression.js'
+import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill, spawnGap, spawnBatchMax } from '../data/progression.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import {
@@ -39,6 +39,15 @@ const ALLY_ON_SCREEN_H = 86
 // На сколько правее края арены рождается враг: он должен ВОЙТИ в кадр, а не
 // возникнуть в нём.
 const ENEMY_SPAWN_MARGIN = 70
+// Шаг между врагами ОДНОЙ пачки по X: они входят в кадр вереницей, а не
+// возникают стопкой в одной точке (иначе крупные спрайты слипаются в пятно).
+const BATCH_SPACING = 92
+// Шаг очереди у героя: на столько дальше встаёт каждый следующий враг.
+// Полностью развести спрайты нельзя (десяток крупных врагов шире арены), но
+// этого хватает, чтобы читались и фигуры, и подписи над ними.
+const QUEUE_SPACING = 56
+// Слой боевого HUD: выше врагов и их подписей (максимум 41), ниже окна смерти (85).
+const PANEL_DEPTH = 50
 // Каждые столько выпущенных врагов считаем «волной» — только ради нарастания
 // сложности внутри зоны (State.bumpWave, +1%).
 const WAVE_EVERY = 5
@@ -103,6 +112,9 @@ export default class BattleScene extends Phaser.Scene {
     this.spawnIndex = 0   // сколько врагов выпущено за бой (ряд и слой спрайта)
     this.spawnTimer = null
     this.lastHitTime = 0
+    // Игрок дерётся — облачный сейв, доехавший с опозданием (медленный SDK, старт
+    // по сторожу в BootScene), не должен подменить состояние прямо в бою.
+    State._started = true
     State.hp = State.heroMaxHp() // полное лечение в начале вылазки
     // Флаг «идёт бой с боссом» живёт только внутри одной вылазки. Если игрок
     // ушёл в лагерь прямо во время боя с воротами, флаг оставался поднятым, а
@@ -115,6 +127,10 @@ export default class BattleScene extends Phaser.Scene {
     // был покинут с открытым окном, на новом входе управление осталось бы
     // заблокированным навсегда при пустом экране. Начинаем с чистого флага.
     this._deathModal = null
+    // Рекорд на момент входа в бой. bestScore растёт прямо по ходу забега, поэтому
+    // «побил ли игрок свой рекорд» узнать на экране смерти уже нельзя — сравнивать
+    // не с чем. Запоминаем планку здесь и сверяемся с ней в heroDie.
+    this._bestAtEntry = State.bestScore
     // Смерть, оставшаяся незакрытой (игрок перезагрузил страницу прямо на окне
     // выбора), доводится до конца здесь — штраф не обходится обновлением.
     State.resolvePendingDeath()
@@ -290,45 +306,54 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // ---------------- Панель (боевой HUD) ----------------
+  // Панель обязана быть НАД ареной. Враги рождаются за правым краем (они должны
+  // войти в кадр, а не возникнуть в нём) и по дороге заезжают на панель. При
+  // глубине панели 0 и врагов 10 они рисовались поверх HUD: спрайт наползал на
+  // кнопку ульты, а подпись с полоской HP — на строку «Союзники». С одиночным
+  // потоком это мелькало редко, с пачками стало постоянным. Всё, что кладётся в
+  // панель, поднимаем на PANEL_DEPTH — выше врагов и их подписей (максимум 41),
+  // но ниже окна смерти (85).
   buildPanel() {
     const px = this.arenaW
-    const g = this.add.graphics()
+    const g = this.add.graphics().setDepth(PANEL_DEPTH)
     g.fillStyle(COLORS.steelDark, 1); g.fillRect(px, 0, PANEL_W, GAME.HEIGHT)
     g.lineStyle(4, COLORS.ink, 0.6); g.strokeRect(px + 2, 2, PANEL_W - 4, GAME.HEIGHT - 4)
     const cx = px + PANEL_W / 2
+    // Каждый элемент панели — на слой выше её подложки.
+    const up = (o) => o.setDepth(PANEL_DEPTH + 1)
 
-    this.add.image(px + 34, 40, TEX.GLOW).setTint(COLORS.cap).setScale(1.2).setAlpha(0.5).setBlendMode('ADD')
-    resIcon(this, px + 34, 40, 'caps', 34)
-    this.capsText = this.add.text(px + 56, 40, '0', {
+    up(this.add.image(px + 34, 40, TEX.GLOW).setTint(COLORS.cap).setScale(1.2).setAlpha(0.5).setBlendMode('ADD'))
+    up(resIcon(this, px + 34, 40, 'caps', 34))
+    this.capsText = up(this.add.text(px + 56, 40, '0', {
       fontFamily: 'Rubik, sans-serif', fontSize: '28px', color: CSS.cap, fontStyle: 'bold',
-    }).setOrigin(0, 0.5)
+    }).setOrigin(0, 0.5))
 
-    this.comboText = this.add.text(cx, 80, '', {
+    this.comboText = up(this.add.text(cx, 80, '', {
       fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold',
-    }).setOrigin(0.5)
+    }).setOrigin(0.5))
 
-    this.add.text(px + 22, 106, t('HP героя'), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0)
+    up(this.add.text(px + 22, 106, t('HP героя'), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0))
     this.hpBarW = PANEL_W - 48
-    this.add.rectangle(px + 24, 132, this.hpBarW, 26, COLORS.ink).setOrigin(0)
-    this.hpFill = this.add.rectangle(px + 26, 134, this.hpBarW - 4, 22, COLORS.blood).setOrigin(0)
-    this.hpText = this.add.text(cx, 145, '', { fontFamily: 'monospace', fontSize: '16px', color: '#fff' }).setOrigin(0.5)
+    up(this.add.rectangle(px + 24, 132, this.hpBarW, 26, COLORS.ink).setOrigin(0))
+    this.hpFill = up(this.add.rectangle(px + 26, 134, this.hpBarW - 4, 22, COLORS.blood).setOrigin(0))
+    this.hpText = up(this.add.text(cx, 145, '', { fontFamily: 'monospace', fontSize: '16px', color: '#fff' }).setOrigin(0.5))
 
-    this.add.text(px + 22, 174, t('Заряд ульты'), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0)
-    this.add.rectangle(px + 24, 200, this.hpBarW, 26, COLORS.ink).setOrigin(0)
-    this.ultFill = this.add.rectangle(px + 26, 202, 1, 22, COLORS.toxicDark).setOrigin(0)
-    createButton(this, cx, 262, {
+    up(this.add.text(px + 22, 174, t('Заряд ульты'), { fontFamily: 'Rubik, sans-serif', fontSize: '18px', color: CSS.paper }).setOrigin(0))
+    up(this.add.rectangle(px + 24, 200, this.hpBarW, 26, COLORS.ink).setOrigin(0))
+    this.ultFill = up(this.add.rectangle(px + 26, 202, 1, 22, COLORS.toxicDark).setOrigin(0))
+    up(createButton(this, cx, 262, {
       label: t('☢  УЛЬТА (Space)'), width: PANEL_W - 44, height: 58, fontSize: 21,
       color: COLORS.toxicDark, hover: COLORS.toxic, onClick: () => this.tryUlt(),
-    })
+    }))
 
-    this.statsText = this.add.text(px + 24, 312, '', {
+    this.statsText = up(this.add.text(px + 24, 312, '', {
       fontFamily: 'monospace', fontSize: '17px', color: '#e8ddc0', lineSpacing: 8,
-    }).setOrigin(0)
+    }).setOrigin(0))
 
-    createButton(this, cx, GAME.HEIGHT - 52, {
+    up(createButton(this, cx, GAME.HEIGHT - 52, {
       label: t('⟵ В лагерь'), width: PANEL_W - 44, height: 60, fontSize: 22,
       onClick: () => { State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.bestScore); this.scene.start(SCENES.HUB) },
-    })
+    }))
   }
 
   // ---------------- Компаньоны (видимые союзники) ----------------
@@ -393,10 +418,18 @@ export default class BattleScene extends Phaser.Scene {
     if (!State.bossActive && bossDue(State.killsInZone)) { this.spawnBoss(); return }
     if (!State.bossActive) {
       const cap = enemiesInWave(State.zoneIndex, State.killsInZone)
-      if (this.enemies.length < cap) {
-        const pool = this.zone.enemies
+      // Пачкой, а не по одному: на глубине их до BAL.spawnBatchMax за раз.
+      // Больше потолка арены всё равно не выпустим — иначе строй превращается
+      // в кашу, в которой не видно, по кому кликаешь.
+      const want = Phaser.Math.Between(BAL.spawnBatchBase, spawnBatchMax(State.zoneIndex))
+      const room = Math.max(0, cap - this.enemies.length)
+      const n = Math.min(want, room)
+      const pool = this.zone.enemies
+      for (let k = 0; k < n; k++) {
         const defId = pool[Math.floor(Math.random() * pool.length)]
-        this.enemies.push(this.makeEnemy(defId, false, this.spawnIndex, 1, this.arenaW + ENEMY_SPAWN_MARGIN))
+        // Разносим по X: пачка входит в кадр вереницей, а не стопкой в одной точке.
+        const atX = this.arenaW + ENEMY_SPAWN_MARGIN + k * BATCH_SPACING
+        this.enemies.push(this.makeEnemy(defId, false, this.spawnIndex, 1, atX))
         this.spawnIndex++
         // «Волна» осталась только как единица нарастания сложности внутри зоны
         // (+1% за волну): считаем её каждые WAVE_EVERY выпущенных врагов.
@@ -408,7 +441,9 @@ export default class BattleScene extends Phaser.Scene {
 
   scheduleSpawn() {
     if (this.spawnTimer) return
-    const gap = Phaser.Math.Between(BAL.spawnGapMin, BAL.spawnGapMax)
+    // Интервал зависит от локации: чем глубже, тем чаще идут пачки.
+    const g = spawnGap(State.zoneIndex)
+    const gap = Phaser.Math.Between(g.min, g.max)
     // Проверку scene.isActive() делаем ЗДЕСЬ, а не в spawnTick: первый враг
     // выпускается из create(), где сцена ещё не помечена активной.
     this.spawnTimer = this.time.delayedCall(gap, () => {
@@ -690,7 +725,7 @@ export default class BattleScene extends Phaser.Scene {
       this.spawnIndex = 0
       this.scheduleSpawn() // новая локация — поток обычных врагов снова идёт
       this.cameras.main.flash(300, 40, 60, 20)
-      Platform.showInterstitial()
+      this.askReviewOrAd()
     } else {
       State.registerKill()
     }
@@ -703,6 +738,20 @@ export default class BattleScene extends Phaser.Scene {
       // Арена опустела раньше тика — не заставляем игрока ждать впустую.
       if (this.enemies.length === 0) this.spawnTick()
     }
+  }
+
+  // Локация взята — лучший момент за весь забег, чтобы спросить оценку.
+  //
+  // На эту же секунду претендует межстраничная реклама, и вместе они бы легли
+  // друг на друга. Приоритет у оценки: её платформа разрешает спросить один раз
+  // за всю жизнь игрока, а ролик вернётся на следующем боссе (он и так троттлится
+  // изнутри showInterstitial). Если оценку показать нельзя — момент честно
+  // достаётся рекламе, как было раньше.
+  askReviewOrAd() {
+    if (!State.reviewUnlocked()) { Platform.showInterstitial(); return }
+    Platform.requestReview()
+      .then((shown) => { if (!shown) Platform.showInterstitial() })
+      .catch(() => Platform.showInterstitial())
   }
 
   // Награда с босса десятой локации: фиолетовый предмет и часть реликвии.
@@ -780,6 +829,23 @@ export default class BattleScene extends Phaser.Scene {
     this.clearEnemies()
     Platform.submitScore(State.bestScore)
     this.showDeathModal()
+    this.askReviewOnRecord()
+  }
+
+  // Забег кончился новым личным рекордом — второй момент, где не стыдно спросить
+  // оценку (первый — взятая локация, см. askReviewOrAd).
+  //
+  // Ждём секунду и проверяем, что окно смерти всё ещё открыто: если игрок за это
+  // время нажал «возродиться», сейчас пойдёт рекламный ролик, и окно оценки
+  // легло бы поверх него. Дальше страхует и сам Platform.requestReview — он
+  // молчит, пока держится пауза рекламы.
+  askReviewOnRecord() {
+    if (State.bestScore <= this._bestAtEntry) return // рекорд не сдвинулся
+    if (!State.reviewUnlocked()) return
+    this.time.delayedCall(1000, () => {
+      if (!this.scene.isActive() || !this._deathModal) return
+      Platform.requestReview().catch(() => { /* окно не открылось — и ладно */ })
+    })
   }
 
   showDeathModal() {
@@ -867,10 +933,23 @@ export default class BattleScene extends Phaser.Scene {
       }
     }
 
+    // Враги держат ОЧЕРЕДЬ, а не толпятся в одной точке. Раньше все шли до
+    // BAL.enemyAttackRange и вставали друг в друга: на глубоких локациях десяток
+    // крупных спрайтов слипался в одно пятно, подписи наезжали, и понять, по кому
+    // кликаешь, было нельзя. Теперь у каждого своя дистанция по месту в очереди.
+    //
+    // На атаку это НЕ влияет: дойдя до своей дистанции, бьёт каждый. Иначе
+    // задние превращались бы в безобидную декорацию, входящий урон падал вместе
+    // с числом врагов, и замеры симуляторов разошлись бы с игрой.
+    const queue = [...this.enemies].sort((a, b) => a.sprite.x - b.sprite.x)
+    for (let i = 0; i < queue.length; i++) {
+      queue[i].standoff = BAL.enemyAttackRange + i * QUEUE_SPACING
+    }
+
     // Поведение врагов: подход и атака в упор.
     for (const e of this.enemies) {
       const gap = e.sprite.x - this.hero.x
-      if (gap > BAL.enemyAttackRange) {
+      if (gap > (e.standoff || BAL.enemyAttackRange)) {
         e.sprite.x -= e.speed * dt
       } else {
         e.attackTimer += delta

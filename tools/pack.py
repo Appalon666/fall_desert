@@ -35,6 +35,22 @@ with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
 
 names = zipfile.ZipFile(OUT).namelist()
 size_mb = os.path.getsize(OUT) / 1024 / 1024
+has_index = 'index.html' in names
 print('файлов: %d, размер: %.1f МБ' % (count, size_mb))
-print('index.html в корне:', 'index.html' in names)
+print('index.html в корне:', has_index)
 print('проблемные пути:', bad_paths if bad_paths else 'нет')
+
+# Проверки должны РОНЯТЬ сборку, а не просто печататься. Раньше скрипт всегда
+# выходил с нулём: строка «index.html в корне: False» терялась в выводе
+# `npm run pack`, и на площадку уезжал заведомо непринимаемый архив.
+LIMIT_MB = 100  # лимит Яндекс.Игр на размер архива
+errors = []
+if not has_index:
+    errors.append('index.html не в корне архива — площадка такой архив не примет')
+if bad_paths:
+    errors.append('пути с пробелами или не-ASCII: ' + ', '.join(bad_paths[:5]))
+if size_mb > LIMIT_MB:
+    errors.append('архив %.1f МБ — больше лимита %d МБ' % (size_mb, LIMIT_MB))
+if errors:
+    raise SystemExit('\nАРХИВ НЕ ГОДЕН:\n' + '\n'.join('  - ' + e for e in errors))
+print('OK: архив пригоден к заливке')

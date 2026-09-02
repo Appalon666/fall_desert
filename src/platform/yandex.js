@@ -17,8 +17,11 @@ class YandexPlatform {
     this.player = null
     this.lb = null
     this._initP = null
+    this._pendingScore = undefined // рекорд, ждущий готовности SDK (см. submitScore)
     this._lastCloud = 0
     this._lastAd = Date.now() // не показываем межстраничную сразу после загрузки
+    this._reviewAsked = false // оценку игры платформа разрешает просить раз за сессию
+    this._reviewSent = false
   }
 
   init() {
@@ -39,15 +42,56 @@ class YandexPlatform {
       this.ya = await window.YaGames.init()
       this.available = true
       try { this.player = await this.ya.getPlayer({ scopes: false }) } catch (e) { this.player = null }
-      // Новый API — ysdk.leaderboards; getLeaderboards() оставлен как запасной.
-      try { this.lb = this.ya.leaderboards || await this.ya.getLeaderboards() } catch (e) { this.lb = null }
+      this.lb = await this._resolveLeaderboards()
       // Догоняем вызовы, сделанные до готовности SDK (см. _flushPlatformState).
       this._flushPlatformState()
+      this._flushScore() // и рекорд, если игрок успел закончить вылазку раньше
       return true
     } catch (e) {
       this.available = false
       return false
     }
+  }
+
+  // ЭТО МЕСТО И ЛОМАЛО ТАБЛИЦУ. У SDK две несовместимые версии API лидербордов,
+  // и различаются они не только способом получения объекта, но и ИМЕНАМИ МЕТОДОВ:
+  //
+  //   ysdk.leaderboards        (новый)  → setScore / getEntries
+  //   ysdk.getLeaderboards()   (старый) → setLeaderboardScore / getLeaderboardEntries
+  //
+  // Раньше здесь стояло `this.ya.leaderboards || await this.ya.getLeaderboards()`,
+  // а вызывались на результате СТАРЫЕ имена. Свойство ysdk.leaderboards истинное,
+  // поэтому забиралось всегда — и каждый вызов падал в TypeError, который молча
+  // съедался catch'ем: рекорд не отправлялся, таблица приходила как «недоступна».
+  // Снаружи это выглядело как «лидерборда нет», хотя он был заведён правильно.
+  //
+  // Старый метод вдобавок объявлен устаревшим и сыплет ошибкой в консоль, поэтому
+  // новый API пробуем первым. Наружу отдаём свой маленький переходник с
+  // постоянными именами — остальному коду знать про версии SDK незачем.
+  _wrapLeaderboards(o) {
+    if (!o) return null
+    if (typeof o.setScore === 'function' && typeof o.getEntries === 'function') {
+      return { setScore: (n, s) => o.setScore(n, s), getEntries: (n, q) => o.getEntries(n, q) }
+    }
+    if (typeof o.setLeaderboardScore === 'function' && typeof o.getLeaderboardEntries === 'function') {
+      return { setScore: (n, s) => o.setLeaderboardScore(n, s), getEntries: (n, q) => o.getLeaderboardEntries(n, q) }
+    }
+    return null
+  }
+
+  async _resolveLeaderboards() {
+    const candidates = [
+      // Свойство может оказаться «тенабельным» — тогда дожидаемся значения.
+      async () => { const o = this.ya.leaderboards; return (o && typeof o.then === 'function') ? await o : o },
+      async () => await this.ya.getLeaderboards(),
+    ]
+    for (const get of candidates) {
+      try {
+        const lb = this._wrapLeaderboards(await get())
+        if (lb) return lb
+      } catch (e) { /* пробуем следующий путь */ }
+    }
+    return null
   }
 
   // Ждём, пока тег из index.html выполнится и объявит window.YaGames.
@@ -157,7 +201,12 @@ class YandexPlatform {
   // Ролик показывается поверх страницы и забирает себе весь ввод, поэтому
   // настоящий клик или нажатие клавиши В ИГРЕ означает, что рекламы на экране
   // уже нет. Снимаем паузу, чего бы там ни намолчал SDK.
+  //
+  // Окно оценки — ровно та же история: оно тоже рисуется платформой поверх игры
+  // и тоже держит паузу до своего промиса. Если этот промис не придёт никогда,
+  // без этой страховки игра осталась бы стоять.
   wakeFromStuckAd() {
+    if (Pause.has(PAUSE.REVIEW)) Pause.remove(PAUSE.REVIEW)
     if (!Pause.has(PAUSE.AD)) return
     this._adEnd()
   }
@@ -208,15 +257,102 @@ class YandexPlatform {
     } catch (e) { this._adEnd() }
   }
 
+  // ---------------- Оценка игры ----------------
+  //
+  // ysdk.feedback: canReview() → { value, reason }, requestReview() → { feedbackSent }.
+  // Два жёстких правила платформы, из-за которых все точки вызова в игре сходятся
+  // в этот шлюз, а не дёргают SDK сами:
+  //   1) requestReview ТОЛЬКО после canReview — иначе SDK отвечает ошибкой
+  //      «use canReview before requestReview»;
+  //   2) не чаще одного запроса за сессию.
+  // Причины отказа (reason): NO_AUTH, GAME_RATED, REVIEW_ALREADY_REQUESTED,
+  // REVIEW_WAS_REQUESTED, UNKNOWN — игре они нужны только для понимания «нельзя»,
+  // поэтому наружу отдаём их как есть и нигде не разбираем.
+
+  // Можно ли сейчас просить оценку. Никогда не бросает: экран лагеря по этому
+  // ответу решает, показывать ли кнопку «оценить».
+  async canReview() {
+    // Свой запрос за сессию мы уже потратили — SDK ответил бы тем же
+    // REVIEW_ALREADY_REQUESTED, но лишний раз ходить в него незачем.
+    if (this._reviewAsked) return { value: false, reason: 'REVIEW_ALREADY_REQUESTED' }
+    const fb = this.ya?.feedback
+    if (!this.available || typeof fb?.canReview !== 'function') return { value: false, reason: 'UNKNOWN' }
+    try {
+      const r = await fb.canReview()
+      return { value: !!r?.value, reason: r?.reason || '' }
+    } catch (e) { return { value: false, reason: 'UNKNOWN' } }
+  }
+
+  // Показать окно оценки. Возвращает true, если окно РЕАЛЬНО открыли, — по этому
+  // ответу вызывающая сторона решает, отдавать ли момент межстраничной рекламе.
+  async requestReview() {
+    if (this._reviewAsked) return false
+    // Поверх рекламного ролика окно не лепим: он и так забрал себе весь экран.
+    if (Pause.has(PAUSE.AD)) return false
+    const { value } = await this.canReview()
+    if (!value) return false
+    this._reviewAsked = true // ровно один запрос за сессию, даже если ниже упадём
+    // Яндекс 4.7: пока поверх игры висит окно платформы, игра не идёт и молчит.
+    Pause.add(PAUSE.REVIEW)
+    let opened = true
+    try {
+      const r = await this.ya.feedback.requestReview()
+      // В документации поле называется feedbackSent, а в примере кода на той же
+      // странице — sentFeedback. Читаем оба: игре важно лишь, оценил игрок или
+      // просто закрыл окно.
+      this._reviewSent = !!(r && (r.feedbackSent ?? r.sentFeedback))
+    } catch (e) {
+      // Окно не открылось — момент свободен, пусть его займёт реклама.
+      opened = false
+      this._reviewSent = false
+    } finally {
+      Pause.remove(PAUSE.REVIEW)
+    }
+    return opened
+  }
+
   // Лидерборды.
+  //
+  // Рекорд отправляется в двух местах — по смерти героя и по кнопке «В лагерь»
+  // (BattleScene). Оба момента могут прийтись на время, когда SDK ещё не доехал:
+  // тогда таблицы (this.lb) просто нет, и рекорд ПРОПАДАЛ насовсем — до
+  // следующего конца вылазки. Поэтому запоминаем лучшее значение и досылаем его,
+  // когда SDK готов (тот же приём, что в _flushPlatformState для LoadingAPI).
   submitScore(value, name = LEADERBOARD) {
-    if (!this.available || !this.lb) return
-    try { this.lb.setLeaderboardScore(name, Math.max(0, Math.floor(value))) } catch (e) { /* */ }
+    const score = Math.floor(value)
+    // NaN/Infinity из битого сейва SDK отвергает, и вместе с ними теряется
+    // вообще вся отправка. Числа держим конечными, как и везде в игре.
+    if (!Number.isFinite(score) || score < 0) return
+    const prev = this._pendingScore
+    this._pendingScore = prev === undefined ? score : Math.max(prev, score)
+    this._pendingName = name
+    return this._flushScore()
+  }
+
+  // Возвращает промис отправки — экран рекордов ждёт его, чтобы прочитать
+  // таблицу уже со своим результатом, а не на кадр раньше.
+  _flushScore() {
+    if (this._pendingScore === undefined) return Promise.resolve()
+    if (!this.available || !this.lb) return Promise.resolve() // SDK не готов — досылаем из _doInit
+    const score = this._pendingScore
+    const name = this._pendingName || LEADERBOARD
+    this._pendingScore = undefined
+    // setLeaderboardScore возвращает ПРОМИС. Прежний try/catch ловил только
+    // синхронный бросок, а настоящий отказ (нет таблицы с таким id, игрок не
+    // авторизован, сеть) приходил отклонением промиса — мимо catch, в
+    // unhandled rejection. Отправка могла падать каждый раз, и снаружи это
+    // выглядело просто как «рекорд не появился».
+    try {
+      const p = this.lb.setScore(name, score)
+      return (p && typeof p.catch === 'function')
+        ? p.catch(() => { /* таблица недоступна */ })
+        : Promise.resolve()
+    } catch (e) { return Promise.resolve() }
   }
   async getEntries(name = LEADERBOARD) {
     if (!this.available || !this.lb) return null
     try {
-      return await this.lb.getLeaderboardEntries(name, { quantityTop: 10, includeUser: true, quantityAround: 3 })
+      return await this.lb.getEntries(name, { quantityTop: 10, includeUser: true, quantityAround: 3 })
     } catch (e) { return null }
   }
 }

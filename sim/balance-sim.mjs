@@ -12,7 +12,7 @@ import { getZone, zoneHpMul } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
 import { CLASSES, CLASS_BY_ID } from '../src/data/classes.js'
-import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../src/data/progression.js'
+import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill, spawnGap, spawnBatchMax } from '../src/data/progression.js'
 import { pathToFileURL } from 'node:url'
 
 const SESSION = process.env.SIM_SECONDS ? +process.env.SIM_SECONDS : 1200 // сек за прогон (env: SIM_SECONDS)
@@ -135,7 +135,8 @@ function runOne(classId, rng) {
   // BAL.spawnGapMin/Max, не дожидаясь зачистки. Одновременно на арене их не
   // больше enemiesInWave() — не успеваешь, поток упирается в потолок и ждёт.
   let wave = []          // живые враги на арене
-  const GAP = (BAL.spawnGapMin + BAL.spawnGapMax) / 2000 // средний интервал, сек
+  // Интервал и размер пачки берём из progression.js — той же формулой, что и бой.
+  const gapSec = () => { const g = spawnGap(st.zoneIndex); return (g.min + g.max) / 2000 }
   let spawned = 0        // всего выпущено за бой (для нарастания сложности)
   const WAVE_EVERY = 5   // каждые столько выпущенных считаем «волной» (+1%)
 
@@ -161,7 +162,11 @@ function runOne(classId, rng) {
   function spawnTick() {
     if (st.bossActive) return
     if (bossDue(st.killsInZone)) { st.bossActive = true; pushEnemy(true); return }
-    if (wave.length < enemiesInWave(st.zoneIndex, st.killsInZone)) pushEnemy(false)
+    // Пачкой, как и в бою: сколько влезет до потолка арены.
+    const room = enemiesInWave(st.zoneIndex, st.killsInZone) - wave.length
+    const lo = BAL.spawnBatchBase, hi = spawnBatchMax(st.zoneIndex)
+    const want = lo + Math.floor(rng() * (hi - lo + 1))
+    for (let k = 0; k < Math.min(want, room); k++) pushEnemy(false)
   }
   function killFront(front) {
     st.caps += Math.ceil(front.reward * (1 + capsBonus()))
@@ -183,9 +188,9 @@ function runOne(classId, rng) {
   spawnTick()
 
   for (let t = 0; t < SESSION; t += DT) {
-    if (t >= nextSpawn) { spawnTick(); nextSpawn = t + GAP }
+    if (t >= nextSpawn) { spawnTick(); nextSpawn = t + gapSec() }
     // Арена опустела раньше тика — как и в бою, не заставляем ждать впустую.
-    if (wave.length === 0) { spawnTick(); nextSpawn = t + GAP }
+    if (wave.length === 0) { spawnTick(); nextSpawn = t + gapSec() }
     // фокус-огонь по переднему живому (wave[0] — он же цель пробития ниже)
     clickAccum += cps * acc * DT
     while (clickAccum >= 1 && wave.length) {
@@ -295,14 +300,28 @@ const gbttk = median(all.map(r => r.bossTtkEnd))
 const early = median(all.map(r => r.earlyRate))
 const late = median(all.map(r => r.lateRate))
 console.log('\n--- Диагностика ---')
-console.log(`Медиана зон достигнуто за 20 мин: ${gz}   (цель: 3-6 — темп ограничен ещё и потоком врагов, см. BAL.spawnGapMin/Max)`)
-console.log(`Медиана смертей: ${gd}   (цель: 1-5, риск есть, но не спираль)`)
-console.log(`TTK обычного врага в конце: ${gttk.toFixed(1)}s   (цель: 0.6-3s)`)
-console.log(`TTK босса зоны в конце: ${gbttk.toFixed(1)}s   (цель: 4-15s)`)
-console.log(`Попаданий кликом на рядового врага: ${median(all.map(r => r.hitsEnd)).toFixed(1)}   (цель: 3-8 — сильный герой, но не ваншот)`)
-console.log(`Попаданий кликом на босса: ${median(all.map(r => r.bossHitsEnd)).toFixed(0)}   (цель: 15-45)`)
+// Раньше коридор был просто текстом в скобках, и сверять его приходилось глазами.
+// Так и уезжало незамеченным: значение выходило за границу на несколько процентов,
+// в логе всё выглядело «как обычно». Теперь выход из коридора помечается явно.
+// Ронять прогон не даём намеренно — это инструмент настройки, а не тест: коридоры
+// подбираются под ощущения, и «чуть за краем» ещё не значит «сломано».
+const outOfBand = []
+const band = (label, value, lo, hi, fmtV = v => v.toFixed(1), note = '') => {
+  const bad = value < lo || value > hi
+  if (bad) outOfBand.push(`${label}: ${fmtV(value)} вне ${fmtV(lo)}–${fmtV(hi)}`)
+  console.log(`${label}: ${fmtV(value)}   (цель: ${fmtV(lo)}-${fmtV(hi)}${note})${bad ? '   ⚠️ ВНЕ КОРИДОРА' : ''}`)
+}
+const int = v => String(Math.round(v))
+band('Медиана зон достигнуто за 20 мин', gz, 3, 6, int, ' — темп ограничен ещё и потоком врагов, см. BAL.spawnGapMin/Max')
+band('Медиана смертей', gd, 1, 5, int, ', риск есть, но не спираль')
+band('TTK обычного врага в конце', gttk, 0.6, 3, v => `${v.toFixed(1)}s`)
+band('TTK босса зоны в конце', gbttk, 4, 15, v => `${v.toFixed(1)}s`)
+band('Попаданий кликом на рядового врага', median(all.map(r => r.hitsEnd)), 3, 8, v => v.toFixed(1), ' — сильный герой, но не ваншот')
+band('Попаданий кликом на босса', median(all.map(r => r.bossHitsEnd)), 15, 45, int)
 console.log(`Темп ранний/поздний (kills/сек): ${early.toFixed(2)} / ${late.toFixed(2)}`)
 console.log(`Стагнация: ${late < early * 0.4 ? '⚠️ ДА' : 'нет'}`)
-console.log(`Макс. крышки (читаемость чисел): ${fmt(Math.max(...all.map(r => r.caps)))}   (не должно быть ∞/e+30)`)
+const maxCaps = Math.max(...all.map(r => r.caps))
+console.log(`Макс. крышки (читаемость чисел): ${fmt(maxCaps)}${Number.isFinite(maxCaps) ? '' : '   ⚠️ ПЕРЕПОЛНЕНИЕ'}   (не должно быть ∞/e+30)`)
+if (outOfBand.length) console.log('\n⚠️ Вне целевых коридоров:\n' + outOfBand.map(s => '  - ' + s).join('\n'))
 
 }

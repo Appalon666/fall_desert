@@ -164,14 +164,14 @@ const EN = {
   'Богатая': 'Rich', 'Бронированная': 'Armored', 'Шустрая': 'Swift', 'Ядрёная': 'Nuclear',
   // — характеристики героя —
   'Сила': 'Strength', 'Живучесть': 'Vitality', 'Удача': 'Luck',
-  '+2 к урону клика': '+2 click damage', '+25 к макс. HP': '+25 max HP',
+  '+2 к урону клика': '+2 click damage', '+30 к макс. HP': '+30 max HP',
   '+1% крит и лучше лут': '+1% crit and better loot',
   // — престиж-бонусы —
   'Наследие бойца': 'Fighter’s Legacy', 'Схрон': 'Stash',
   'Крепкий род': 'Hardy Bloodline', 'Быстрый старт': 'Quick Start',
-  '+10% урон клика за уровень': '+10% click damage per level',
-  '+10% крышек за уровень': '+10% caps per level',
-  '+8% макс. HP за уровень': '+8% max HP per level',
+  '+20% урон клика за уровень': '+20% click damage per level',
+  '+20% крышек за уровень': '+20% caps per level',
+  '+15% макс. HP за уровень': '+15% max HP per level',
   '+300 крышек и +1 ур. «Калибра» на старте за уровень':
     '+300 caps and +1 Caliber level at start, per level',
 
@@ -204,6 +204,8 @@ const EN = {
   'Загрузка таблицы…': 'Loading leaderboard…',
   'Онлайн-таблица доступна в версии на Яндекс.Играх.\nЗдесь — твой личный рекорд.':
     'Online leaderboard is available in the Yandex Games version.\nHere — your personal best.',
+  'В таблице пока пусто.\nТвой рекорд отправлен — загляни позже.':
+    'The leaderboard is still empty.\nYour score has been sent — check back later.',
   'Аноним': 'Anonymous',
   // — Hero —
   'ГЕРОЙ': 'HERO',

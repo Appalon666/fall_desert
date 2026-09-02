@@ -8,7 +8,7 @@ import { ENEMIES, ENEMY_IDS } from '../src/data/enemies.js'
 import { BOSSES, BOSS_IDS, defOf, sheetKey, isBossId } from '../src/data/bosses.js'
 import { setLang, t, itemName } from '../src/i18n.js'
 import { readFileSync } from 'node:fs'
-import { RARITIES, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID } from '../src/data/loot.js'
+import { RARITIES, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID, ITEM_LEVEL_CAP } from '../src/data/loot.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { fmt, fmtDuration } from '../src/util/format.js'
 
@@ -201,6 +201,21 @@ describe('loot', () => {
     const relic = scrapValue({ rarity: 'relic', level: 10 })
     expect(common).toBeGreaterThan(0)
     expect(relic).toBeGreaterThan(common)
+  })
+  it('scrapValue упирается в тот же потолок уровня, что и сила предмета', () => {
+    // Уровень предмета растёт линейно от убийств и не ограничен, а цены на
+    // верстаке фиксированные: без потолка серый хлам с глубины давал сотни
+    // металлолома, и «Мастерская ковка» становилась бесплатной.
+    const atCap = scrapValue({ rarity: 'common', level: ITEM_LEVEL_CAP })
+    for (const lv of [ITEM_LEVEL_CAP + 1, 500, 5000, 1e6]) {
+      expect(scrapValue({ rarity: 'common', level: lv }), `уровень ${lv}`).toBe(atCap)
+    }
+    // самый дорогой тир крафта по-прежнему стоит десятков разобранных вещей
+    const top = CRAFT_TIERS[CRAFT_TIERS.length - 1]
+    expect(top.cost / atCap).toBeGreaterThan(50)
+  })
+  it('scrapValue не ломается на предмете без level', () => {
+    expect(scrapValue({ rarity: 'common' })).toBeGreaterThan(0)
   })
   it('тиры крафта отсортированы по цене', () => {
     for (let i = 1; i < CRAFT_TIERS.length; i++) {

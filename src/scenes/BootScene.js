@@ -65,13 +65,22 @@ export default class BootScene extends Phaser.Scene {
   // Инициализация платформы (Яндекс), загрузка облачного сейва, старт игры.
   boot() {
     let done = false
-    const proceed = () => {
+    // cloudSettled — успело ли облако ответить ДО старта игры.
+    //
+    // Флаг _started закрывает применение облачного сейва (см. GameState.applyCloud).
+    // Раньше он взводился и на пути сторожевого таймера: на медленной сети SDK не
+    // укладывался в 3.5 секунды, игра стартовала, приехавший следом облачный сейв
+    // молча отбрасывался — а первое же сохранение затирало им же облако. То есть
+    // на новом устройстве игрок с плохой связью терял весь прогресс НАВСЕГДА.
+    // Теперь по сторожу флаг остаётся снятым: облако ещё сможет догнать, а от
+    // затирания активной игры защищает сравнение прогресса внутри applyCloud.
+    const proceed = (cloudSettled) => {
       if (done) return
       done = true
       setPreloaderProgress(1)
       hidePreloader()
       setLang(Platform.lang()) // язык из Яндекс SDK (или браузера) до старта сцен
-      State._started = true // с этого момента позднее облако не затирает сессию
+      State._started = cloudSettled
       Platform.ready()
       // Первый вход без класса — на экран выбора класса, иначе в лагерь.
       // launch (а не start): BootScene остаётся жить и догружает музыку фоном.
@@ -80,12 +89,18 @@ export default class BootScene extends Phaser.Scene {
     }
     // Сторож на setTimeout, а не на таймере сцены: сцена может стоять на паузе
     // (вкладка свёрнута), и тогда таймер сцены не тикает, а игра не стартует.
-    const safety = setTimeout(proceed, 3500) // не зависаем, если SDK молчит
+    const safety = setTimeout(() => proceed(false), 3500) // не зависаем, если SDK молчит
     Platform.init()
       .then(() => Platform.loadCloud())
       .then((cloud) => { if (cloud) State.applyCloud(cloud) })
       .catch(() => { /* нет SDK — работаем локально */ })
-      .finally(() => { clearTimeout(safety); proceed() })
+      .finally(() => {
+        clearTimeout(safety)
+        // Облако отработало (успешно или нет) — окно для позднего применения
+        // закрыто в любом случае, даже если игра уже стартовала по сторожу.
+        State._started = true
+        proceed(true)
+      })
   }
 
   // Иконки разделов и музыка (~4 МБ) догружаются уже во время игры: до первого
