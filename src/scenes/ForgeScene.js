@@ -6,7 +6,7 @@ import { GAME, COLORS, CSS, SCENES } from '../config.js'
 import { State } from '../state/GameState.js'
 import { CRAFT_TIERS, RARITIES, RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
-import { buildBackground, titleText, applyPostFX, panel, resIcon } from '../ui/scenery.js'
+import { buildBackground, titleText, applyPostFX, panel, resIcon, itemIcon } from '../ui/scenery.js'
 import { Sfx } from '../audio/sfx.js'
 import { t, itemName } from '../i18n.js'
 import { fmt } from '../util/format.js'
@@ -106,7 +106,9 @@ export default class ForgeScene extends Phaser.Scene {
     // иначе фон результата улетает в левый верхний угол сцены.
     const bg = panel(this, -w / 2, -h / 2, w, h, { radius: 10, fill: 0x241d15, border: rar.color, borderW: 3 })
     const glow = this.add.image(0, 0, 'tex-glow').setTint(rar.color).setAlpha(0.35).setScale(4, 2).setBlendMode('ADD')
-    const icon = this.add.text(-w / 2 + 30, 0, slot.icon, { fontSize: '38px' }).setOrigin(0.5)
+    // Иконка — тот же арт, что игрок увидит в инвентаре (эмодзи слота остаётся
+    // фолбэком, если лист иконок ещё не доехал).
+    const icon = itemIcon(this, -w / 2 + 30, 0, item, slot.icon, 38, item.slot, 0.5)
     const name = this.add.text(-w / 2 + 62, -16, itemName(item.name), { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: rar.css, fontStyle: 'bold' }).setOrigin(0, 0.5)
     const sub = this.add.text(-w / 2 + 62, 12, `${t(slot.name)} · ${t(rar.name)} · ${statText(item)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '14px', color: '#ddd2b4' }).setOrigin(0, 0.5)
     const tag = this.add.text(w / 2 - 20, 0, t('скован!'), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic }).setOrigin(1, 0.5)

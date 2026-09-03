@@ -109,6 +109,13 @@ export function weaponTexKey(item) {
 export const RARITY_BY_ID = Object.fromEntries(RARITIES.map(r => [r.id, r]))
 export const SLOT_BY_ID = Object.fromEntries(SLOTS.map(s => [s.id, s]))
 
+// Цена продажи предмета в крышках. Живёт рядом со scrapValue, потому что оба
+// нужны инвентарю ещё и ДО действия: массовые «продать всё» / «в лом» обязаны
+// показать в подтверждении, сколько именно игрок получит.
+export function sellValue(item) {
+  return 10 + (item.level || 1) * 3
+}
+
 // Сколько металлолома даёт разбор предмета (по редкости и уровню).
 //
 // Уровень режем тем же потолком ITEM_LEVEL_CAP, что и силу предмета. Без этого

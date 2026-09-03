@@ -225,9 +225,11 @@ export default class HubScene extends Phaser.Scene {
         ['slot-weapon', '🎁', 'С врагов падает снаряга — надевай в «Инвентаре»'],
         ['res-scrap', '⚒', 'Лишнее разбирай в металлолом и куй новое на «Верстаке»'],
         ['up-damage', '🦸', 'За уровни дают очки: Сила, Живучесть, Удача'],
+        ['', '⚙', 'Босс 10-й локации роняет части реликвии — собери 5 и куй'],
         ['res-core', '☢', 'После 4-й локации откроется Перерождение — вечные бонусы'],
       ]
-      let y = cy - h / 2 + 110
+      // Шаг ужат с 68 до 62: пятая строка (реликвии) иначе налезает на кнопки.
+      let y = cy - h / 2 + 104
       for (const [iconKey, emoji, text] of rows) {
         const em = this.textures.exists(iconKey)
           ? this.add.image(cx - 330, y, iconKey).setDisplaySize(40, 40).setOrigin(0.5).setDepth(92)
@@ -236,7 +238,7 @@ export default class HubScene extends Phaser.Scene {
           fontFamily: 'Rubik, sans-serif', fontSize: '19px', color: CSS.paper, wordWrap: { width: 600 },
         }).setOrigin(0, 0.5).setDepth(92)
         page.push(em, tx)
-        y += 68
+        y += 62
       }
       footer('← Назад', page1)
     }

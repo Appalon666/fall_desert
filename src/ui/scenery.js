@@ -2,6 +2,7 @@
 // Используется всеми сценами для единого «чистового» вида.
 
 import { GAME, COLORS, CSS, TEX } from '../config.js'
+import { weaponTexKey } from '../data/loot.js'
 
 export function darken(c, f) {
   const r = Math.floor((c >> 16 & 255) * f)
@@ -157,4 +158,20 @@ export function titleText(scene, x, y, text, opts = {}) {
     stroke: '#120d09', strokeThickness: Math.max(3, size / 8),
     shadow: { offsetX: 0, offsetY: 3, color: '#000', blur: 6, fill: true },
   }).setOrigin(0.5)
+}
+
+// Иконка предмета: арт оружия (по wtype) → иконка слота → эмодзи-фолбэк.
+// Живёт здесь, а не в инвентаре: тот же предмет показывают ещё и верстак
+// (результат ковки) — иначе один экран рисует арт, а другой эмодзи.
+export function itemIcon(scene, x, y, item, fallbackIcon, px, slotKey, origin = 0) {
+  const base = (slotKey === 'acc1' || slotKey === 'acc2') ? 'accessory' : slotKey
+  let key = weaponTexKey(item)
+  if (!key && base && scene.textures.exists(`slot-${base}`)) key = `slot-${base}`
+  if (key && scene.textures.exists(key)) {
+    const img = scene.add.image(x, y, key).setOrigin(origin, 0.5)
+    const src = scene.textures.get(key).getSourceImage()
+    img.setScale(px / Math.max(src.width, src.height))
+    return img
+  }
+  return scene.add.text(x, y, fallbackIcon, { fontSize: `${px}px` }).setOrigin(origin, 0.5)
 }

@@ -15,7 +15,7 @@ import { fmt } from '../util/format.js'
 const STATS = [
   { id: 'str',  name: 'Сила',      icon: '💪', desc: '+2 к урону клика' },
   { id: 'vit',  name: 'Живучесть', icon: '❤️', desc: '+30 к макс. HP' },
-  { id: 'luck', name: 'Удача',     icon: '🍀', desc: '+1% крит и лучше лут' },
+  { id: 'luck', name: 'Удача',     icon: '🍀', desc: '+1% крит (сверх потолка — крит-урон) и лучше лут' },
 ]
 
 export default class HeroScene extends Phaser.Scene {
@@ -90,7 +90,7 @@ export default class HeroScene extends Phaser.Scene {
     const summary = this.add.text(cx, y + 20, [
       t('Урон клика: {n}', { n: fmt(State.clickDamage(false)) }),
       t('Макс. HP: {n}', { n: fmt(State.heroMaxHp()) }),
-      t('Крит: {n}%', { n: (State.critChance() * 100).toFixed(0) }),
+      t('Крит: {n}% ×{m}', { n: (State.critChance() * 100).toFixed(0), m: State.critMultiplier().toFixed(2) }),
       t('Урон союзников: {n}/сек', { n: fmt(State.allyDps()) }),
     ].join('     '), { fontFamily: 'monospace', fontSize: '16px', color: '#e8ddc0' }).setOrigin(0.5)
     this.uiObjs.push(summary)

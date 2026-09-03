@@ -7,7 +7,7 @@ import { BAL } from '../data/balance.js'
 import { UPGRADES, upgradeCost } from '../data/upgrades.js'
 import { ALLIES, allyCost } from '../data/allies.js'
 import { CLASS_BY_ID } from '../data/classes.js'
-import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, CRAFT_TIERS, weaponStyleFor, itemPower, ITEM_LEVEL_CAP } from '../data/loot.js'
+import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, sellValue, CRAFT_TIERS, weaponStyleFor, itemPower, ITEM_LEVEL_CAP } from '../data/loot.js'
 import { RELIC_PART_IDS, RELIC_PART_BY_ID, RELIC_DUPE_SCRAP } from '../data/relics.js'
 import { zoneHpMul } from '../data/zones.js'
 import { zoneKillsFor } from '../data/progression.js'
@@ -50,6 +50,14 @@ export class GameState extends Emitter {
     this.killsInZone = 0
     this.totalKills = 0
     this.waveCount = 0      // сколько волн выпущено за забег (+1% к врагам за волну)
+    // Крышки, добытые в ТЕКУЩЕЙ локации, — из них считается награда окна
+    // «локация взята» (×2 за ролик). Копим отдельно от caps: продажа хлама
+    // в лагере или офлайн-доход не должны раздувать эту награду.
+    this.capsInZone = 0
+    this.lastZoneCaps = 0   // сколько было в предыдущей — окно читает уже после сброса
+    // Убийства, сделанные на глубине (с локации BAL.deepZoneStart) — база
+    // глубинного рампа. Считаем отдельно от totalKills: см. deepZoneMul.
+    this.deepKills = 0
     this.bossActive = false // идёт бой с боссом-воротами зоны
     // престиж (сохраняется между перерождениями)
     this.cores = 0
@@ -84,6 +92,9 @@ export class GameState extends Emitter {
     this.killsInZone = 0
     this.totalKills = 0
     this.waveCount = 0
+    this.capsInZone = 0
+    this.lastZoneCaps = 0
+    this.deepKills = 0
     this.bossActive = false
     this.hp = this.heroMaxHp()
     this.combo = 0
@@ -184,6 +195,19 @@ export class GameState extends Emitter {
     const tail = Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap))
     return ramp * tail * zoneHpMul(this.zoneIndex)
   }
+  // Глубинный рамп — две составляющие, которые перемножаются (см. BAL.deepZoneStart):
+  // ступенька за каждую локацию плюс ровный рост по убийствам ВНУТРИ локации.
+  // Убийства считает свой счётчик (deepKills), а не totalKills: иначе на входе
+  // в 30-ю локацию накопленного за забег хватило бы сразу на ×19.
+  onDeepZone() { return (this.zoneIndex + 1) >= BAL.deepZoneStart }
+  deepZoneLevels() { return Math.max(0, (this.zoneIndex + 1) - BAL.deepZoneStart) }
+  deepZoneSteps() { return Math.floor(this.deepKills / BAL.deepKillStep) }
+  deepZoneMul() {
+    return Math.pow(BAL.deepZoneRamp, this.deepZoneLevels())
+      * Math.pow(BAL.deepKillRamp, this.deepZoneSteps())
+  }
+  // Скорость по тому же рампу, но с потолком: см. BAL.deepSpeedCap.
+  deepZoneSpeedMul() { return Math.min(BAL.deepSpeedCap, this.deepZoneMul()) }
   // Нарастание за волну ВНУТРИ зоны: каждая волна +1% (к боссу ~+35%),
   // новая зона обнуляет счётчик (но базовая сложность зоны выше). Так «каждая
   // волна сильнее» ощущается, но не компаундится в абсурд за сотни волн.
@@ -231,11 +255,15 @@ export class GameState extends Emitter {
   }
   // Картечь: доля урона, которую попадание переносит на соседних врагов.
   splashFrac() { return this.upgAdd('splash') }
-  critChance() {
-    return Math.min(0.9,
-      BAL.baseCritChance + this.hero.luck * BAL.perLuckCrit
-      + this.upgAdd('critChance') + this.equipSum('critChance') + this.classBonus('critChance'))
+  // Крит считаем в три шага, потому что вклад сверх потолка не пропадает,
+  // а переливается в крит-УРОН (см. BAL.critChanceCap / critOverflowToMult).
+  critChanceRaw() {
+    return BAL.baseCritChance + this.hero.luck * BAL.perLuckCrit
+      + this.upgAdd('critChance') + this.equipSum('critChance') + this.classBonus('critChance')
   }
+  critChance() { return Math.min(BAL.critChanceCap, this.critChanceRaw()) }
+  critOverflow() { return Math.max(0, this.critChanceRaw() - BAL.critChanceCap) }
+  critMultiplier() { return BAL.critMultiplier + this.critOverflow() * BAL.critOverflowToMult }
   heroMaxHp() {
     const flat = BAL.baseHeroHp + this.hero.vit * BAL.perVitality
     const mul = 1 + this.equipSum('hpMul') + this.classBonus('hpMul') + this.prestigeHpMul()
@@ -273,6 +301,8 @@ export class GameState extends Emitter {
 
   // ---------- экономика ----------
   addCaps(n) { this.caps += n; this.emit('caps') }
+  // Крышки за убийство: те же caps, но с отметкой «добыто в этой локации».
+  addBattleCaps(n) { this.addCaps(n); this.capsInZone += n }
   spend(n) { if (this.caps < n) return false; this.caps -= n; this.emit('caps'); return true }
   buyUpgrade(id) {
     const def = UPGRADES.find(u => u.id === id)
@@ -372,7 +402,7 @@ export class GameState extends Emitter {
     if (idx < 0) return
     const it = this.inventory[idx]
     this.inventory.splice(idx, 1)
-    this.addCaps(10 + (it.level || 1) * 3)
+    this.addCaps(sellValue(it))
     this.emit('inventory'); this.save()
   }
   // Разобрать предмет на металлолом.
@@ -398,6 +428,34 @@ export class GameState extends Emitter {
     if (count) { this.scrap += gained; this.emit('inventory'); this.emit('scrap'); this.save() }
     return { count, gained }
   }
+  // Массовые операции над рюкзаком целиком.
+  //
+  // Экипировка здесь физически недосягаема: equip() ВЫНИМАЕТ предмет из
+  // inventory и кладёт в equipment (а unequip — наоборот), так что «всё» — это
+  // ровно ненадетое. Считаем итог отдельным методом, потому что подтверждение
+  // обязано назвать сумму ДО того, как рюкзак опустеет.
+  bulkValue() {
+    let scrapGain = 0, capsGain = 0
+    for (const it of this.inventory) { scrapGain += scrapValue(it); capsGain += sellValue(it) }
+    return { count: this.inventory.length, scrapGain, capsGain }
+  }
+  scrapAll() {
+    const { count, scrapGain } = this.bulkValue()
+    if (!count) return { count: 0, gained: 0 }
+    this.inventory = []
+    this.scrap += scrapGain
+    this.emit('inventory'); this.emit('scrap'); this.save()
+    return { count, gained: scrapGain }
+  }
+  sellAll() {
+    const { count, capsGain } = this.bulkValue()
+    if (!count) return { count: 0, gained: 0 }
+    this.inventory = []
+    this.addCaps(capsGain)
+    this.emit('inventory'); this.save()
+    return { count, gained: capsGain }
+  }
+
   // Крафт случайного предмета за металлолом; тир задаёт шанс качества (luck).
   craft(tierId) {
     const t = CRAFT_TIERS.find(c => c.id === tierId)
@@ -457,16 +515,23 @@ export class GameState extends Emitter {
   registerKill() {
     this.totalKills++
     this.killsInZone++
+    if (this.onDeepZone()) this.deepKills++
     if (this.totalKills > this.bestScore) this.bestScore = this.totalKills
     this.save()
   }
   // Убит босс-ворота → зона пройдена.
   registerBossKill() {
     this.totalKills++
+    // Босса засчитываем ДО продвижения зоны: он убит ещё в той локации.
+    if (this.onDeepZone()) this.deepKills++
     this.bossActive = false
     this.zoneIndex++
     this.killsInZone = 0
     this.waveCount = 0 // новая зона — ваве-рамп с нуля
+    // Копилку локации закрываем ЗДЕСЬ, а не в бою: награду окна «локация взята»
+    // читают уже после продвижения зоны (см. lastZoneCaps).
+    this.lastZoneCaps = this.capsInZone
+    this.capsInZone = 0
     if (this.totalKills > this.bestScore) this.bestScore = this.totalKills
     this.save()
     this.emit('zone')
@@ -543,6 +608,7 @@ export class GameState extends Emitter {
       equipment: this.equipment, inventory: this.inventory, scrap: this.scrap,
       relicParts: this.relicParts, relicsCrafted: this.relicsCrafted, pendingDeath: this.pendingDeath,
       zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills, waveCount: this.waveCount,
+      capsInZone: this.capsInZone, deepKills: this.deepKills,
       cores: this.cores, prestige: this.prestige, prestigeCount: this.prestigeCount,
       bestScore: this.bestScore, lastSeen: Date.now(),
     }
@@ -601,6 +667,8 @@ export class GameState extends Emitter {
       killsInZone: fin(d.killsInZone),
       totalKills: fin(d.totalKills),
       waveCount: fin(d.waveCount),
+      capsInZone: fin(d.capsInZone),
+      deepKills: fin(d.deepKills),
       cores: fin(d.cores),
       prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0, ...finMap(d.prestige) },
       prestigeCount: fin(d.prestigeCount),

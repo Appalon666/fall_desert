@@ -127,6 +127,7 @@ export default class BattleScene extends Phaser.Scene {
     // был покинут с открытым окном, на новом входе управление осталось бы
     // заблокированным навсегда при пустом экране. Начинаем с чистого флага.
     this._deathModal = null
+    this._zoneModal = null
     // Рекорд на момент входа в бой. bestScore растёт прямо по ходу забега, поэтому
     // «побил ли игрок свой рекорд» узнать на экране смерти уже нельзя — сравнивать
     // не с чем. Запоминаем планку здесь и сверяемся с ней в heroDie.
@@ -165,7 +166,7 @@ export default class BattleScene extends Phaser.Scene {
     this.heroBaseX = hx // якорь для отдачи выстрела — см. shoot()
     this.tweens.add({ targets: this.hero, y: this.hero.y - 6, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.inOut' })
 
-    this.input.on('pointerdown', (p) => { if (this._deathModal || State.hp <= 0) return; if (p.x < this.arenaW) this.shoot(p.x, p.y) })
+    this.input.on('pointerdown', (p) => { if (this._deathModal || this._zoneModal || State.hp <= 0) return; if (p.x < this.arenaW) this.shoot(p.x, p.y) })
     this.input.keyboard.on('keydown-SPACE', () => this.tryUlt())
 
     this.buildAllies()
@@ -482,13 +483,17 @@ export default class BattleScene extends Phaser.Scene {
     // BAL.bossHpMul. Мягчение корнем ^0.6 на глубоких зонах делало боссов слабее
     // обычных врагов — ворота проходились быстрее рядовой волны.
     const prog = State.enemyProgMul()
+    // Глубинный рамп: с локации BAL.deepZoneStart враги крепнут и за каждую
+    // следующую локацию, и за каждые 20 убийств на глубине — +2% к HP, урону и
+    // скорости за то и за другое (у скорости свой потолок).
+    const deep = State.deepZoneMul()
     // Кэпим ИТОГ (base уже закэплен, но множители могут пробить MAX_SAFE → Infinity
     // → неубиваемый враг). Держим числа конечными.
     const MAX = Number.MAX_SAFE_INTEGER
-    const hp = Math.min(MAX, Math.ceil(base.hp * af.hp * mHp * prog * wave))
+    const hp = Math.min(MAX, Math.ceil(base.hp * af.hp * mHp * prog * wave * deep))
     const reward = Math.min(MAX, Math.ceil(base.reward * af.rew))
-    const dmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave)
-    const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd
+    const dmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave * deep)
+    const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd * State.deepZoneSpeedMul()
     // У боссов свой арт со своими пропорциями — берём их собственный scale.
     // BAL.bossScale остаётся запасным для «босса из обычного врага».
     const baseScale = isBoss ? (def.scale > BAL.bossScale ? def.scale : BAL.bossScale) : def.scale
@@ -643,7 +648,7 @@ export default class BattleScene extends Phaser.Scene {
   hitEnemy(e, x, y) {
     const crit = Math.random() < State.critChance()
     let dmg = State.clickDamage()
-    if (crit) dmg *= BAL.critMultiplier
+    if (crit) dmg *= State.critMultiplier() // множитель растёт от перелива крит-шанса
     dmg = Math.max(1, Math.round(dmg))
     e.hp -= dmg
 
@@ -713,7 +718,7 @@ export default class BattleScene extends Phaser.Scene {
     if (idx < 0) return // уже мёртв (двойное попадание в кадре)
     this.enemies.splice(idx, 1)
 
-    State.addCaps(Math.ceil(e.reward * (1 + State.capsBonus())))
+    State.addBattleCaps(Math.ceil(e.reward * (1 + State.capsBonus())))
     if (State.addXp(xpFromKill(State.totalKills))) Sfx.levelup()
     State.ult = Math.min(BAL.ultMax, State.ult + BAL.ultChargePerKill)
     Sfx.kill(); Sfx.cap()
@@ -740,9 +745,10 @@ export default class BattleScene extends Phaser.Scene {
       State.registerBossKill()
       this.applyZoneVisuals()
       this.spawnIndex = 0
-      this.scheduleSpawn() // новая локация — поток обычных врагов снова идёт
       this.cameras.main.flash(300, 40, 60, 20)
-      this.askReviewOrAd()
+      // Поток НЕ перезапускаем здесь: его включит обратно окно взятой локации,
+      // иначе враги набегали бы на героя, пока игрок читает награду.
+      this.showZoneClearModal()
     } else {
       State.registerKill()
     }
@@ -755,6 +761,74 @@ export default class BattleScene extends Phaser.Scene {
       // Арена опустела раньше тика — не заставляем игрока ждать впустую.
       if (this.enemies.length === 0) this.spawnTick()
     }
+  }
+
+  // Окно «локация взята»: передышка с выбором — идти дальше или удвоить
+  // добытые в этой локации крышки за рекламный ролик.
+  //
+  // Почему поток врагов на это время выключен. Окно перехватывает клики
+  // (overlay), а бой продолжается сам: без остановки враги дошли бы до героя и
+  // били его, пока игрок читает награду, — вплоть до смерти на экране победы.
+  // Поэтому арену чистим, а поток запускаем заново уже по кнопке.
+  showZoneClearModal() {
+    if (this._zoneModal) return
+    this.clearEnemies() // внутри и cancelSpawns: поток встаёт до выбора игрока
+    const gain = Math.floor(State.lastZoneCaps)
+    const cx = this.arenaW / 2, cy = GAME.HEIGHT / 2
+    const objs = []
+    const push = (o, d = 86) => { objs.push(o.setDepth(d)); return o }
+    push(this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.72).setOrigin(0).setInteractive(), 85)
+    push(this.add.text(cx, cy - 118, t('ЛОКАЦИЯ ВЗЯТА!'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '34px', color: CSS.toxic, fontStyle: 'bold',
+      stroke: '#120d09', strokeThickness: 5,
+    }).setOrigin(0.5))
+    push(this.add.text(cx, cy - 72, t('Впереди зона {z} · {name}', {
+      z: State.zoneIndex + 1, name: t(this.zone.name),
+    }), { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: CSS.paper }).setOrigin(0.5))
+    if (gain > 0) {
+      push(resIcon(this, cx - 58, cy - 22, 'caps', 38))
+      push(this.add.text(cx - 30, cy - 22, t('Собрано: {n}', { n: fmt(gain) }), {
+        fontFamily: 'Rubik, sans-serif', fontSize: '24px', color: CSS.cap, fontStyle: 'bold',
+      }).setOrigin(0, 0.5))
+    }
+
+    const close = () => {
+      if (!this._zoneModal) return
+      this._zoneModal = null
+      objs.forEach(o => o.destroy())
+    }
+    // Поток врагов новой локации трогаем ровно один раз — из кнопки.
+    const resume = () => { close(); this.spawnTick() }
+
+    if (gain > 0) {
+      // Яндекс 4.5.1: на кнопке rewarded прямо написано, что покажут рекламу.
+      // Сначала close(), потом ролик (см. тот же порядок в лагере,
+      // HubScene.showOfflineReward): showRewarded ставит игру на паузу, и окно,
+      // закрытое после него, оставило бы за собой мёртвый экран.
+      push(createButton(this, cx + 130, cy + 62, {
+        label: t('📺 Реклама: ×2'), width: 250, height: 58, fontSize: 20,
+        color: COLORS.toxicDark, hover: COLORS.toxic,
+        onClick: () => {
+          resume()
+          Platform.showRewarded(() => {
+            State.addCaps(gain)
+            this.floatText(this.arenaW / 2, GAME.HEIGHT / 2, `+${fmt(gain)}`, CSS.cap, 34)
+          })
+        },
+      }))
+      push(createButton(this, cx - 130, cy + 62, {
+        label: t('Идти дальше ⟶'), width: 250, height: 58, fontSize: 20,
+        // Ролик за награду и межстраничная — две рекламы подряд, поэтому
+        // оценку/межстраничную просим только на «мирном» выходе.
+        onClick: () => { resume(); this.askReviewOrAd() },
+      }))
+    } else {
+      push(createButton(this, cx, cy + 62, {
+        label: t('Идти дальше ⟶'), width: 300, height: 58, fontSize: 20,
+        onClick: () => { resume(); this.askReviewOrAd() },
+      }))
+    }
+    this._zoneModal = objs
   }
 
   // Локация взята — лучший момент за весь забег, чтобы спросить оценку.
@@ -800,7 +874,7 @@ export default class BattleScene extends Phaser.Scene {
 
   // ---------------- Ульта (AoE по волне) ----------------
   tryUlt() {
-    if (this._deathModal) return // на экране смерти ульта недоступна
+    if (this._deathModal || this._zoneModal) return // на экране смерти/победы ульта недоступна
     if (State.ult < BAL.ultMax) {
       this.floatText(this.arenaW / 2, 120, t('Ульта не заряжена'), '#ff6a6a', 22)
       return
@@ -1021,7 +1095,7 @@ export default class BattleScene extends Phaser.Scene {
 
     this.statsText.setText([
       t('Урон клика: {n}', { n: fmt(State.clickDamage(false)) }),
-      t('Крит: {n}%', { n: (State.critChance() * 100).toFixed(0) }),
+      t('Крит: {n}% ×{m}', { n: (State.critChance() * 100).toFixed(0), m: State.critMultiplier().toFixed(2) }),
       t('Союзники: {n}/сек', { n: fmt(State.allyDps()) }),
     ].join('\n'))
   }

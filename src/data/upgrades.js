@@ -29,7 +29,7 @@ export const UPGRADES = [
   },
   {
     id: 'crit', name: 'Меткий глаз', icon: '🎯',
-    desc: '+1% шанс крита за уровень',
+    desc: '+1% шанс крита за уровень (сверх потолка — крит-урон)',
     baseCost: 40, costMult: 1.30, kind: 'add', stat: 'critChance', perLevel: 0.01,
   },
 ]

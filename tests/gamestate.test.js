@@ -45,10 +45,175 @@ describe('экономика: апгрейды и союзники', () => {
   })
 })
 
+describe('глубинный рамп', () => {
+  // Рамп считает СВОИ убийства, а не totalKills: иначе на входе в 30-ю локацию
+  // накопленных за забег хватило бы сразу на ×19 — стена вместо рампа.
+  it('до deepZoneStart не работает ни одна из двух составляющих', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.deepZoneStart - 2 // локация номер deepZoneStart-1
+    for (let i = 0; i < 100; i++) st.registerKill()
+    expect(st.deepKills).toBe(0)
+    expect(st.deepZoneLevels()).toBe(0)
+    expect(st.deepZoneMul()).toBe(1)
+    expect(st.deepZoneSpeedMul()).toBe(1)
+  })
+
+  it('за каждую локацию глубже deepZoneStart — +deepZoneRamp', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.deepZoneStart + 9 // десять локаций сверх порога
+    expect(st.deepZoneLevels()).toBe(10)
+    expect(st.deepZoneMul()).toBeCloseTo(Math.pow(BAL.deepZoneRamp, 10), 10)
+  })
+
+  it('за каждые deepKillStep убийств на глубине — +deepKillRamp', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.deepZoneStart - 1 // это и есть локация номер deepZoneStart
+    for (let i = 0; i < BAL.deepKillStep * 3; i++) st.registerKill()
+    expect(st.deepKills).toBe(BAL.deepKillStep * 3)
+    expect(st.deepZoneSteps()).toBe(3)
+    expect(st.deepZoneMul()).toBeCloseTo(Math.pow(BAL.deepKillRamp, 3), 10)
+    st.registerKill() // неполный шаг ступень не двигает
+    expect(st.deepZoneSteps()).toBe(3)
+  })
+
+  // Главное: одно НЕ заменило другое — множители складываются в произведение.
+  it('обе составляющие работают вместе', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.deepZoneStart + 4 // пять локаций сверх порога
+    st.deepKills = BAL.deepKillStep * 7
+    expect(st.deepZoneMul()).toBeCloseTo(
+      Math.pow(BAL.deepZoneRamp, 5) * Math.pow(BAL.deepKillRamp, 7), 10)
+    expect(st.deepZoneMul()).toBeGreaterThan(Math.pow(BAL.deepZoneRamp, 5))
+    expect(st.deepZoneMul()).toBeGreaterThan(Math.pow(BAL.deepKillRamp, 7))
+  })
+
+  it('босс-ворота глубины тоже считаются', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.deepZoneStart - 1
+    st.registerBossKill()
+    expect(st.deepKills).toBe(1)
+  })
+
+  // Скорость — единственное, что нельзя отдавать экспоненте: иначе на глубине
+  // враг пересекает арену быстрее, чем игрок успевает кликнуть.
+  it('скорость упирается в потолок, HP и урон — нет', () => {
+    const st = new GameState()
+    st.zoneIndex = 500
+    st.deepKills = 100000
+    expect(st.deepZoneSpeedMul()).toBe(BAL.deepSpeedCap)
+    expect(st.deepZoneMul()).toBeGreaterThan(BAL.deepSpeedCap)
+  })
+
+  it('счётчик глубины переживает сейв и обнуляется перерождением', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.deepZoneStart - 1
+    for (let i = 0; i < 25; i++) st.registerKill()
+    const clone = new GameState()
+    clone._apply(JSON.parse(JSON.stringify(st.toJSON())))
+    expect(clone.deepKills).toBe(25)
+    st.resetRun()
+    expect(st.deepKills).toBe(0)
+  })
+})
+
+describe('крышки за локацию и награда за ролик', () => {
+  it('копятся только боевые крышки, продажа лута мимо копилки', () => {
+    const st = new GameState()
+    st.addBattleCaps(100)
+    st.addCaps(500) // продажа/офлайн — не «добыто в локации»
+    expect(st.capsInZone).toBe(100)
+    expect(st.caps).toBe(600)
+  })
+  it('взятие локации закрывает копилку и открывает новую', () => {
+    const st = new GameState()
+    st.addBattleCaps(250)
+    st.registerBossKill()
+    expect(st.lastZoneCaps).toBe(250)
+    expect(st.capsInZone).toBe(0)
+    st.addBattleCaps(40)
+    expect(st.capsInZone).toBe(40)
+    expect(st.lastZoneCaps).toBe(250) // прошлая награда не переписана
+  })
+  it('копилка переживает перезагрузку сейва', () => {
+    const st = new GameState()
+    st.addBattleCaps(77)
+    const clone = new GameState()
+    clone._apply(JSON.parse(JSON.stringify(st.toJSON())))
+    expect(clone.capsInZone).toBe(77)
+  })
+})
+
+describe('массовый разбор и продажа рюкзака', () => {
+  const fill = (st) => {
+    for (let i = 0; i < 6; i++) st.addItem(rollItem(Math.random, 5 + i, 0))
+  }
+
+  it('«всё в лом» опустошает рюкзак и даёт обещанный металлолом', () => {
+    const st = new GameState()
+    fill(st)
+    const { count, scrapGain } = st.bulkValue()
+    const before = st.scrap
+    const r = st.scrapAll()
+    expect(r).toEqual({ count, gained: scrapGain })
+    expect(st.inventory).toHaveLength(0)
+    expect(st.scrap - before).toBe(scrapGain)
+  })
+
+  it('«продать всё» опустошает рюкзак и даёт обещанные крышки', () => {
+    const st = new GameState()
+    fill(st)
+    const { count, capsGain } = st.bulkValue()
+    const before = st.caps
+    const r = st.sellAll()
+    expect(r).toEqual({ count, gained: capsGain })
+    expect(st.inventory).toHaveLength(0)
+    expect(st.caps - before).toBe(capsGain)
+  })
+
+  // Главное обещание кнопок: надетое они не трогают.
+  it('надетое не попадает ни в подсчёт, ни под нож', () => {
+    const st = new GameState()
+    fill(st)
+    st.equip(st.inventory[0].uid)
+    const worn = Object.values(st.equipment).filter(Boolean)
+    expect(worn).toHaveLength(1)
+    expect(st.bulkValue().count).toBe(st.inventory.length)
+    st.scrapAll()
+    expect(Object.values(st.equipment).filter(Boolean)).toEqual(worn)
+    expect(st.heroMaxHp()).toBeGreaterThan(0)
+  })
+
+  it('на пустом рюкзаке ничего не начисляют', () => {
+    const st = new GameState()
+    const caps = st.caps, scrap = st.scrap
+    expect(st.scrapAll()).toEqual({ count: 0, gained: 0 })
+    expect(st.sellAll()).toEqual({ count: 0, gained: 0 })
+    expect(st.caps).toBe(caps)
+    expect(st.scrap).toBe(scrap)
+  })
+})
+
 describe('характеристики и крит', () => {
-  it('крит-шанс не превышает 90%', () => {
+  it('крит-шанс не превышает потолок', () => {
     s.hero.luck = 1000
-    expect(s.critChance()).toBeLessThanOrEqual(0.9)
+    expect(s.critChance()).toBeLessThanOrEqual(BAL.critChanceCap)
+  })
+  // Иначе очки удачи после потолка молча пропадают — ровно тот баг, из-за
+  // которого «Крит: 90%» не двигался, а игроку об этом никто не говорил.
+  it('перелив крит-шанса сверх потолка уходит в крит-урон', () => {
+    s.hero.luck = 0
+    expect(s.critOverflow()).toBe(0)
+    expect(s.critMultiplier()).toBeCloseTo(BAL.critMultiplier, 6)
+    const before = s.critMultiplier()
+    s.hero.luck = Math.ceil(BAL.critChanceCap / BAL.perLuckCrit) + 50
+    expect(s.critChance()).toBe(BAL.critChanceCap)
+    expect(s.critOverflow()).toBeGreaterThan(0)
+    expect(s.critMultiplier()).toBeGreaterThan(before)
+    expect(s.critMultiplier()).toBeCloseTo(BAL.critMultiplier + s.critOverflow() * BAL.critOverflowToMult, 6)
+    // и каждое следующее очко удачи продолжает что-то давать
+    const step = s.critMultiplier()
+    s.hero.luck += 1
+    expect(s.critMultiplier()).toBeGreaterThan(step)
   })
   it('комбо-множитель в пределах [1, comboMax]', () => {
     s.combo = 0; expect(s.comboMult()).toBe(1)

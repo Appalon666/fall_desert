@@ -81,9 +81,13 @@ const EN = {
   'Зачистка: {a}/{b}': 'Clear: {a}/{b}',
   'Зачистка: {a}/{b}   ·   Всего убито: {t}': 'Clear: {a}/{b}   ·   Total kills: {t}',
   '{prog}   ·   Всего убито: {t}': '{prog}   ·   Total kills: {t}',
-  // 'Урон клика: {n}' и 'Крит: {n}%' объявлены ниже, в блоке экрана героя —
+  // 'Урон клика: {n}' и 'Крит: {n}% ×{m}' объявлены ниже, в блоке экрана героя —
   // дубли молча перетирали друг друга, поэтому здесь их нет.
   'Союзники: {n}/сек': 'Allies: {n}/sec',
+  'ЛОКАЦИЯ ВЗЯТА!': 'ZONE CLEARED!',
+  'Впереди зона {z} · {name}': 'Next up: zone {z} · {name}',
+  'Собрано: {n}': 'Collected: {n}',
+  'Идти дальше ⟶': 'Push on ⟶',
   '☠  БОСС': '☠  BOSS',
   '☠  БОСС-ВОРОТА': '☠  BOSS GATE',
   '⟵ В лагерь': '⟵ To camp',
@@ -148,7 +152,7 @@ const EN = {
   'Макс. HP ×1.13 за уровень': 'Max HP ×1.13 per level',
   '+25% к урону союзников за уровень': '+25% ally damage per level',
   '+10% урона по врагам рядом с целью за уровень': '+10% splash damage to enemies near the target per level',
-  '+1% шанс крита за уровень': '+1% crit chance per level',
+  '+1% шанс крита за уровень (сверх потолка — крит-урон)': '+1% crit chance per level (past the cap — crit damage)',
   // — лут: редкости/слоты/статы/крафт —
   'Хлам': 'Junk', 'Годное': 'Decent', 'Редкое': 'Rare', 'Легенда': 'Legend', 'Реликвия': 'Relic',
   'Оружие': 'Weapon', 'Шлем': 'Helmet', 'Обувь': 'Boots', 'Аксессуар': 'Accessory',
@@ -165,7 +169,7 @@ const EN = {
   // — характеристики героя —
   'Сила': 'Strength', 'Живучесть': 'Vitality', 'Удача': 'Luck',
   '+2 к урону клика': '+2 click damage', '+30 к макс. HP': '+30 max HP',
-  '+1% крит и лучше лут': '+1% crit and better loot',
+  '+1% крит (сверх потолка — крит-урон) и лучше лут': '+1% crit (past the cap — crit damage) and better loot',
   // — престиж-бонусы —
   'Наследие бойца': 'Fighter’s Legacy', 'Схрон': 'Stash',
   'Крепкий род': 'Hardy Bloodline', 'Быстрый старт': 'Quick Start',
@@ -215,7 +219,7 @@ const EN = {
   'Стереть весь прогресс?\nЭто нельзя отменить.': 'Erase all progress?\nThis cannot be undone.',
   'Стереть': 'Erase',
   'Урон клика: {n}': 'Click dmg: {n}', 'Макс. HP: {n}': 'Max HP: {n}',
-  'Крит: {n}%': 'Crit: {n}%', 'Урон союзников: {n}/сек': 'Ally dmg: {n}/sec',
+  'Крит: {n}% ×{m}': 'Crit: {n}% ×{m}', 'Урон союзников: {n}/сек': 'Ally dmg: {n}/sec',
   // — Inventory / Forge —
   'ИНВЕНТАРЬ': 'INVENTORY', 'ВЕРСТАК': 'WORKBENCH',
   'Экипировка': 'Equipment', 'Рюкзак': 'Backpack', 'Пусто': 'Empty',
@@ -223,7 +227,13 @@ const EN = {
   'Металлолом: {n}': 'Scrap: {n}',
   'Разобрать хлам': 'Scrap junk', 'Скрафтить': 'Craft',
   'Инвентарь пуст — иди на пустошь за лутом!': 'Inventory is empty — go loot the wasteland!',
-  'ДОБЫЧА': 'LOOT', '🔩 Разобрать хлам': '🔩 Scrap junk',
+  'ДОБЫЧА': 'LOOT',
+  '🔩 Хлам и годное': '🔩 Junk & decent', '🔩 Всё в лом': '🔩 Scrap all', '💰 Продать всё': '💰 Sell all',
+  'В рюкзаке пусто — разбирать нечего.': 'The backpack is empty — nothing to clear out.',
+  'Разобрать {n} предметов в металлолом?\nНадетое останется на герое.\nПолучишь 🔩 {g}':
+    'Scrap {n} items for parts?\nEquipped gear stays on the hero.\nYou get 🔩 {g}',
+  'Продать {n} предметов за крышки?\nНадетое останется на герое.\nПолучишь 🍾 {g}':
+    'Sell {n} items for caps?\nEquipped gear stays on the hero.\nYou get 🍾 {g}',
   '— пусто —': '— empty —',
   'От экипировки:  {parts}': 'From gear:  {parts}', 'Экипировка пуста': 'No gear equipped',
   'Пусто. Иди в поход за лутом!': 'Empty. Go raid for loot!',
@@ -239,6 +249,7 @@ const EN = {
   '🔥 Выковать': '🔥 Forge it',
   'Части падают с босса 10-й локации': 'Parts drop from the zone 10 boss',
   'Собери все части — выкуешь случайную реликвию': 'Collect every part to forge a random relic',
+  'Босс 10-й локации роняет части реликвии — собери 5 и куй': 'The zone 10 boss drops relic parts — collect 5 and forge',
   'НАБОР СОБРАН! Кузни реликвию в инвентаре': 'SET COMPLETE! Forge the relic in your inventory',
   '🔩 {part} (повтор) +{n}': '🔩 {part} (duplicate) +{n}',
   '⭐ {name}': '⭐ {name}',

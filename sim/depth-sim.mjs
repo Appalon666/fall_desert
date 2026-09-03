@@ -49,7 +49,7 @@ function runOne(classId, rng) {
       hero: { level: 1, xp: 0, points: 0, str: cls.startStats.str, vit: cls.startStats.vit, luck: cls.startStats.luck },
       upgrades: meta.prestige.quickstart > 0 ? { damage: meta.prestige.quickstart } : {},
       allies: { ...cls.startAllies },
-      zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, bossActive: false, waveCount: 0,
+      zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, bossActive: false, waveCount: 0, deepKills: 0,
     }
     st.hp = heroMaxHp()
   }
@@ -58,7 +58,11 @@ function runOne(classId, rng) {
   const uP = s => UPGRADES.reduce((p, u) => (u.kind === 'pow' && u.stat === s) ? p * Math.pow(u.mul, uL(u.id)) : p, 1)
   const cb = s => cls.bonus[s] || 0
   const comboMult = () => Math.min(BAL.comboMax, 1 + Math.floor(st.combo / BAL.comboHitsPerStep) * BAL.comboStep)
-  const clickHit = () => (BAL.baseClickDamage + st.hero.str * BAL.perStrength) * (1 + uA('clickMul') + cb('clickMul')) * uP('clickPow') * comboMult() * (1 + Math.min(0.9, BAL.baseCritChance + st.hero.luck * BAL.perLuckCrit + uA('critChance') + cb('critChance')) * (BAL.critMultiplier - 1)) * pDmg()
+  const critRaw = () => BAL.baseCritChance + st.hero.luck * BAL.perLuckCrit + uA('critChance') + cb('critChance')
+  // Перелив крит-шанса сверх потолка идёт в множитель — см. GameState.critMultiplier.
+  const critEV = () => 1 + Math.min(BAL.critChanceCap, critRaw())
+    * (BAL.critMultiplier + Math.max(0, critRaw() - BAL.critChanceCap) * BAL.critOverflowToMult - 1)
+  const clickHit = () => (BAL.baseClickDamage + st.hero.str * BAL.perStrength) * (1 + uA('clickMul') + cb('clickMul')) * uP('clickPow') * comboMult() * critEV() * pDmg()
   const heroMaxHp = () => Math.floor((BAL.baseHeroHp + st.hero.vit * BAL.perVitality) * (1 + cb('hpMul') + pHp()) * uP('hpPow'))
   const allyDps = () => { let b = 0; for (const a of ALLIES) b += (st.allies[a.id] || 0) * a.dps; return b * (1 + uA('allyMul') + cb('allyMul')) * uP('allyPow') }
   const capsBonus = () => cb('capsMul') + pCaps()
@@ -106,8 +110,12 @@ function runOne(classId, rng) {
     const prog = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap)) * zoneHpMul(st.zoneIndex)
     const wv = Math.pow(BAL.enemyWaveRamp, st.waveCount)
     const b = enemyStats(def, st.totalKills, boss)
-    const hp = b.hp * af.hp * mHp * prog * wv, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg * wv
-    const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd
+    // Глубинный рамп — тот же, что в бою (см. GameState.deepZoneMul): ступенька
+    // за локацию × рост по убийствам, сделанным на глубине.
+    const deep = Math.pow(BAL.deepZoneRamp, Math.max(0, (st.zoneIndex + 1) - BAL.deepZoneStart))
+      * Math.pow(BAL.deepKillRamp, Math.floor(st.deepKills / BAL.deepKillStep))
+    const hp = b.hp * af.hp * mHp * prog * wv * deep, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg * wv * deep
+    const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd * Math.min(BAL.deepSpeedCap, deep)
     const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed)
     wave.push({ hp, reward, dmg, approach, attackAccum: 0, boss })
     if (!boss) { spawned++; if (spawned % WAVE_EVERY === 0) st.waveCount++ }
@@ -126,6 +134,8 @@ function runOne(classId, rng) {
     st.caps += Math.ceil(e.reward * (1 + capsBonus()))
     st.hero.xp += xpFromKill(st.totalKills)
     while (st.hero.xp >= xpNeed()) { st.hero.xp -= xpNeed(); st.hero.level++; st.hero.points += BAL.pointsPerLevel }
+    // Убийство на глубине — топливо глубинного рампа (см. GameState.registerKill).
+    if ((st.zoneIndex + 1) >= BAL.deepZoneStart) st.deepKills++
     if (e.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
     else { st.totalKills++; st.killsInZone++ }
   }

@@ -5,10 +5,10 @@
 import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
-import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue, weaponTexKey } from '../data/loot.js'
+import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue } from '../data/loot.js'
 import { RELIC_PARTS } from '../data/relics.js'
 import { createButton } from '../ui/Button.js'
-import { buildBackground, titleText, applyPostFX, resIcon } from '../ui/scenery.js'
+import { buildBackground, titleText, applyPostFX, resIcon, itemIcon } from '../ui/scenery.js'
 import { heroScaleFor } from '../assets.js'
 import { Sfx } from '../audio/sfx.js'
 import { t, itemName } from '../i18n.js'
@@ -48,16 +48,70 @@ export default class InventoryScene extends Phaser.Scene {
     this.scrapText = this.add.text(242, 36, '', { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: '#d8d8e0', fontStyle: 'bold' }).setOrigin(0, 0.5)
 
     this.add.text(GAME.WIDTH * 0.72, 74, t('ДОБЫЧА'), { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.toxic, fontStyle: 'bold' }).setOrigin(0.5)
-    // Массовый разбор хлама (серое+зелёное) в металлолом
-    createButton(this, GAME.WIDTH * 0.72, GAME.HEIGHT - 40, {
-      label: t('🔩 Разобрать хлам'), width: 260, height: 52, fontSize: 18, color: COLORS.steelDark, hover: COLORS.steel,
+    // Три массовые операции в ряд под списком добычи. Разбор хлама (серое+
+    // зелёное) идёт без вопросов — терять там нечего; «всё в лом» и «продать
+    // всё» спрашивают, потому что заметают и легенды с реликвиями.
+    // Надетое ни одна из них не трогает: оно лежит не в рюкзаке (см. bulkValue).
+    const bx = GAME.WIDTH * 0.72, by = GAME.HEIGHT - 40, bw = 164
+    createButton(this, bx - bw - 14, by, {
+      label: t('🔩 Хлам и годное'), width: bw, height: 52, fontSize: 15, color: COLORS.steelDark, hover: COLORS.steel,
       onClick: () => { const r = State.scrapAllUpTo(1); if (r.count) Sfx.click(); this.safeRender() },
+    })
+    createButton(this, bx, by, {
+      label: t('🔩 Всё в лом'), width: bw, height: 52, fontSize: 15, color: COLORS.steelDark, hover: COLORS.steel,
+      onClick: () => this.confirmBulk('scrap'),
+    })
+    createButton(this, bx + bw + 14, by, {
+      label: t('💰 Продать всё'), width: bw, height: 52, fontSize: 15, color: COLORS.rust, hover: COLORS.rustLight,
+      onClick: () => this.confirmBulk('sell'),
     })
 
     createButton(this, GAME.WIDTH * 0.28, GAME.HEIGHT - 40, { label: t('⟵ В лагерь'), width: 260, height: 50, onClick: () => this.scene.start(SCENES.HUB) })
 
     this.uiObjs = []
     this.safeRender()
+  }
+
+  // Подтверждение массовой операции. Спрашиваем всегда, даже когда рюкзак
+  // пуст, — молчаливая кнопка выглядит как сломанная; вместо суммы тогда
+  // показываем, что чистить нечего.
+  //
+  // Слои обязательны (тот же приём, что в сбросе прогресса на экране героя):
+  // без depth окно живёт на нулевом слое вместе со списком добычи, и строки
+  // предметов под ним перехватывают клики по «Да».
+  confirmBulk(mode) {
+    if (this._modal) return // второй клик не должен вешать окно поверх окна
+    const cx = GAME.WIDTH / 2, cy = GAME.HEIGHT / 2
+    const { count, scrapGain, capsGain } = State.bulkValue()
+    const gain = mode === 'scrap' ? scrapGain : capsGain
+    const body = count === 0
+      ? t('В рюкзаке пусто — разбирать нечего.')
+      : mode === 'scrap'
+        ? t('Разобрать {n} предметов в металлолом?\nНадетое останется на герое.\nПолучишь 🔩 {g}', { n: count, g: fmt(gain) })
+        : t('Продать {n} предметов за крышки?\nНадетое останется на герое.\nПолучишь 🍾 {g}', { n: count, g: fmt(gain) })
+
+    const objs = []
+    const close = () => { objs.forEach(o => o.destroy()); this._modal = null }
+    this._modal = true
+    objs.push(this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.78).setOrigin(0).setDepth(120).setInteractive())
+    objs.push(this.add.text(cx, cy - 64, body, {
+      fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: '#fff', align: 'center', lineSpacing: 6,
+    }).setOrigin(0.5).setDepth(121))
+    if (count === 0) {
+      objs.push(createButton(this, cx, cy + 40, { label: t('Понятно!'), width: 220, height: 54, onClick: close }).setDepth(122))
+      return
+    }
+    objs.push(createButton(this, cx - 120, cy + 40, {
+      label: mode === 'scrap' ? t('В лом') : t('Продать'), width: 200, height: 54,
+      color: COLORS.blood, hover: 0xc23b3b,
+      onClick: () => {
+        const r = mode === 'scrap' ? State.scrapAll() : State.sellAll()
+        close()
+        if (r.count) Sfx.levelup()
+        this.safeRender()
+      },
+    }).setDepth(122))
+    objs.push(createButton(this, cx + 120, cy + 40, { label: t('Отмена'), width: 200, height: 54, onClick: close }).setDepth(122))
   }
 
   // Отрисовка с защитой: любой сбой не «замораживает» игру — кнопка выхода жива.
@@ -187,18 +241,9 @@ export default class InventoryScene extends Phaser.Scene {
     return parts.length ? t('От экипировки:  {parts}', { parts: parts.join('   ') }) : t('Экипировка пуста')
   }
 
-  // Иконка предмета: арт оружия (по wtype) → иконка слота → эмодзи-фолбэк.
+  // Сама иконка живёт в ui/scenery.js — её делит с верстаком (результат ковки).
   slotIcon(x, y, item, fallbackIcon, px, slotKey) {
-    const base = (slotKey === 'acc1' || slotKey === 'acc2') ? 'accessory' : slotKey
-    let key = weaponTexKey(item)
-    if (!key && base && this.textures.exists(`slot-${base}`)) key = `slot-${base}`
-    if (key && this.textures.exists(key)) {
-      const img = this.add.image(x, y, key).setOrigin(0, 0.5)
-      const src = this.textures.get(key).getSourceImage()
-      img.setScale(px / Math.max(src.width, src.height))
-      return img
-    }
-    return this.add.text(x, y, fallbackIcon, { fontSize: `${px}px` }).setOrigin(0, 0.5)
+    return itemIcon(this, x, y, item, fallbackIcon, px, slotKey)
   }
 
   makeSlot(key, x, y) {
