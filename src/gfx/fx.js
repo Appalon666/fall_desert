@@ -8,6 +8,29 @@
 import { COLORS, TEX } from '../config.js'
 import { resIcon } from '../ui/scenery.js'
 
+// Сообщение поверх всего экрана — например «награда не начислена» после
+// незакрытого до конца ролика. Слой выше модалок (у окна смерти 85-86):
+// обычная всплывашка спряталась бы под их затемнением, и игрок решил бы, что
+// кнопка просто не сработала.
+export function toast(scene, text, color = '#ff9a6a', y = 96) {
+  // Приходит из колбэка рекламы, а он может сработать сильно позже клика (после
+  // сторожа — минутами), когда сцены уже нет.
+  //
+  // Проверяем И paused: Phaser кладёт pause/resume сцены в очередь и применяет
+  // их следующим кадром, поэтому в колбэке «реклама закрылась» сцена ещё
+  // числится приостановленной, хотя жива и через кадр пойдёт. Проверка одной
+  // только isActive() глушила подсказку «награда не начислена» ровно там, где
+  // она и нужна, — сразу после незакрытого ролика.
+  const plugin = scene.scene
+  if (!plugin || !(plugin.isActive() || plugin.isPaused())) return null
+  const o = scene.add.text(scene.scale.width / 2, y, text, {
+    fontFamily: 'Rubik, sans-serif', fontSize: '24px', color, fontStyle: 'bold',
+    align: 'center', stroke: '#120d09', strokeThickness: 5,
+  }).setOrigin(0.5).setDepth(200)
+  scene.tweens.add({ targets: o, y: y - 26, alpha: 0, delay: 1600, duration: 700, onComplete: () => o.destroy() })
+  return o
+}
+
 // Всплывающая надпись (урон, лечение, имя предмета).
 export function floatText(scene, x, y, text, color, size = 22) {
   const t = scene.add.text(x, y, text, {

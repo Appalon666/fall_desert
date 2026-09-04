@@ -7,16 +7,20 @@ import { BAL } from '../data/balance.js'
 import { UPGRADES, upgradeCost } from '../data/upgrades.js'
 import { ALLIES, allyCost } from '../data/allies.js'
 import { CLASS_BY_ID } from '../data/classes.js'
-import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, sellValue, CRAFT_TIERS, weaponStyleFor, itemPower, ITEM_LEVEL_CAP } from '../data/loot.js'
+import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, sellValue, CRAFT_TIERS, weaponStyleFor, itemPower, ITEM_LEVEL_CAP, itemStats } from '../data/loot.js'
 import { RELIC_PART_IDS, RELIC_PART_BY_ID, RELIC_DUPE_SCRAP } from '../data/relics.js'
 import { zoneHpMul } from '../data/zones.js'
-import { zoneKillsFor } from '../data/progression.js'
+import { zoneKillsFor, maxKillsPerSec, MAX_KILLS_PER_SEC } from '../data/progression.js'
+import { deepRampMul, deepRampSpeedMul } from '../data/scaling.js'
 import { Platform } from '../platform/yandex.js'
 
 const SAVE_KEY = 'wasteland_save_v1'
 // С какой пройденной зоны открывается перерождение (см. canPrestige/coresFromRun).
 const PRESTIGE_GATE_ZONE = 4
 const CAPS_PER_DPS = 0.12 // перевод idle-DPS в крышки/сек для офлайн-дохода
+// Допуск проверки рекорда (см. leaderboardScore): пара сотен убийств прощается,
+// чтобы округления, лаги и первый кадр сессии никогда не задели честного игрока.
+const SCORE_SLACK = 200
 // С какой локации игре позволено просить оценку (см. reviewUnlocked).
 // zoneIndex нулевой, поэтому 2 — это третья локация.
 export const REVIEW_MIN_ZONE = 2
@@ -58,6 +62,22 @@ export class GameState extends Emitter {
     // Убийства, сделанные на глубине (с локации BAL.deepZoneStart) — база
     // глубинного рампа. Считаем отдельно от totalKills: см. deepZoneMul.
     this.deepKills = 0
+    // То же самое для второй ступени (с BAL.abyssZoneStart) — свой счётчик,
+    // чтобы вход в 60-ю локацию не выдал сразу весь накопленный множитель.
+    this.abyssKills = 0
+    // Секунды, реально проведённые В БОЮ (тикают в BattleScene.update, то есть
+    // не в лагере и не на паузе). Живут через перерождения, как и bestScore;
+    // обнуляются только сбросом.
+    this.battleSeconds = 0
+    // Сколько убийств игрок ФИЗИЧЕСКИ мог успеть за это время. Копится по той
+    // же секунде, но со скоростью той локации, где игрок в эту секунду был:
+    // на первой поток даёт 2 убийства в секунду, за 60-й — в разы больше.
+    // Это и есть опора проверки рекорда, см. leaderboardScore.
+    this.killBudget = 0
+    // Отметка на входе в сессию (см. leaderboardScore). У чистого состояния она
+    // нулевая; загрузка сейва переставит её в _apply.
+    this._sessionScore = 0
+    this._sessionBudget = 0
     this.bossActive = false // идёт бой с боссом-воротами зоны
     // престиж (сохраняется между перерождениями)
     this.cores = 0
@@ -95,6 +115,10 @@ export class GameState extends Emitter {
     this.capsInZone = 0
     this.lastZoneCaps = 0
     this.deepKills = 0
+    this.abyssKills = 0
+    this.lastItemUid = null
+    // battleSeconds и killBudget перерождение НЕ трогает: они обосновывают
+    // bestScore, а тот тоже живёт через перерождения.
     this.bossActive = false
     this.hp = this.heroMaxHp()
     this.combo = 0
@@ -133,11 +157,15 @@ export class GameState extends Emitter {
     for (const u of UPGRADES) if (u.kind === 'pow' && u.stat === stat) p *= Math.pow(u.mul, this.upgLevel(u.id))
     return p
   }
+  // Сумма бонуса к одному стату со всей надетой экипировки. Предмет несёт
+  // несколько статов (см. STAT_SHARES), поэтому один и тот же предмет попадает
+  // в несколько таких сумм — это и есть смысл смешанных статов.
   equipSum(stat) {
     let s = 0
     for (const key of EQUIP_KEYS) {
-      const it = this.equipment[key]
-      if (it && it.stat === stat) s += it.value
+      for (const st of itemStats(this.equipment[key])) {
+        if (st && st.stat === stat && Number.isFinite(st.value)) s += st.value
+      }
     }
     return s
   }
@@ -195,19 +223,19 @@ export class GameState extends Emitter {
     const tail = Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap))
     return ramp * tail * zoneHpMul(this.zoneIndex)
   }
-  // Глубинный рамп — две составляющие, которые перемножаются (см. BAL.deepZoneStart):
-  // ступенька за каждую локацию плюс ровный рост по убийствам ВНУТРИ локации.
-  // Убийства считает свой счётчик (deepKills), а не totalKills: иначе на входе
-  // в 30-ю локацию накопленного за забег хватило бы сразу на ×19.
+  // Глубинный рамп. Сама формула — в data/scaling.js (её же считают оба
+  // симулятора), здесь только счётчики: у каждой ступени свои убийства, а не
+  // общий totalKills, иначе на входе в 30-ю локацию накопленного за забег
+  // хватило бы сразу на ×19 — стена вместо рампа.
   onDeepZone() { return (this.zoneIndex + 1) >= BAL.deepZoneStart }
+  onAbyssZone() { return (this.zoneIndex + 1) >= BAL.abyssZoneStart }
   deepZoneLevels() { return Math.max(0, (this.zoneIndex + 1) - BAL.deepZoneStart) }
   deepZoneSteps() { return Math.floor(this.deepKills / BAL.deepKillStep) }
-  deepZoneMul() {
-    return Math.pow(BAL.deepZoneRamp, this.deepZoneLevels())
-      * Math.pow(BAL.deepKillRamp, this.deepZoneSteps())
-  }
+  abyssZoneLevels() { return Math.max(0, (this.zoneIndex + 1) - BAL.abyssZoneStart) }
+  abyssZoneSteps() { return Math.floor(this.abyssKills / BAL.abyssKillStep) }
+  deepZoneMul() { return deepRampMul(this.zoneIndex + 1, this.deepKills, this.abyssKills) }
   // Скорость по тому же рампу, но с потолком: см. BAL.deepSpeedCap.
-  deepZoneSpeedMul() { return Math.min(BAL.deepSpeedCap, this.deepZoneMul()) }
+  deepZoneSpeedMul() { return deepRampSpeedMul(this.zoneIndex + 1, this.deepKills, this.abyssKills) }
   // Нарастание за волну ВНУТРИ зоны: каждая волна +1% (к боссу ~+35%),
   // новая зона обнуляет счётчик (но базовая сложность зоны выше). Так «каждая
   // волна сильнее» ощущается, но не компаундится в абсурд за сотни волн.
@@ -289,14 +317,22 @@ export class GameState extends Emitter {
     if (leveled) this.emit('level')
     return leveled
   }
-  spendPoint(stat) {
-    if (this.hero.points <= 0 || !['str', 'vit', 'luck'].includes(stat)) return false
-    this.hero.points--
-    this.hero[stat]++
-    if (stat === 'vit') this.hp = Math.min(this.heroMaxHp(), this.hp + BAL.perVitality)
+  spendPoint(stat) { return this.spendPoints(stat, 1) > 0 }
+
+  // Вложить сразу несколько очков (кнопки «+10» и «MAX» на экране героя).
+  // Возвращает, сколько реально вложено: просить больше, чем есть, можно —
+  // возьмём остаток. Событие и сейв — по разу на всю пачку, а не на каждое
+  // очко: иначе «MAX» на сотне очков это сотня записей в localStorage и облако.
+  spendPoints(stat, n = 1) {
+    if (!['str', 'vit', 'luck'].includes(stat)) return 0
+    const spend = Math.min(Math.floor(n) || 0, this.hero.points)
+    if (spend <= 0) return 0
+    this.hero.points -= spend
+    this.hero[stat] += spend
+    if (stat === 'vit') this.hp = Math.min(this.heroMaxHp(), this.hp + BAL.perVitality * spend)
     this.emit('stats')
     this.save()
-    return true
+    return spend
   }
 
   // ---------- экономика ----------
@@ -369,7 +405,15 @@ export class GameState extends Emitter {
   }
 
   // ---------- лут ----------
-  addItem(it) { this.inventory.push(it); this.emit('inventory') }
+  // Последний добытый предмет. Нужен инвентарю: список показывает шесть строк
+  // из сотен, и без этой пометки свежая вещь (особенно выкованная реликвия)
+  // терялась среди старых — выглядело как «крафт ничего не сделал».
+  // В сейв НЕ пишем: пометка живёт до перезагрузки, дальше она уже не новость.
+  addItem(it) { this.inventory.push(it); this.lastItemUid = it && it.uid; this.emit('inventory') }
+  // Пометка живёт, пока предмет лежит в рюкзаке нетронутым. Без этого надетая, а
+  // потом снятая реликвия возвращалась в список снова «новой» и занимала первую
+  // строку из шести — впереди действительно свежего дропа.
+  _forgetNew(uid) { if (uid && this.lastItemUid === uid) this.lastItemUid = null }
   // В какое гнездо пойдёт предмет данного слота.
   targetKey(slot) {
     if (slot === 'accessory') {
@@ -387,6 +431,7 @@ export class GameState extends Emitter {
     const prev = this.equipment[key]
     this.equipment[key] = it
     this.inventory.splice(idx, 1)
+    this._forgetNew(uid)
     if (prev) this.inventory.push(prev)
     this.emit('inventory'); this.emit('stats'); this.save()
   }
@@ -402,6 +447,7 @@ export class GameState extends Emitter {
     if (idx < 0) return
     const it = this.inventory[idx]
     this.inventory.splice(idx, 1)
+    this._forgetNew(uid)
     this.addCaps(sellValue(it))
     this.emit('inventory'); this.save()
   }
@@ -412,6 +458,7 @@ export class GameState extends Emitter {
     const it = this.inventory[idx]
     const gain = scrapValue(it)
     this.inventory.splice(idx, 1)
+    this._forgetNew(uid)
     this.scrap += gain
     this.emit('inventory'); this.emit('scrap'); this.save()
     return gain
@@ -422,7 +469,7 @@ export class GameState extends Emitter {
     let gained = 0, count = 0
     this.inventory = this.inventory.filter((it) => {
       const rIdx = order.indexOf(it.rarity)
-      if (rIdx >= 0 && rIdx <= maxIdx) { gained += scrapValue(it); count++; return false }
+      if (rIdx >= 0 && rIdx <= maxIdx) { gained += scrapValue(it); count++; this._forgetNew(it.uid); return false }
       return true
     })
     if (count) { this.scrap += gained; this.emit('inventory'); this.emit('scrap'); this.save() }
@@ -443,6 +490,7 @@ export class GameState extends Emitter {
     const { count, scrapGain } = this.bulkValue()
     if (!count) return { count: 0, gained: 0 }
     this.inventory = []
+    this.lastItemUid = null
     this.scrap += scrapGain
     this.emit('inventory'); this.emit('scrap'); this.save()
     return { count, gained: scrapGain }
@@ -451,6 +499,7 @@ export class GameState extends Emitter {
     const { count, capsGain } = this.bulkValue()
     if (!count) return { count: 0, gained: 0 }
     this.inventory = []
+    this.lastItemUid = null
     this.addCaps(capsGain)
     this.emit('inventory'); this.save()
     return { count, gained: capsGain }
@@ -495,7 +544,7 @@ export class GameState extends Emitter {
     this.emit('relic'); this.save()
     return { part: RELIC_PART_BY_ID[id], dupe: false, scrap: 0 }
   }
-  // Ковка: тратит все пять частей, даёт случайную реликвию (оранжевый тир).
+  // Ковка: тратит все пять частей, даёт случайную реликвию (красный тир).
   craftRelic() {
     if (!this.canCraftRelic()) return null
     this.relicParts = this.relicParts.filter(id => !RELIC_PART_IDS.includes(id))
@@ -504,6 +553,51 @@ export class GameState extends Emitter {
     this.addItem(item)
     this.emit('relic'); this.save()
     return item
+  }
+
+  // ---------- защита таблицы рекордов от невозможных результатов ----------
+  //
+  // Лидерборды Яндекса принимают то, что прислал клиент: серверной проверки нет,
+  // и достаточно поправить сейв в localStorage. Совсем это не лечится в принципе
+  // (любой клиентский код можно переписать), но ОТПРАВЛЯТЬ заведомо невозможное
+  // число мы не обязаны.
+  //
+  // Опора — время, реально проведённое в бою. Убийства начисляются ровно там же,
+  // где тикает этот счётчик, и только там, поэтому темп «убийств на секунду боя»
+  // ограничен потоком врагов (MAX_KILLS_PER_SEC). У честного игрока запас только
+  // РАСТЁТ: потолок набегает по 19 в секунду, а убийства — по 9-11.
+  //
+  // Проверок две, и вторая важнее первой:
+  //   1) за всю жизнь — ловит сейв с дорисованным рекордом;
+  //   2) за текущую сессию — ловит скачок ВНУТРИ игры (правка сейва на ходу,
+  //      вызов внутренних функций из консоли). Именно так выглядит «с 33к до
+  //      40к за пару минут»: столько убийств физически не помещается в две
+  //      минуты боя, сколько ни кликай.
+  tickBattleTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return
+    // Отсекаем разовые выбросы delta (вкладка вернулась из фона, лаг): секунда
+    // за кадр — это уже не кадр. Иначе такой выброс дарил бы запас потолку.
+    const dt = Math.min(seconds, 1)
+    this.battleSeconds += dt
+    this.killBudget += dt * maxKillsPerSec(this.zoneIndex)
+  }
+  // Отметка на входе в сессию. Ставится при каждой загрузке состояния: облачный
+  // сейв может доехать позже локального и законно поднять рекорд.
+  _baselineScore() {
+    this._sessionScore = this.bestScore
+    this._sessionBudget = this.killBudget
+  }
+  // Результат для таблицы: bestScore, урезанный до физически возможного.
+  //
+  // Именно УРЕЗАННЫЙ, а не «отказ отправлять»: таблица хранит лучший результат,
+  // поэтому заниженная отправка честному игроку ничего не портит, а сейв с
+  // дорисованными цифрами не даст больше, чем можно было набить руками.
+  leaderboardScore() {
+    const grown = Math.max(0, this.killBudget - this._sessionBudget)
+    const byLife = this.killBudget + SCORE_SLACK
+    const bySession = this._sessionScore + grown + SCORE_SLACK
+    const score = Math.min(this.bestScore, byLife, bySession)
+    return Math.max(0, Math.floor(score))
   }
 
   // ---------- зоны / убийства ----------
@@ -516,6 +610,7 @@ export class GameState extends Emitter {
     this.totalKills++
     this.killsInZone++
     if (this.onDeepZone()) this.deepKills++
+    if (this.onAbyssZone()) this.abyssKills++
     if (this.totalKills > this.bestScore) this.bestScore = this.totalKills
     this.save()
   }
@@ -524,6 +619,7 @@ export class GameState extends Emitter {
     this.totalKills++
     // Босса засчитываем ДО продвижения зоны: он убит ещё в той локации.
     if (this.onDeepZone()) this.deepKills++
+    if (this.onAbyssZone()) this.abyssKills++
     this.bossActive = false
     this.zoneIndex++
     this.killsInZone = 0
@@ -608,7 +704,8 @@ export class GameState extends Emitter {
       equipment: this.equipment, inventory: this.inventory, scrap: this.scrap,
       relicParts: this.relicParts, relicsCrafted: this.relicsCrafted, pendingDeath: this.pendingDeath,
       zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills, waveCount: this.waveCount,
-      capsInZone: this.capsInZone, deepKills: this.deepKills,
+      capsInZone: this.capsInZone, deepKills: this.deepKills, abyssKills: this.abyssKills,
+      battleSeconds: this.battleSeconds, killBudget: this.killBudget,
       cores: this.cores, prestige: this.prestige, prestigeCount: this.prestigeCount,
       bestScore: this.bestScore, lastSeen: Date.now(),
     }
@@ -669,6 +766,14 @@ export class GameState extends Emitter {
       waveCount: fin(d.waveCount),
       capsInZone: fin(d.capsInZone),
       deepKills: fin(d.deepKills),
+      abyssKills: fin(d.abyssKills),
+      battleSeconds: fin(d.battleSeconds) || fin(d.bestScore) / MAX_KILLS_PER_SEC,
+      // Сейвы, сделанные до появления счётчика, поля не знают. Ноль означал бы
+      // «набить это было нельзя» и обнулил бы рекорд всем, кто играет давно,
+      // поэтому старому сейву выдаём бюджет ровно под его нынешний рекорд — не
+      // больше. Дыра тут известная (поле можно удалить руками), её прикрывает
+      // проверка за сессию: расти дальше всё равно можно только по потолку.
+      killBudget: fin(d.killBudget) || fin(d.bestScore),
       cores: fin(d.cores),
       prestige: { legacy: 0, stash: 0, vitality: 0, quickstart: 0, ...finMap(d.prestige) },
       prestigeCount: fin(d.prestigeCount),
@@ -677,24 +782,41 @@ export class GameState extends Emitter {
     })
     this.sanitizeItems()
     this.hp = this.heroMaxHp()
+    this._baselineScore()
   }
 
   // Приводит инвентарь/экипировку к текущей схеме (миграция старых сейвов).
   // Без этого предметы старых версий (напр. slot 'trinket') роняют сцены.
   sanitizeItems() {
     const valid = (it) => it && it.uid && SLOT_BY_ID[it.slot] && RARITY_BY_ID[it.rarity]
-      && it.stat && typeof it.value === 'number'
+      && Array.isArray(it.stats) && it.stats.length > 0
     const remap = (it) => {
       if (it && it.slot === 'trinket') it.slot = 'accessory'
       // Нормализуем level: без него sellItem/scrapValue дают NaN-крышки.
       if (it && !Number.isFinite(it.level)) it.level = 1
+      // Сейвы до смешанных статов несут один стат полем stat/value. Переводим их
+      // в общий список — и НЕ добираем недостающие: старая вещь должна остаться
+      // ровно такой, какой была, иначе загрузка сейва молча усилила бы игрока.
+      if (it && !Array.isArray(it.stats)) {
+        it.stats = it.stat ? [{ stat: it.stat, value: it.value }] : []
+        delete it.stat; delete it.value
+      }
       // Срезаем силу предметов из сейвов, сделанных до потолка ITEM_LEVEL_CAP.
       // Там уровень предмета доходил до тысяч, и один надетый ствол давал
       // +800% к урону — с такой вещью в инвентаре никакой баланс не читается.
+      //
+      // Потолок — ПОЛНАЯ сила тира, без деления на доли. Доли (STAT_SHARES)
+      // задают, сколько кладёт в стат генератор, а не что вообще возможно.
+      // Резать по доле нельзя: у предметов из старых сейвов стат ровно один, и
+      // такой потолок отнял бы у всех, кто уже играет, треть их экипировки
+      // разом — за одну загрузку и без всякой замены.
       const rar = it && RARITY_BY_ID[it.rarity]
-      if (rar && Number.isFinite(it.value)) {
-        const max = itemPower(rar.mul, ITEM_LEVEL_CAP, it.stat === 'critChance')
-        if (it.value > max) it.value = max
+      if (rar && Array.isArray(it.stats)) {
+        it.stats = it.stats.filter(st => st && st.stat && Number.isFinite(st.value))
+        for (const st of it.stats) {
+          const max = itemPower(rar.mul, ITEM_LEVEL_CAP, st.stat === 'critChance')
+          if (st.value > max) st.value = max
+        }
       }
       return it
     }
@@ -716,7 +838,10 @@ export class GameState extends Emitter {
   wipe() {
     try { localStorage.removeItem(SAVE_KEY) } catch (e) { /* */ }
     this.bestScore = 0
+    this.battleSeconds = 0 // вместе с рекордом обнуляем и его обоснование
+    this.killBudget = 0
     this.reset()
+    this._baselineScore()
   }
 }
 

@@ -19,7 +19,7 @@ import {
   loadBosses, bossAssetsReady, buildBossSheets, buildAllySheets,
 } from '../assets.js'
 import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX, resIcon } from '../ui/scenery.js'
-import { floatText, hitSpark, capsBurst, explode, impactRing } from '../gfx/fx.js'
+import { floatText, toast, hitSpark, capsBurst, explode, impactRing } from '../gfx/fx.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
@@ -128,6 +128,10 @@ export default class BattleScene extends Phaser.Scene {
     // заблокированным навсегда при пустом экране. Начинаем с чистого флага.
     this._deathModal = null
     this._zoneModal = null
+    // По той же причине — флаг «уже уходим в лагерь»: он держится, пока крутится
+    // межстраничная реклама, и сцена его переживёт. Не сбросить здесь — и после
+    // возвращения в бой кнопка «В лагерь» больше никогда не сработает.
+    this._leaving = false
     // Рекорд на момент входа в бой. bestScore растёт прямо по ходу забега, поэтому
     // «побил ли игрок свой рекорд» узнать на экране смерти уже нельзя — сравнивать
     // не с чем. Запоминаем планку здесь и сверяемся с ней в heroDie.
@@ -352,9 +356,19 @@ export default class BattleScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '17px', color: '#e8ddc0', lineSpacing: 8,
     }).setOrigin(0))
 
+    // ЕДИНСТВЕННАЯ точка межстраничной рекламы в игре (Яндекс 4.4). Выход из
+    // вылазки в лагерь — неигровое действие, переход в меню: реалтайм-игре с
+    // короткими локациями показ разрешён только на таком действии.
+    // Переход в лагерь ждёт конца ролика (onDone), иначе лагерь ожил бы под
+    // рекламой — со своей музыкой и живыми кнопками (нарушение п.4.7).
     up(createButton(this, cx, GAME.HEIGHT - 52, {
       label: t('⟵ В лагерь'), width: PANEL_W - 44, height: 60, fontSize: 22,
-      onClick: () => { State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.bestScore); this.scene.start(SCENES.HUB) },
+      onClick: () => {
+        if (this._leaving) return // ролик уже идёт — второй клик его не удвоит
+        this._leaving = true
+        State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.leaderboardScore())
+        Platform.showInterstitial(() => this.scene.start(SCENES.HUB))
+      },
     }))
   }
 
@@ -485,7 +499,8 @@ export default class BattleScene extends Phaser.Scene {
     const prog = State.enemyProgMul()
     // Глубинный рамп: с локации BAL.deepZoneStart враги крепнут и за каждую
     // следующую локацию, и за каждые 20 убийств на глубине — +2% к HP, урону и
-    // скорости за то и за другое (у скорости свой потолок).
+    // скорости за то и за другое (у скорости свой потолок). С BAL.abyssZoneStart
+    // сверху ложится вторая такая же ступень по +2.5%, и они перемножаются.
     const deep = State.deepZoneMul()
     // Кэпим ИТОГ (base уже закэплен, но множители могут пробить MAX_SAFE → Infinity
     // → неубиваемый враг). Держим числа конечными.
@@ -810,22 +825,25 @@ export default class BattleScene extends Phaser.Scene {
         color: COLORS.toxicDark, hover: COLORS.toxic,
         onClick: () => {
           resume()
-          Platform.showRewarded(() => {
-            State.addCaps(gain)
-            this.floatText(this.arenaW / 2, GAME.HEIGHT / 2, `+${fmt(gain)}`, CSS.cap, 34)
-          })
+          Platform.showRewarded(
+            () => {
+              State.addCaps(gain)
+              this.floatText(this.arenaW / 2, GAME.HEIGHT / 2, `+${fmt(gain)}`, CSS.cap, 34)
+            },
+            // Яндекс 4.5: награда только за досмотренный ролик. Молча ничего не
+            // делать нельзя — игрок решит, что кнопка сломана.
+            () => this.adFailNote(),
+          )
         },
       }))
       push(createButton(this, cx - 130, cy + 62, {
         label: t('Идти дальше ⟶'), width: 250, height: 58, fontSize: 20,
-        // Ролик за награду и межстраничная — две рекламы подряд, поэтому
-        // оценку/межстраничную просим только на «мирном» выходе.
-        onClick: () => { resume(); this.askReviewOrAd() },
+        onClick: () => { resume(); this.askReview() },
       }))
     } else {
       push(createButton(this, cx, cy + 62, {
         label: t('Идти дальше ⟶'), width: 300, height: 58, fontSize: 20,
-        onClick: () => { resume(); this.askReviewOrAd() },
+        onClick: () => { resume(); this.askReview() },
       }))
     }
     this._zoneModal = objs
@@ -833,16 +851,19 @@ export default class BattleScene extends Phaser.Scene {
 
   // Локация взята — лучший момент за весь забег, чтобы спросить оценку.
   //
-  // На эту же секунду претендует межстраничная реклама, и вместе они бы легли
-  // друг на друга. Приоритет у оценки: её платформа разрешает спросить один раз
-  // за всю жизнь игрока, а ролик вернётся на следующем боссе (он и так троттлится
-  // изнутри showInterstitial). Если оценку показать нельзя — момент честно
-  // достаётся рекламе, как было раньше.
-  askReviewOrAd() {
-    if (!State.reviewUnlocked()) { Platform.showInterstitial(); return }
-    Platform.requestReview()
-      .then((shown) => { if (!shown) Platform.showInterstitial() })
-      .catch(() => Platform.showInterstitial())
+  // Раньше отсюда же уходила межстраничная реклама, если оценку показать было
+  // нельзя. Больше нет: «идти дальше» — игровое действие, продолжение забега, а
+  // в реалтайм-игре с короткими локациями реклама по игровому действию
+  // запрещена (п.4.4). Ролик теперь живёт только на выходе в лагерь.
+  askReview() {
+    if (!State.reviewUnlocked()) return
+    Platform.requestReview().catch(() => { /* окно не открылось — и ладно */ })
+  }
+
+  // «Ролик не досмотрен — награды нет». Одна формулировка на все три кнопки
+  // rewarded: и на экране смерти, и в окне взятой локации.
+  adFailNote() {
+    toast(this, t('Награда не начислена: ролик не досмотрен'), '#ff9a6a')
   }
 
   // Награда с босса десятой локации: фиолетовый предмет и часть реликвии.
@@ -918,13 +939,13 @@ export default class BattleScene extends Phaser.Scene {
     Sfx.death()
     this.cameras.main.flash(400, 120, 0, 0)
     this.clearEnemies()
-    Platform.submitScore(State.bestScore)
+    Platform.submitScore(State.leaderboardScore())
     this.showDeathModal()
     this.askReviewOnRecord()
   }
 
   // Забег кончился новым личным рекордом — второй момент, где не стыдно спросить
-  // оценку (первый — взятая локация, см. askReviewOrAd).
+  // оценку (первый — взятая локация, см. askReview).
   //
   // Ждём секунду и проверяем, что окно смерти всё ещё открыто: если игрок за это
   // время нажал «возродиться», сейчас пойдёт рекламный ролик, и окно оценки
@@ -947,17 +968,24 @@ export default class BattleScene extends Phaser.Scene {
       // Яндекс 4.5.1: текст кнопки прямо говорит, что будет реклама за награду.
       label: t('📺 Реклама: возродиться'), width: 380, height: 60, fontSize: 21,
       color: COLORS.toxicDark, hover: COLORS.toxic,
-      onClick: () => Platform.showRewarded(() => {
-        if (!this._deathModal) return
-        // Сбрасываем bossActive: если пали в бою с боссом, иначе он больше не
-        // заспавнится (bossDue гейтится bossActive) и зона застрянет навсегда.
-        this.closeDeathModal(); State.cancelDeath(); this.spawnTick()
-      }),
+      onClick: () => Platform.showRewarded(
+        () => {
+          if (!this._deathModal) return
+          // Сбрасываем bossActive: если пали в бою с боссом, иначе он больше не
+          // заспавнится (bossDue гейтится bossActive) и зона застрянет навсегда.
+          this.closeDeathModal(); State.cancelDeath(); this.spawnTick()
+        },
+        // Ролик закрыли раньше времени — возрождения нет (п.4.5). Окно смерти
+        // остаётся на экране: игрок либо пробует ещё раз, либо смиряется.
+        () => this.adFailNote(),
+      ),
     })
     const give = createButton(this, cx, cy + 66, {
       label: t('Смириться и продолжить'), width: 380, height: 54, fontSize: 19,
-      // Смерть без возрождения → межстраничная реклама Яндекса (сама троттлит ≥60с).
-      onClick: () => { this.closeDeathModal(); Platform.showInterstitial(); State.onHeroDeath(); this.spawnTick() },
+      // Рекламы здесь БОЛЬШЕ НЕТ: кнопка продолжает забег, то есть это игровое
+      // действие, а в реалтайм-игре с короткими локациями показ по игровому
+      // действию запрещён (п.4.4). Ролик остался только на выходе в лагерь.
+      onClick: () => { this.closeDeathModal(); State.onHeroDeath(); this.spawnTick() },
     })
     revive.setDepth(86); give.setDepth(86)
     this._deathModal = [ov, title, revive, give]
@@ -992,6 +1020,10 @@ export default class BattleScene extends Phaser.Scene {
   // ---------------- Игровой цикл ----------------
   update(time, delta) {
     const dt = delta / 1000
+    // Время боя — опора проверки рекорда (см. GameState.leaderboardScore).
+    // Считаем ЗДЕСЬ, потому что здесь же начисляются убийства: update не идёт
+    // ни в лагере, ни на паузе, ни под рекламой, — и то и другое встаёт вместе.
+    State.tickBattleTime(dt)
 
     // Пули — каждая бьёт ближайшего врага в радиусе.
     for (let i = this.bullets.length - 1; i >= 0; i--) {
@@ -1082,7 +1114,10 @@ export default class BattleScene extends Phaser.Scene {
 
     const maxHp = State.heroMaxHp()
     this.hpFill.width = Math.max(0, (this.hpBarW - 4) * Phaser.Math.Clamp(State.hp / maxHp, 0, 1))
-    this.hpText.setText(`${Math.max(0, Math.ceil(State.hp))} / ${maxHp}`)
+    // Через fmt, а не числом: на глубине HP уходит в 16 знаков
+    // («4100470306233230 / 4100470306233230») и подпись вылезала за полоску
+    // далеко в панель. Сокращённая запись — «4.1aa / 4.1aa» — влезает всегда.
+    this.hpText.setText(`${fmt(Math.max(0, Math.ceil(State.hp)))} / ${fmt(maxHp)}`)
 
     const full = State.ult >= BAL.ultMax
     this.ultFill.width = Math.max(1, (this.hpBarW - 4) * (State.ult / BAL.ultMax))

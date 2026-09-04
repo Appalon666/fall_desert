@@ -55,20 +55,32 @@ export default class HeroScene extends Phaser.Scene {
 
     let y = 210
     STATS.forEach(s => {
-      const row = this.add.container(cx - 300, y)
+      // Строку сдвинули левее прежнего (было cx - 300): три кнопки вместо одной
+      // заняли правый край, и длинное описание удачи упиралось в них вплотную.
+      const row = this.add.container(cx - 330, y)
       const icon = this.add.text(0, 0, s.icon, { fontSize: '32px' }).setOrigin(0, 0.5)
       const label = this.add.text(50, -12, `${t(s.name)}: ${State.hero[s.id]}`, { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: CSS.paper, fontStyle: 'bold' }).setOrigin(0, 0.5)
       const desc = this.add.text(50, 14, t(s.desc), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: '#ddd2b4' }).setOrigin(0, 0.5)
       row.add([icon, label, desc])
       this.uiObjs.push(row)
 
+      // Три шага вложения: по одному, десяткой и всё разом. К сотому уровню
+      // свободных очков накапливаются сотни, и тыкать «＋» по разу — работа, а не
+      // игра. «+10» и «MAX» берут не больше, чем есть: просить лишнее можно.
       const canAdd = State.hero.points > 0
-      const btn = createButton(this, cx + 250, y, {
-        label: '＋', width: 60, height: 52, fontSize: 30,
-        color: canAdd ? COLORS.toxicDark : COLORS.steelDark, hover: COLORS.toxic, enabled: canAdd,
-        onClick: () => { if (State.spendPoint(s.id)) this.render() },
-      })
-      this.uiObjs.push(btn)
+      const step = (x, w, label, fontSize, howMany) => {
+        const b = createButton(this, x, y, {
+          label, width: w, height: 52, fontSize,
+          color: canAdd ? COLORS.toxicDark : COLORS.steelDark, hover: COLORS.toxic, enabled: canAdd,
+          // Сколько очков брать, считаем в момент КЛИКА, а не при отрисовке:
+          // между построением кнопки и нажатием их могла потратить соседняя.
+          onClick: () => { if (State.spendPoints(s.id, howMany()) > 0) this.render() },
+        })
+        this.uiObjs.push(b)
+      }
+      step(cx + 191, 62, '＋', 30, () => 1)
+      step(cx + 286, 96, '+10', 22, () => 10)
+      step(cx + 405, 110, 'MAX', 22, () => State.hero.points)
       y += 90
     })
 

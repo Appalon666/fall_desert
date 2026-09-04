@@ -2,9 +2,9 @@
 // классовые механики, офлайн-доход, инвентарь. GameState развязан от Phaser.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { GameState } from '../src/state/GameState.js'
-import { zoneKillsFor } from '../src/data/progression.js'
+import { zoneKillsFor, maxKillsPerSec, MAX_KILLS_PER_SEC } from '../src/data/progression.js'
 import { BAL } from '../src/data/balance.js'
-import { rollItem } from '../src/data/loot.js'
+import { rollItem, itemPower, RARITY_BY_ID, ITEM_LEVEL_CAP } from '../src/data/loot.js'
 import { RELIC_PART_IDS } from '../src/data/relics.js'
 
 const rng = (seed => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)(123)
@@ -113,6 +113,373 @@ describe('глубинный рамп', () => {
     expect(clone.deepKills).toBe(25)
     st.resetRun()
     expect(st.deepKills).toBe(0)
+  })
+})
+
+// Вторая ступень глубины: с BAL.abyssZoneStart поверх первой ложится такая же
+// схема, но по +2.5%. Повод: к 60-й локации первая ступень даёт около ×35, а
+// герой к этому времени прокачан на порядки сильнее — сопротивления не остаётся.
+// Кнопки «+10» и «MAX» на экране героя ходят через spendPoints. Опасностей две:
+// вложить БОЛЬШЕ, чем есть очков (ушли бы в минус), и разойтись с лечением за
+// живучесть, которое одиночный spendPoint делал по очку.
+// Пометка «НОВОЕ» в инвентаре (см. InventoryScene): она поднимает свежий
+// предмет в первую строку списка на шесть строк из сотен. Если её не снимать,
+// надетая и потом снятая вещь возвращается «новой» и занимает место настоящего
+// свежего дропа.
+// Защита таблицы рекордов. Лидерборды Яндекса принимают то, что прислал клиент,
+// поэтому единственное, что можно сделать честно, — не отправлять физически
+// невозможное. Опора: время, реально проведённое в бою, и потолок темпа
+// MAX_KILLS_PER_SEC (пачка не больше spawnBatchMax не чаще spawnGapFloor).
+//
+// Главное здесь — НЕ ЗАДЕТЬ честного игрока: у него запас обязан только расти,
+// потому что потолок набегает по 19 убийств в секунду, а реально их выходит 9-11.
+describe('рекорд для таблицы (защита от дорисованных цифр)', () => {
+  // Секунда за вызов — ровно как в бою: tickBattleTime сам режет выбросы delta,
+  // поэтому «наиграть» час одним вызовом нельзя (это и проверяет тест ниже).
+  // Локацию задаём явно: бюджет копится со скоростью ТОЙ локации, где игрок был,
+  // а на первой поток даёт всего 2 убийства в секунду.
+  const DEEP = 40
+  const played = (sec, zone = DEEP) => {
+    const s = new GameState()
+    s.zoneIndex = zone
+    for (let i = 0; i < sec; i++) s.tickBattleTime(1)
+    return s
+  }
+  const rateAt = (zone) => maxKillsPerSec(zone)
+
+  it('честная игра не урезается: запас растёт быстрее убийств', () => {
+    // Полчаса боя на пределе реального темпа (11 убийств/с — предел идеального
+    // автокликера, замерено в игре) против потолка этой локации (19.2).
+    const s = played(1800)
+    s.bestScore = Math.floor(1800 * 11)
+    expect(rateAt(DEEP)).toBeGreaterThan(11)
+    expect(s.leaderboardScore()).toBe(s.bestScore)
+  })
+
+  // Мелководье своё: там поток медленный, и потолок обязан быть тоже медленным —
+  // иначе на первых локациях он не значит ничего.
+  it('на первой локации потолок в разы ниже, чем на глубине', () => {
+    expect(rateAt(0)).toBeLessThan(rateAt(DEEP) / 5)
+    const s = played(600, 0)
+    s.bestScore = 100000
+    expect(s.leaderboardScore()).toBeLessThan(600 * rateAt(0) + 300)
+  })
+
+  it('дорисованный в сейве рекорд урезается до возможного', () => {
+    const s = played(60)          // минута боя
+    s.bestScore = 1_000_000
+    expect(s.leaderboardScore()).toBeLessThan(60 * rateAt(DEEP) + 300)
+    expect(s.leaderboardScore()).toBeGreaterThan(0)
+  })
+
+  // Ровно тот случай, с которого всё началось: 33к → 40к «за пару минут».
+  it('скачок внутри сессии урезается по времени этой сессии', () => {
+    const s = new GameState()
+    s._apply({ heroClass: 'gunner', bestScore: 33000, killBudget: 33000, zoneIndex: DEEP })
+    for (let i = 0; i < 120; i++) s.tickBattleTime(1) // две минуты боя
+    s.bestScore = 40000                              // и вдруг +7000
+    const out = s.leaderboardScore()
+    expect(out).toBeLessThan(36000)
+    expect(out).toBeGreaterThanOrEqual(33000) // прежний рекорд не отбираем
+  })
+
+  it('за сессию можно законно прибавить столько, сколько успел', () => {
+    const s = new GameState()
+    s._apply({ heroClass: 'gunner', bestScore: 33000, killBudget: 33000, zoneIndex: DEEP })
+    for (let i = 0; i < 600; i++) s.tickBattleTime(1) // десять минут боя
+    s.bestScore = 33000 + 6000                        // 10 убийств/с — реальный темп
+    expect(s.leaderboardScore()).toBe(39000)
+  })
+
+  // Поле появилось позже самой игры: у давних игроков его в сейве нет, и ноль
+  // означал бы «наиграно ноль» — рекорд обнулился бы всем разом.
+  it('старый сейв без счётчика не теряет рекорд', () => {
+    const s = new GameState()
+    s._apply({ heroClass: 'gunner', bestScore: 25000 })
+    expect(s.killBudget).toBe(25000) // бюджет ровно под нынешний рекорд, не больше
+    expect(s.battleSeconds).toBeCloseTo(25000 / MAX_KILLS_PER_SEC, 6)
+    expect(s.leaderboardScore()).toBe(25000)
+  })
+
+  it('выброс delta (вкладка вернулась из фона) не дарит запас', () => {
+    const s = new GameState()
+    s.tickBattleTime(3600)  // «час за один кадр»
+    expect(s.battleSeconds).toBe(1)
+    s.tickBattleTime(NaN); s.tickBattleTime(-5); s.tickBattleTime(0)
+    expect(s.battleSeconds).toBe(1)
+  })
+
+  it('сброс прогресса обнуляет и рекорд, и его обоснование', () => {
+    const s = played(500)
+    s.bestScore = 5000
+    s.wipe()
+    expect(s.battleSeconds).toBe(0)
+    expect(s.killBudget).toBe(0)
+    expect(s.leaderboardScore()).toBe(0)
+  })
+
+  it('перерождение бюджет НЕ обнуляет — рекорд тоже живёт дальше', () => {
+    const s = played(4000)
+    s.bestScore = 30000
+    s.resetRun()
+    expect(s.battleSeconds).toBe(4000)
+    expect(s.killBudget).toBeGreaterThan(30000)
+    expect(s.leaderboardScore()).toBe(30000)
+  })
+
+  it('счётчики переживают сейв', () => {
+    const s = played(1234)
+    const clone = new GameState()
+    clone._apply(JSON.parse(JSON.stringify(s.toJSON())))
+    expect(clone.battleSeconds).toBeCloseTo(1234, 6)
+    expect(clone.killBudget).toBeCloseTo(s.killBudget, 6)
+  })
+})
+
+// Смешанные статы: у предмета теперь список stats вместо одного поля stat.
+// Сейвы со старой формой живы у всех, кто играл до этой версии, — их нельзя ни
+// потерять, ни молча усилить.
+describe('миграция предметов на смешанные статы', () => {
+  const oldItem = (over = {}) => ({
+    uid: 'old1', slot: 'weapon', rarity: 'epic', name: 'Ржавый обрез',
+    stat: 'clickMul', value: 0.75, level: 50, ...over,
+  })
+
+  it('старый предмет переносится в список статов и не исчезает', () => {
+    const s = new GameState()
+    s._apply({ heroClass: 'gunner', inventory: [oldItem()] })
+    expect(s.inventory).toHaveLength(1)
+    expect(s.inventory[0].stats).toEqual([{ stat: 'clickMul', value: 0.75 }])
+    expect(s.inventory[0].stat).toBeUndefined() // старое поле убрано, чтобы не разъехалось
+  })
+
+  it('надетый старый предмет продолжает давать свой бонус', () => {
+    const s = new GameState()
+    s._apply({ heroClass: 'gunner', equipment: { weapon: oldItem() } })
+    expect(s.equipSum('clickMul')).toBeCloseTo(0.75, 6)
+  })
+
+  // Главное: миграция НЕ добирает недостающие статы. Иначе одна загрузка сейва
+  // молча удваивала бы силу всей старой экипировки.
+  it('миграция не дописывает новые статы', () => {
+    const s = new GameState()
+    s._apply({ heroClass: 'gunner', inventory: [oldItem()] })
+    expect(s.inventory[0].stats).toHaveLength(1)
+  })
+
+  it('раздутый старый предмет всё так же срезается по потолку', () => {
+    const s = new GameState()
+    s._apply({ heroClass: 'gunner', inventory: [oldItem({ value: 99, level: 4000 })] })
+    // Потолок — полная сила тира: доли STAT_SHARES говорят, сколько кладёт
+    // генератор, а не что вообще возможно. Иначе старый предмет с одним статом
+    // терял бы треть силы за одну загрузку сейва.
+    const max = itemPower(RARITY_BY_ID.epic.mul, ITEM_LEVEL_CAP, false)
+    expect(s.inventory[0].stats[0].value).toBeCloseTo(max, 4)
+  })
+
+  it('битый предмет без статов выбрасывается, а не роняет сцену', () => {
+    const s = new GameState()
+    s._apply({ heroClass: 'gunner', inventory: [{ uid: 'x', slot: 'weapon', rarity: 'epic', name: 'Пустышка', level: 5 }] })
+    expect(s.inventory).toHaveLength(0)
+  })
+
+  it('новый предмет несёт все свои статы в сумму экипировки', () => {
+    const s = new GameState()
+    const it = rollItem(Math.random, ITEM_LEVEL_CAP, 0, 'epic', 'weapon')
+    s.addItem(it); s.equip(it.uid)
+    for (const st of it.stats) expect(s.equipSum(st.stat), st.stat).toBeCloseTo(st.value, 6)
+  })
+})
+
+describe('пометка «новое» у последнего добытого предмета', () => {
+  const gear = (uid) => ({ uid, slot: 'boots', rarity: 'epic', name: 'Сапоги', stat: 'capsMul', value: 0.75, level: 50 })
+
+  it('ставится на последний добытый', () => {
+    const s = new GameState()
+    s.addItem(gear('a')); s.addItem(gear('b'))
+    expect(s.lastItemUid).toBe('b')
+  })
+
+  it('снимается, когда предмет надели', () => {
+    const s = new GameState()
+    s.addItem(gear('a'))
+    s.equip('a')
+    expect(s.lastItemUid).toBe(null)
+    s.unequip('boots') // вернули в рюкзак — новинкой он уже не считается
+    expect(s.lastItemUid).toBe(null)
+  })
+
+  it('снимается при продаже и разборе', () => {
+    const s = new GameState()
+    s.addItem(gear('a')); s.sellItem('a')
+    expect(s.lastItemUid).toBe(null)
+    s.addItem(gear('b')); s.scrapItem('b')
+    expect(s.lastItemUid).toBe(null)
+  })
+
+  it('снимается при массовых операциях и перерождении', () => {
+    const s = new GameState()
+    s.addItem(gear('a')); s.scrapAll()
+    expect(s.lastItemUid).toBe(null)
+    s.addItem(gear('b')); s.sellAll()
+    expect(s.lastItemUid).toBe(null)
+    s.addItem(gear('c')); s.scrapAllUpTo(4)
+    expect(s.lastItemUid).toBe(null)
+    s.addItem(gear('d')); s.resetRun()
+    expect(s.lastItemUid).toBe(null)
+  })
+
+  it('чужой предмет пометку не снимает', () => {
+    const s = new GameState()
+    s.addItem(gear('a')); s.addItem(gear('b'))
+    s.sellItem('a')
+    expect(s.lastItemUid).toBe('b')
+  })
+})
+
+describe('вложение очков пачкой', () => {
+  const withPoints = (n) => { const s = new GameState(); s.hero.points = n; return s }
+
+  it('вкладывает ровно столько, сколько просили', () => {
+    const s = withPoints(50)
+    expect(s.spendPoints('str', 10)).toBe(10)
+    expect(s.hero.str).toBe(10)
+    expect(s.hero.points).toBe(40)
+  })
+
+  it('просить больше, чем есть, можно — возьмёт остаток и не уйдёт в минус', () => {
+    const s = withPoints(7)
+    expect(s.spendPoints('luck', 10)).toBe(7)
+    expect(s.hero.luck).toBe(7)
+    expect(s.hero.points).toBe(0)
+    expect(s.spendPoints('luck', 10)).toBe(0) // и второй раз уже нечего
+    expect(s.hero.points).toBe(0)
+  })
+
+  it('«MAX» на нуле очков ничего не делает', () => {
+    const s = withPoints(0)
+    expect(s.spendPoints('str', s.hero.points)).toBe(0)
+    expect(s.hero.str).toBe(0)
+  })
+
+  it('мусор на входе не ломает счётчик', () => {
+    const s = withPoints(5)
+    expect(s.spendPoints('str', 0)).toBe(0)
+    expect(s.spendPoints('str', -3)).toBe(0)
+    expect(s.spendPoints('str', NaN)).toBe(0)
+    expect(s.spendPoints('нет-такого', 3)).toBe(0)
+    expect(s.hero.points).toBe(5)
+  })
+
+  it('живучесть пачкой лечит на столько же, сколько по одному очку', () => {
+    const a = withPoints(10), b = withPoints(10)
+    a.hp = 1; b.hp = 1
+    a.spendPoints('vit', 10)
+    for (let i = 0; i < 10; i++) b.spendPoint('vit')
+    expect(a.hero.vit).toBe(b.hero.vit)
+    expect(a.heroMaxHp()).toBe(b.heroMaxHp())
+    expect(a.hp).toBe(b.hp)
+  })
+
+  it('лечение не задирает HP выше максимума', () => {
+    const s = withPoints(100)
+    s.hp = s.heroMaxHp()
+    s.spendPoints('vit', 100)
+    expect(s.hp).toBe(s.heroMaxHp())
+  })
+
+  it('старый spendPoint работает как прежде', () => {
+    const s = withPoints(1)
+    expect(s.spendPoint('str')).toBe(true)
+    expect(s.spendPoint('str')).toBe(false)
+    expect(s.hero.str).toBe(1)
+  })
+})
+
+describe('вторая ступень глубины (abyss)', () => {
+  it('порог выше первой ступени, и растит жёстче', () => {
+    expect(BAL.abyssZoneStart).toBeGreaterThan(BAL.deepZoneStart)
+    expect(BAL.abyssZoneRamp).toBeGreaterThan(BAL.deepZoneRamp)
+    expect(BAL.abyssKillRamp).toBeGreaterThan(BAL.deepKillRamp)
+  })
+
+  it('до abyssZoneStart не работает: множитель — это ровно первая ступень', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.abyssZoneStart - 2 // локация номер abyssZoneStart-1
+    for (let i = 0; i < 100; i++) st.registerKill()
+    expect(st.abyssKills).toBe(0)
+    expect(st.abyssZoneLevels()).toBe(0)
+    expect(st.deepZoneMul()).toBeCloseTo(
+      Math.pow(BAL.deepZoneRamp, st.deepZoneLevels()) * Math.pow(BAL.deepKillRamp, st.deepZoneSteps()), 10)
+  })
+
+  it('за каждую локацию глубже abyssZoneStart — ещё +abyssZoneRamp поверх первой', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.abyssZoneStart + 9 // десять локаций сверх второго порога
+    expect(st.abyssZoneLevels()).toBe(10)
+    expect(st.deepZoneMul()).toBeCloseTo(
+      Math.pow(BAL.deepZoneRamp, st.deepZoneLevels()) * Math.pow(BAL.abyssZoneRamp, 10), 10)
+  })
+
+  it('свои убийства, а не deepKills: на входе в 60-ю ступень стоит на нуле', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.abyssZoneStart - 1 // это и есть локация номер abyssZoneStart
+    st.deepKills = 5000 // накоплено первой ступенью — второй оно не достаётся
+    for (let i = 0; i < BAL.abyssKillStep * 3; i++) st.registerKill()
+    expect(st.abyssKills).toBe(BAL.abyssKillStep * 3)
+    expect(st.abyssZoneSteps()).toBe(3)
+    st.registerKill() // неполный шаг ступень не двигает
+    expect(st.abyssZoneSteps()).toBe(3)
+  })
+
+  it('босс-ворота второй ступени тоже считаются', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.abyssZoneStart - 1
+    st.registerBossKill()
+    expect(st.abyssKills).toBe(1)
+    expect(st.deepKills).toBe(1) // и первой ступени заодно
+  })
+
+  it('обе ступени перемножаются, а не заменяют друг друга', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.abyssZoneStart + 4
+    st.deepKills = BAL.deepKillStep * 7
+    st.abyssKills = BAL.abyssKillStep * 3
+    const deep = Math.pow(BAL.deepZoneRamp, st.deepZoneLevels()) * Math.pow(BAL.deepKillRamp, 7)
+    const abyss = Math.pow(BAL.abyssZoneRamp, 5) * Math.pow(BAL.abyssKillRamp, 3)
+    expect(st.deepZoneMul()).toBeCloseTo(deep * abyss, 8)
+    expect(st.deepZoneMul()).toBeGreaterThan(deep)
+  })
+
+  it('на скорость вторая ступень не влияет — потолок добран задолго до 60-й', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.abyssZoneStart + 20
+    st.deepKills = 4000
+    st.abyssKills = 2000
+    expect(st.deepZoneSpeedMul()).toBe(BAL.deepSpeedCap)
+  })
+
+  it('счётчик переживает сейв и обнуляется перерождением', () => {
+    const st = new GameState()
+    st.zoneIndex = BAL.abyssZoneStart - 1
+    for (let i = 0; i < 25; i++) st.registerKill()
+    const clone = new GameState()
+    clone._apply(JSON.parse(JSON.stringify(st.toJSON())))
+    expect(clone.abyssKills).toBe(25)
+    st.resetRun()
+    expect(st.abyssKills).toBe(0)
+  })
+
+  // Старые сейвы поля не знают — оно должно приезжать нулём, а не NaN, иначе
+  // множитель станет NaN и HP врага уедет в «неубиваемо».
+  it('сейв без поля читается нулём, а не NaN', () => {
+    const st = new GameState()
+    const data = JSON.parse(JSON.stringify(st.toJSON()))
+    delete data.abyssKills
+    const clone = new GameState()
+    clone._apply(data)
+    expect(clone.abyssKills).toBe(0)
+    expect(Number.isFinite(clone.deepZoneMul())).toBe(true)
   })
 })
 

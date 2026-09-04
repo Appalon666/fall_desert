@@ -35,7 +35,7 @@ export default class LeaderboardScene extends Phaser.Scene {
     // «Загрузка таблицы…». Даём отправке короткую фору и читаем в любом случае;
     // не успела — рекорд подхватится при следующем открытии.
     const SEND_GRACE = 1200
-    const sent = Promise.resolve(Platform.submitScore(State.bestScore)).catch(() => {})
+    const sent = Promise.resolve(Platform.submitScore(State.leaderboardScore())).catch(() => {})
     // Сторож на setTimeout, а не на таймере сцены: сцена может стоять на паузе
     // (свёрнутая вкладка), и тогда её таймеры не тикают.
     await Promise.race([sent, new Promise(r => setTimeout(r, SEND_GRACE))])

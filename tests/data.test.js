@@ -8,7 +8,7 @@ import { ENEMIES, ENEMY_IDS } from '../src/data/enemies.js'
 import { BOSSES, BOSS_IDS, defOf, sheetKey, isBossId } from '../src/data/bosses.js'
 import { setLang, t, itemName } from '../src/i18n.js'
 import { readFileSync } from 'node:fs'
-import { RARITIES, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID, ITEM_LEVEL_CAP } from '../src/data/loot.js'
+import { RARITIES, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID, ITEM_LEVEL_CAP, itemPower, itemQuality, itemRank, SLOTS, STAT_SHARES, STATS_PER_ITEM, STAT_SHORT } from '../src/data/loot.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { fmt, fmtDuration } from '../src/util/format.js'
 
@@ -82,7 +82,11 @@ describe('zones / affixes', () => {
     const zE = getZone(ZONES.length)
     expect(zE.endless).toBe(true)
     expect(zE.loop).toBe(1)
-    expect(zE.name).toContain('+1')
+    // Номер петли в ИМЕНИ не печатаем: на экране рядом всегда стоит номер
+    // локации («ЗОНА 46 · ЛОГОВО БОССА»), и «+36» рядом с ним читалось как
+    // второе, противоречащее число. Само поле loop при этом живо — по нему
+    // считается аффикс.
+    expect(zE.name).not.toMatch(/\+\d/)
   })
   it('аффиксы циклятся по петлям', () => {
     for (let loop = 1; loop <= AFFIXES.length * 2; loop++) {
@@ -171,6 +175,8 @@ describe('враги и боссы', () => {
   })
 })
 
+const ANY_STAT_IDS = Object.keys(STAT_SHORT)
+
 describe('loot', () => {
   const rng = (seed => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)(42)
   it('rollItem всегда возвращает валидный предмет', () => {
@@ -178,9 +184,40 @@ describe('loot', () => {
       const it = rollItem(rng, 1 + i, 0)
       expect(SLOT_BY_ID[it.slot]).toBeTruthy()
       expect(RARITY_BY_ID[it.rarity]).toBeTruthy()
-      expect(typeof it.value).toBe('number')
-      expect(it.value).toBeGreaterThan(0)
       expect(it.uid).toBeTruthy()
+      expect(it.stats).toHaveLength(STATS_PER_ITEM)
+      for (const st of it.stats) {
+        expect(ANY_STAT_IDS, st.stat).toContain(st.stat)
+        expect(typeof st.value).toBe('number')
+        expect(st.value).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  // Смешанные статы: слот больше не диктует единственную характеристику.
+  it('первый стат — родной для слота, остальные не повторяются', () => {
+    const seen = {}
+    for (let i = 0; i < 800; i++) {
+      const it = rollItem(rng, 20, 0)
+      const ids = it.stats.map(s => s.stat)
+      expect(new Set(ids).size, ids.join(',')).toBe(ids.length) // без дублей
+      const native = SLOT_BY_ID[it.slot].stat
+      if (native !== 'any') expect(ids[0], it.slot).toBe(native)
+      ;(seen[it.slot] ||= new Set()).add(ids.slice(1).sort().join('+'))
+    }
+    // У каждого слота набор вторых статов не один и тот же — иначе предметы
+    // одного вида снова стали бы одинаковыми.
+    for (const slot of Object.keys(seen)) expect(seen[slot].size, slot).toBeGreaterThan(1)
+  })
+
+  it('сила статов убывает по долям STAT_SHARES', () => {
+    for (let i = 0; i < 200; i++) {
+      const it = rollItem(rng, 30, 0)
+      const rar = RARITY_BY_ID[it.rarity]
+      it.stats.forEach((st, k) => {
+        const max = itemPower(rar.mul, it.level, st.stat === 'critChance')
+        expect(st.value / max, `${it.rarity}/${st.stat}`).toBeCloseTo(STAT_SHARES[k], 2)
+      })
     }
   })
   it('удача повышает шанс редких предметов', () => {
@@ -271,6 +308,93 @@ describe('локализация', () => {
         expect(CYR.test(getZone(z).name), `зона ${z}`).toBe(false)
       }
     } finally { setLang('ru') }
+  })
+})
+
+// itemQuality — общая мера силы предмета, по которой инвентарь сортирует список.
+//
+// Зачем она понадобилась: у шанса крита коэффициент в формуле впятеро меньше,
+// чем у остальных статов, поэтому ПРЕДЕЛЬНАЯ реликвия-шлем (value 0.2)
+// сортировалась НИЖЕ рядовых эпических сапог (0.75). В списке на шесть строк из
+// сотен предметов свежевыкованная реликвия просто не показывалась — снаружи это
+// выглядело как «крафт реликвии выдал шмотку тиром ниже».
+describe('качество предмета (сортировка инвентаря)', () => {
+  const item = (rarity, stat, level = ITEM_LEVEL_CAP) => ({
+    uid: 'u', slot: stat === 'critChance' ? 'helmet' : 'boots', rarity, stat, level,
+    value: itemPower(RARITY_BY_ID[rarity].mul, level, stat === 'critChance'),
+  })
+
+  it('предельный предмет любого тира и стата — это 1', () => {
+    for (const r of RARITIES) {
+      expect(itemQuality(item(r.id, 'capsMul')), r.id).toBeCloseTo(1, 6)
+      expect(itemQuality(item(r.id, 'critChance')), r.id + '/crit').toBeCloseTo(1, 6)
+    }
+  })
+
+  // Ровно та пара, на которой ломалась сортировка: внутри одного тира крит-вещь
+  // с меньшим value обязана стоять ВЫШЕ слабой вещи с большим value.
+  // (Разные тиры сортировка разводит раньше — по редкости.)
+  it('крит-вещь не проваливается вниз только из-за меньшего value', () => {
+    const helm = item('relic', 'critChance')      // предельный шлем: value 0.2
+    const boots = item('relic', 'capsMul', 10)    // слабые сапоги: value 0.56
+    expect(helm.value).toBeLessThan(boots.value)  // сырое value обманывает…
+    expect(itemQuality(helm)).toBeGreaterThan(itemQuality(boots)) // …а качество — нет
+  })
+
+  it('предмет низкого уровня хуже предельного того же тира', () => {
+    expect(itemQuality(item('relic', 'capsMul', 1))).toBeLessThan(itemQuality(item('relic', 'capsMul')))
+  })
+
+  it('битый предмет не ломает сортировку, а получает ноль', () => {
+    expect(itemQuality(null)).toBe(0)
+    expect(itemQuality({ rarity: 'нет-такого', stat: 'capsMul', value: 1 })).toBe(0)
+    expect(itemQuality({ rarity: 'relic', stat: 'capsMul', value: NaN })).toBe(0)
+  })
+})
+
+// Требование простое и его легко потерять при следующей правке коэффициентов:
+// РЕЛИКВИЯ СИЛЬНЕЕ ЛЕГЕНДЫ. Всегда, в каждом слоте.
+//
+// Путаница тут родилась из-за формулы: у шанса крита коэффициент 0.01, у всех
+// прочих статов 0.05, поэтому предельный шлем-реликвия показывает «+20.0%», а
+// рядовые легендарные сапоги — «+75%», и снаружи это читается как понижение.
+describe('реликвия сильнее легенды', () => {
+  const best = (rarityId, crit) => itemPower(RARITY_BY_ID[rarityId].mul, ITEM_LEVEL_CAP, crit)
+
+  it('в каждом слоте предельная реликвия сильнее предельной легенды', () => {
+    for (const s of SLOTS) {
+      const crit = s.stat === 'critChance'
+      expect(best('relic', crit), s.name).toBeGreaterThan(best('epic', crit))
+    }
+  })
+
+  it('разрыв одинаковый во всех слотах — ровно множитель тира', () => {
+    const ratio = RARITY_BY_ID.relic.mul / RARITY_BY_ID.epic.mul
+    for (const s of SLOTS) {
+      const crit = s.stat === 'critChance'
+      expect(best('relic', crit) / best('epic', crit), s.name).toBeCloseTo(ratio, 6)
+    }
+  })
+
+  // itemRank — то, чем инвентарь сравнивает вещи с РАЗНЫМИ статами и печатает
+  // «лучше/хуже надетого». Без него список сравнивал несравнимые проценты.
+  it('ранг ставит реликвию выше легенды даже при разных статах', () => {
+    const item = (rarity, stat) => ({
+      uid: 'u', slot: stat === 'critChance' ? 'helmet' : 'boots', rarity, stat, level: ITEM_LEVEL_CAP,
+      value: itemPower(RARITY_BY_ID[rarity].mul, ITEM_LEVEL_CAP, stat === 'critChance'),
+    })
+    const relicHelm = item('relic', 'critChance')   // «+20.0% шанс крита»
+    const epicBoots = item('epic', 'capsMul')       // «+75% крышек»
+    expect(relicHelm.value).toBeLessThan(epicBoots.value)      // проценты обманывают…
+    expect(itemRank(relicHelm)).toBeGreaterThan(itemRank(epicBoots)) // …ранг — нет
+  })
+
+  it('у предельного предмета ранг равен множителю его тира', () => {
+    for (const r of RARITIES) {
+      const it = { uid: 'u', slot: 'boots', rarity: r.id, stat: 'capsMul', level: ITEM_LEVEL_CAP,
+        value: itemPower(r.mul, ITEM_LEVEL_CAP, false) }
+      expect(itemRank(it), r.id).toBeCloseTo(r.mul, 6)
+    }
   })
 })
 

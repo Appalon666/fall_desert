@@ -11,6 +11,7 @@ export default [
       globals: {
         window: 'readonly', document: 'readonly', navigator: 'readonly',
         localStorage: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly',
+        setInterval: 'readonly', clearInterval: 'readonly',
         console: 'readonly', fetch: 'readonly', Image: 'readonly',
         requestAnimationFrame: 'readonly', performance: 'readonly',
         process: 'readonly', URL: 'readonly', URLSearchParams: 'readonly',

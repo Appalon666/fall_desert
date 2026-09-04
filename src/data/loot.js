@@ -6,7 +6,13 @@ export const RARITIES = [
   { id: 'uncommon', name: 'Годное',   color: 0x6fbf4f, css: '#6fbf4f', weight: 27, mul: 1.8 },
   { id: 'rare',     name: 'Редкое',   color: 0x4f9fef, css: '#4f9fef', weight: 13, mul: 3.0 },
   { id: 'epic',     name: 'Легенда',  color: 0xb96ff0, css: '#b96ff0', weight: 3.4, mul: 5.0 },
-  { id: 'relic',    name: 'Реликвия', color: 0xff8a2a, css: '#ff8a2a', weight: 0.6, mul: 8.0 },
+  // mul реликвии = РОВНО ВДВОЕ от легенды (5.0 → 10.0). Так высший тир и
+  // ощущается высшим: полный комплект даёт ×6.0 к урону клика против ×3.3 у
+  // легендарного. Разрыв стережёт тест «реликвия сильнее легенды».
+  // Красный — намеренно: это ВЫСШИЙ тир, и он обязан читаться как другой класс
+  // вещей, а не как «ещё немного лучше легенды». Оранжевый слишком близок к
+  // рыжей палитре пустоши (ржавчина, огонь верстака, крышки) и терялся в ней.
+  { id: 'relic',    name: 'Реликвия', color: 0xff3b30, css: '#ff3b30', weight: 0.6, mul: 10.0 },
 ]
 
 // Слоты экипировки. accessory занимает два гнезда (acc1/acc2).
@@ -30,7 +36,49 @@ export const STAT_LABEL = {
   capsMul: 'крышек',
 }
 
+// Значки статов — для карточек «куклы», где на три стата есть одна строка
+// шириной 150 px. Словами туда не влезть: минимальный кегль в игре 16 px
+// (требование Яндекса 1.8 к читаемости, см. MIN_FONT в main.js), мельче нельзя.
+export const STAT_ICON = {
+  clickMul: '🔫',
+  hpMul: '❤️',
+  critChance: '🎯',
+  allyMul: '🐕',
+  capsMul: '🍾',
+}
+
+// Короткие ярлыки: в строке инвентаря теперь три стата вместо одного, и
+// полными названиями («урон союзников») они туда не помещаются.
+export const STAT_SHORT = {
+  clickMul: 'урон',
+  hpMul: 'HP',
+  critChance: 'крит',
+  allyMul: 'союзники',
+  capsMul: 'крышки',
+}
+
 const ANY_STATS = ['clickMul', 'hpMul', 'critChance', 'allyMul', 'capsMul']
+// Локальная карта слотов: экспортируемая SLOT_BY_ID объявлена ниже по файлу,
+// а rollItem нужна раньше.
+const SLOT_BY_ID_INTERNAL = Object.fromEntries(SLOTS.map(s => [s.id, s]))
+
+// СКОЛЬКО СТАТОВ НА ПРЕДМЕТЕ И КАК МЕЖДУ НИМИ ДЕЛИТСЯ СИЛА.
+//
+// Раньше слот жёстко задавал один стат: шлем — всегда шанс крита, сапоги —
+// всегда крышки. Предметы одного слота отличались только числом, выбирать было
+// не из чего, и весь лут сводился к «больше процент — надеть».
+//
+// Теперь у предмета три стата: первый — родной для слота (у аксессуара
+// случайный), два других — случайные из оставшихся, без повторов. Пять статов и
+// три места дают 6 наборов на слот, и это на КАЖДОМ из тиров — то есть предметы
+// одного вида перестали быть одинаковыми.
+//
+// Доли — от силы предмета его тира и уровня (itemPower). Сумма БОЛЬШЕ единицы
+// намеренно: три размазанных стата слабее одного собранного, потому что часть
+// из них не работает на текущую сборку. Сумму держим здесь одним числом —
+// после правки прогонять `node sim/gear-sim.mjs` и `npm run sim`.
+export const STAT_SHARES = [0.7, 0.3, 0.2]
+export const STATS_PER_ITEM = STAT_SHARES.length
 
 const PREFIX = ['Ржавый', 'Кривой', 'Самопальный', 'Треснутый', 'Ядрёный', 'Липкий', 'Гудящий', 'Счастливый', 'Помятый', 'Фонящий']
 const NOUN = {
@@ -57,6 +105,56 @@ export function itemPower(rarityMul, level, isCrit = false) {
   return +((isCrit ? 0.01 : 0.05) * rarityMul * (1 + lv * (isCrit ? 0.03 : 0.04))).toFixed(3)
 }
 
+// Статы предмета единым списком. Понимает и старую форму ({stat, value} одним
+// полем) — сейвы с ней ещё живы у всех, кто играл до этой версии.
+export function itemStats(item) {
+  if (!item) return []
+  if (Array.isArray(item.stats)) return item.stats
+  return item.stat ? [{ stat: item.stat, value: item.value }] : []
+}
+
+// Первый (главный) стат — им предмет и представляется там, где место только на
+// одну строку. Для родного слота это всегда его собственный стат.
+export function mainStat(item) { return itemStats(item)[0] || null }
+
+// «Качество» предмета — его сила В ДОЛЯХ от потолка своего тира и стата (0..1).
+//
+// Зачем: сырое item.value сравнивать между статами нельзя. У шанса крита
+// коэффициент 0.01, у всех остальных 0.05, поэтому предельная реликвия-шлем
+// даёт value 0.2, а предельные эпические сапоги — 0.75. Сортировка по value
+// ставила лучший шлем НИЖЕ обычных сапог, и в списке на шесть строк свежая
+// реликвия просто не показывалась: игрок ковал её и не находил.
+export function itemQuality(item) {
+  const rar = item && RARITY_BY_ID[item.rarity]
+  if (!rar) return 0
+  const list = itemStats(item)
+  if (!list.length) return 0
+  // Складываем доли каждого стата от ЕГО потолка и нормируем на сумму долей:
+  // у предельного предмета получается ровно 1, сколько бы статов он ни нёс.
+  let got = 0
+  for (const st of list) {
+    if (!st || !Number.isFinite(st.value)) continue
+    const max = itemPower(rar.mul, ITEM_LEVEL_CAP, st.stat === 'critChance')
+    if (max > 0) got += st.value / max
+  }
+  const full = STAT_SHARES.slice(0, list.length).reduce((a, b) => a + b, 0)
+  return full > 0 ? Math.min(1, got / full) : 0
+}
+
+// Сила предмета в «единицах тира» — единственная величина, которой можно
+// честно сравнить вещи с РАЗНЫМИ статами.
+//
+// Зачем. Игрок видит «Шлем · Реликвия · +20.0% шанс крита» и рядом «Обувь ·
+// Легенда · +75% крышек» и делает вывод, что выковал вещь тиром ниже. На самом
+// деле проценты разных статов между собой несравнимы: у шанса крита коэффициент
+// в формуле 0.01, у всех прочих 0.05. В своём слоте реликвия ровно в 1.6 раза
+// сильнее легенды — и здесь это наконец видно числом: у предельных предметов
+// ранг равен множителю тира (легенда 5.0, реликвия 8.0).
+export function itemRank(item) {
+  const rar = item && RARITY_BY_ID[item.rarity]
+  return rar ? rar.mul * itemQuality(item) : 0
+}
+
 function pickRarity(rng, luckBonus = 0) {
   const table = RARITIES.map((r, i) => ({ r, w: r.weight * (i >= 2 ? 1 + luckBonus : 1) }))
   const total = table.reduce((s, t) => s + t.w, 0)
@@ -68,18 +166,31 @@ function choose(rng, arr) { return arr[Math.floor(rng() * arr.length)] }
 
 // forceRarityId — выдать предмет заданной редкости вместо броска по таблице
 // (ковка реликвии из частей, гарантированный эпик с босса десятой локации).
-export function rollItem(rng, level = 1, luckBonus = 0, forceRarityId = null) {
-  const slotDef = choose(rng, SLOTS)
+// forceSlotId — задать слот; нужно замеру полного комплекта (sim/gear-sim.mjs),
+// в самой игре слот всегда случайный.
+export function rollItem(rng, level = 1, luckBonus = 0, forceRarityId = null, forceSlotId = null) {
+  const slotDef = (forceSlotId && SLOT_BY_ID_INTERNAL[forceSlotId]) || choose(rng, SLOTS)
   const rarity = (forceRarityId && RARITY_BY_ID[forceRarityId]) || pickRarity(rng, luckBonus)
-  const stat = slotDef.stat === 'any' ? choose(rng, ANY_STATS) : slotDef.stat
+  // Первый стат — родной для слота (у аксессуара любой), остальные добираем из
+  // оставшихся без повторов: два одинаковых стата на одном предмете читались бы
+  // как ошибка генерации.
+  const first = slotDef.stat === 'any' ? choose(rng, ANY_STATS) : slotDef.stat
+  const pool = ANY_STATS.filter(s => s !== first)
+  const picked = [first]
+  while (picked.length < STATS_PER_ITEM && pool.length) {
+    picked.push(pool.splice(Math.floor(rng() * pool.length), 1)[0])
+  }
+  const stats = picked.map((stat, i) => ({
+    stat,
+    value: +(itemPower(rarity.mul, level, stat === 'critChance') * STAT_SHARES[i]).toFixed(4),
+  }))
 
-  const value = itemPower(rarity.mul, level, stat === 'critChance')
   const nouns = NOUN[slotDef.id]
   const nounIdx = Math.floor(rng() * nouns.length)
   const name = `${choose(rng, PREFIX)} ${nouns[nounIdx]}`
   const item = {
     uid: `${Date.now().toString(36)}${Math.floor(rng() * 1e9).toString(36)}`,
-    slot: slotDef.id, rarity: rarity.id, name, stat, value, level,
+    slot: slotDef.id, rarity: rarity.id, name, stats, level,
   }
   // Тип оружия (индекс NOUN.weapon) → визуал выстрела в бою.
   if (slotDef.id === 'weapon') item.wtype = nounIdx

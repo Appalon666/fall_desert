@@ -9,6 +9,7 @@ import { heroScaleFor, buildHowToSheets } from '../assets.js'
 import { Platform } from '../platform/yandex.js'
 import { Sfx } from '../audio/sfx.js'
 import { Music } from '../audio/music.js'
+import { toast } from '../gfx/fx.js'
 import { t } from '../i18n.js'
 import { fmt, fmtDuration } from '../util/format.js'
 
@@ -339,7 +340,15 @@ export default class HubScene extends Phaser.Scene {
       // Сначала close(), потом реклама. В обратном порядке showRewarded ставит
       // игру на паузу, и следом за ним close() открывал «Как играть» — окно
       // рождалось уже в паузе, с мёртвыми кнопками.
-      onClick: () => { close(); Platform.showRewarded(() => State.addCaps(res.caps)) },
+      onClick: () => {
+        close()
+        Platform.showRewarded(
+          () => State.addCaps(res.caps),
+          // Яндекс 4.5: не досмотрел — удвоения нет. Базовую награду игрок уже
+          // забрал (claimOffline выше), так что терять ему нечего.
+          () => toast(this, t('Награда не начислена: ролик не досмотрен'), '#ff9a6a'),
+        )
+      },
     }).setDepth(92)
   }
 }

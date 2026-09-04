@@ -4,17 +4,21 @@
 import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES } from '../config.js'
 import { State } from '../state/GameState.js'
-import { CRAFT_TIERS, RARITIES, RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL } from '../data/loot.js'
+import { CRAFT_TIERS, RARITIES, RARITY_BY_ID, SLOT_BY_ID, STAT_SHORT, itemStats } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX, panel, resIcon, itemIcon } from '../ui/scenery.js'
 import { Sfx } from '../audio/sfx.js'
 import { t, itemName } from '../i18n.js'
 import { fmt } from '../util/format.js'
 
+// Все статы выкованного предмета. Названия короткие: их теперь три, и полными
+// («урон союзников») строка вылезала за карточку результата.
 function statText(it) {
-  const v = it.value
-  const label = t(STAT_LABEL[it.stat] || it.stat)
-  return `${it.stat === 'critChance' ? '+' + (v * 100).toFixed(1) : '+' + (v * 100).toFixed(0)}% ${label}`
+  return itemStats(it).map((st) => {
+    const label = t(STAT_SHORT[st.stat] || st.stat)
+    const n = st.stat === 'critChance' ? (st.value * 100).toFixed(1) : (st.value * 100).toFixed(0)
+    return `+${n}% ${label}`
+  }).join(' · ')
 }
 function topPct(luck) {
   const top = RARITIES.filter((r, i) => i >= 2).reduce((s, r) => s + r.weight, 0)
@@ -110,7 +114,9 @@ export default class ForgeScene extends Phaser.Scene {
     // фолбэком, если лист иконок ещё не доехал).
     const icon = itemIcon(this, -w / 2 + 30, 0, item, slot.icon, 38, item.slot, 0.5)
     const name = this.add.text(-w / 2 + 62, -16, itemName(item.name), { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: rar.css, fontStyle: 'bold' }).setOrigin(0, 0.5)
-    const sub = this.add.text(-w / 2 + 62, 12, `${t(slot.name)} · ${t(rar.name)} · ${statText(item)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '14px', color: '#ddd2b4' }).setOrigin(0, 0.5)
+    // Название слота из строки убрано: его показывает иконка слева, а место
+    // нужно трём статам предмета.
+    const sub = this.add.text(-w / 2 + 62, 12, `${t(rar.name)} · ${statText(item)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '14px', color: '#ddd2b4' }).setOrigin(0, 0.5)
     const tag = this.add.text(w / 2 - 20, 0, t('скован!'), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic }).setOrigin(1, 0.5)
     this.resultBox.add([bg, glow, icon, name, sub, tag])
     this.resultBox.setScale(0.8).setAlpha(0)

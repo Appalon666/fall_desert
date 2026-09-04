@@ -3,6 +3,9 @@
 // Проверяются пункты, по которым игру уже снимали с публикации:
 //   п.1.3 — при сворачивании окна и переходе на другую вкладку звук/музыка
 //           должны молчать;
+//   п.1.14 — возврат на вкладку обязан расклинить игру, даже если браузер не
+//           прислал ни одного события;
+//   п.1.15 — своей заглушки о повороте устройства в игре нет;
 //   п.4.7 — под полноэкранной рекламой (interstitial/rewarded) звук на паузе.
 // Плюс то, что легко сломать правкой: снятие одной причины паузы не должно
 // возвращать звук, пока держится другая, а пользовательский мьют не должен
@@ -143,16 +146,45 @@ const muteKept = await page.evaluate(() => !!window.__yp.game.sound.mute)
 check('выключённый игроком звук не включился сам после паузы', muteKept)
 await page.evaluate(() => { window.__yp.game.sound.mute = false })
 
-// --- портрет на телефоне (п.1.8): экран «поверни устройство» тоже глушит ---
+// --- п.1.15: своей заглушки о повороте в игре быть не должно ---
+//
+// Раньше здесь жил экран «поверни устройство», и он же ставил игру на паузу.
+// Модерация сняла игру дважды: за саму заглушку (свои запрещены — ориентация
+// объявляется в консоли, стоп-экран рисует платформа) и за то, что она
+// залипала — `orientationchange` прилетает до обновления размеров окна, так что
+// в ландшафте заглушка оставалась висеть вместе с паузой.
 await page.setViewportSize({ width: 540, height: 960 })
-await page.waitForTimeout(600)
+await page.emulateMedia({ media: 'screen' })
+await page.waitForTimeout(800)
 const portrait = await snapshot()
-// На desktop-контексте pointer не coarse, поэтому пауза не обязана срабатывать —
-// проверяем только, что состояние осталось согласованным.
-check('портретная ориентация не ломает состояние паузы',
-  portrait.mute === portrait.paused || portrait.reasons.includes('orientation'),
+check('п.1.15 в портрете нет своей заглушки о повороте',
+  await page.evaluate(() => !document.getElementById('rotate') && !document.body.classList.contains('portrait-lock')))
+check('п.1.15 портрет не ставит игру на паузу', !portrait.paused && portrait.running.length > 0,
   `причины: ${portrait.reasons.join(',') || 'нет'}`)
 await page.setViewportSize({ width: 1280, height: 720 })
+await page.waitForTimeout(600)
+
+// --- п.1.14: возврат на вкладку расклинивает игру, даже если событие потеряно ---
+//
+// Сторож в main.js раз в секунду сверяет паузу с document.hidden. Проверяем
+// именно его: ставим паузу как «скрытая вкладка», возвращаем видимость БЕЗ
+// события visibilitychange — игра всё равно обязана ожить.
+await page.evaluate(() => {
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+  document.dispatchEvent(new Event('visibilitychange'))
+})
+await page.waitForTimeout(400)
+const stuck = await snapshot()
+check('п.1.14 скрытая вкладка → игра стоит', stuck.paused)
+await page.evaluate(() => {
+  // Событие «проглочено»: снимать паузу некому, кроме сторожа.
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+})
+await page.waitForTimeout(2000)
+const unstuck = await snapshot()
+check('п.1.14 без события возврата сторож всё равно снимает паузу',
+  !unstuck.paused && !unstuck.mute && unstuck.running.length > 0,
+  `причины: ${unstuck.reasons.join(',') || 'нет'}`)
 
 await browser.close()
 

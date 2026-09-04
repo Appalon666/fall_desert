@@ -34,9 +34,19 @@ export function enemiesInWave(zoneIndex, killsInZone = 0) {
 // скорости spawnGapFloor — иначе на глубине поток превращается в сплошную стену,
 // в которой уже ничего не читается.
 export function spawnGap(zoneIndex) {
-  const k = Math.pow(BAL.spawnGapZoneDecay, Math.max(0, Math.floor(zoneIndex) || 0))
-  const min = Math.max(BAL.spawnGapFloor, Math.round(BAL.spawnGapMin * k))
-  const max = Math.max(min, Math.round(BAL.spawnGapMax * k))
+  const z = Math.max(0, Math.floor(zoneIndex) || 0)
+  const k = Math.pow(BAL.spawnGapZoneDecay, z)
+  let min = Math.max(BAL.spawnGapFloor, Math.round(BAL.spawnGapMin * k))
+  let max = Math.max(min, Math.round(BAL.spawnGapMax * k))
+  // Вторая ступень глубины (с BAL.abyssZoneStart) ускоряет поток на 2% за
+  // локацию — и уводит его НИЖЕ обычного пола, до своего abyssGapFloor.
+  // Иначе ускорять нечего: к 34-й локации интервал уже лежит на 260 мс.
+  const deep = Math.max(0, (z + 1) - BAL.abyssZoneStart)
+  if (deep > 0) {
+    const a = Math.pow(BAL.abyssSpawnRamp, deep)
+    min = Math.max(BAL.abyssGapFloor, Math.round(min * a))
+    max = Math.max(min, Math.round(max * a))
+  }
   return { min, max }
 }
 
@@ -56,6 +66,31 @@ export function spawnBatchMax(zoneIndex) {
 export function zoneKillsFor() {
   return BAL.zoneKills
 }
+
+// ФИЗИЧЕСКИЙ ПОТОЛОК ТЕМПА УБИЙСТВ НА ЭТОЙ ЛОКАЦИИ, убийств в секунду боя.
+//
+// Убить можно только того, кто уже вышел на арену, а выходят враги пачками не
+// больше spawnBatchMax(zone) и не чаще spawnGap(zone).min. Отсюда и потолок.
+// Он ЩЕДРЫЙ: размер пачки бросается случайно от spawnBatchBase, поэтому даже
+// идеальный автокликер, убивающий каждого врага мгновенно, выдаёт примерно
+// две трети от этого числа — замерено в игре. Плюс потолок не учитывает ворота
+// зон: каждые zoneKills убийств поток встаёт на босса и на окно «локация
+// взята».
+//
+// СЧИТАЕТСЯ ПО ЛОКАЦИИ, а не одним числом на всю игру: на первой локации поток
+// даёт 2 убийства в секунду, а за 60-й, где вторая ступень его разгоняет, — в
+// двадцать раз больше. Плоский потолок пришлось бы брать по самой быстрой
+// локации, и на мелководье он перестал бы что-либо значить.
+//
+// Нужен таблице рекордов: см. GameState.leaderboardScore.
+export function maxKillsPerSec(zoneIndex) {
+  const g = spawnGap(zoneIndex)
+  return spawnBatchMax(zoneIndex) / (g.min / 1000)
+}
+
+// Самый быстрый темп, возможный в игре ВООБЩЕ. Нужен только для миграции старых
+// сейвов и для отчётов инструментов.
+export const MAX_KILLS_PER_SEC = BAL.spawnBatchMax / (BAL.abyssGapFloor / 1000)
 
 // Пора ли выпускать босса-ворот (набрали норму убийств в зоне).
 export function bossDue(killsInZone) {

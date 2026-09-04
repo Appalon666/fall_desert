@@ -90,34 +90,10 @@
       transition: width 0.25s ease-out;
     }
     #pl-pct { color: #e8bf3a; font-size: clamp(15px, 2.6vw, 20px); font-weight: 700; }
-    /* Просьба повернуть телефон (Яндекс 1.8): в портрете игровое поле сжимается
-       в узкую полосу — кнопки и текст становятся мелкими. Игра — ландшафтная. */
-    #rotate {
-      position: fixed;
-      inset: 0;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 18px;
-      padding: 24px;
-      box-sizing: border-box;
-      text-align: center;
-      background: radial-gradient(ellipse at 50% 40%, #2a2013 0%, #0b0806 80%);
-      color: #fbf3df;
-      z-index: 60;
-    }
-    #rotate .rot-icon {
-      font-size: clamp(56px, 16vw, 110px);
-      animation: rot-tilt 2s ease-in-out infinite;
-    }
-    #rotate .rot-text { font-size: clamp(18px, 5vw, 28px); font-weight: 700; color: #e8bf3a; }
-    #rotate .rot-sub { font-size: clamp(14px, 3.6vw, 19px); color: #cbb98e; }
-    @keyframes rot-tilt {
-      0%, 45% { transform: rotate(0deg); }
-      70%, 100% { transform: rotate(90deg); }
-    }
-    body.portrait-lock #rotate { display: flex; }
+    /* Экрана «поверни устройство» в игре НЕТ намеренно (Яндекс 1.15): свои
+       заглушки о повороте запрещены — ориентация объявлена в консоли
+       разработчика (ландшафт), и нужную заглушку рисует сама платформа.
+       Игра просто масштабируется под любой размер окна (Phaser Scale.FIT). */
   </style>
 </head>
 <body>
@@ -127,11 +103,6 @@
     <div id="pl-track"><div id="pl-fill"></div></div>
     <div id="pl-pct">0%</div>
     <div class="pl-hint">Разогреваем дробовик…</div>
-  </div>
-  <div id="rotate">
-    <div class="rot-icon">📱</div>
-    <div class="rot-text">Поверни устройство</div>
-    <div class="rot-sub">Игра рассчитана на горизонтальный экран —<br />так кнопки и враги крупные и удобные.</div>
   </div>
   <!-- Страховка от «вечного экрана загрузки» (Яндекс 1.14): если модуль игры не
        выполнился (ошибка сети/JS), показываем понятное сообщение с перезагрузкой,

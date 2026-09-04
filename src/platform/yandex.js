@@ -172,25 +172,50 @@ class YandexPlatform {
   // должны молчать И звук, И игровой процесс).
   attachGame(game) { this.game = game; Pause.attach(game) }
 
-  // Пауза на время ролика. Сторож нужен на случай, если SDK не вызовет ни один
-  // колбэк (реклама не открылась): иначе игра осталась бы висеть на паузе.
-  // Срок намеренно большой: снять паузу раньше, чем реклама успела открыться,
-  // хуже — тогда под роликом заиграет музыка (нарушение п.4.7).
-  _adStart() {
+  // Пауза на время ролика и два сторожа против вечной паузы:
+  //    15 с — ролик так и не открылся (SDK не прислал ни одного колбэка);
+  //     3 мин — ролик открылся и не закрылся (не пришли ни onClose, ни onError).
+  // Сроки намеренно большие: снять паузу раньше, чем реклама успела открыться,
+  // хуже — тогда под роликом заиграет музыка (нарушение п.4.7). Но не «никогда»:
+  // висящая пауза для игрока неотличима от зависшей игры (п.1.14).
+  //
+  // onStuck — что сделать, если сторож всё-таки сработал. Через него вызвавшая
+  // сторона узнаёт, что показа не было: rewarded не выдаст награду, а переход,
+  // который ждал конца ролика, всё же состоится.
+  _adStart(onStuck = null) {
+    this._adBusy = true
+    this._adStuck = onStuck
     Pause.add(PAUSE.AD)
     this._adOpened = false // хвост от прошлого показа не должен глушить сторожа
-    if (this._adGuard) clearTimeout(this._adGuard)
-    this._adGuard = setTimeout(() => { if (!this._adOpened) this._adEnd() }, 15000)
+    this._clearAdGuards()
+    this._adGuard = setTimeout(() => { if (!this._adOpened) this._adGiveUp() }, 15000)
   }
   _adOpen() {
     this._adOpened = true
     if (this._adGuard) { clearTimeout(this._adGuard); this._adGuard = null }
     Pause.add(PAUSE.AD) // на случай, если ролик стартовал без нашего _adStart
+    // Старый сторож снимаем обязательно: SDK может прислать onOpen дважды за
+    // один показ, и тогда первый таймер стал бы недосягаем для _clearAdGuards —
+    // сработал бы посреди СЛЕДУЮЩЕГО ролика и вернул музыку прямо под ним.
+    if (this._adHard) clearTimeout(this._adHard)
+    this._adHard = setTimeout(() => this._adGiveUp(), 180000)
+  }
+  // Сдаёмся: снимаем паузу и сообщаем об этом тому, кто показ заказывал.
+  _adGiveUp() {
+    const stuck = this._adStuck
+    this._adEnd()
+    try { if (stuck) stuck() } catch (e) { /* */ }
   }
   _adEnd() {
+    this._adBusy = false
     this._adOpened = false
-    if (this._adGuard) { clearTimeout(this._adGuard); this._adGuard = null }
+    this._adStuck = null
+    this._clearAdGuards()
     Pause.remove(PAUSE.AD)
+  }
+  _clearAdGuards() {
+    if (this._adGuard) { clearTimeout(this._adGuard); this._adGuard = null }
+    if (this._adHard) { clearTimeout(this._adHard); this._adHard = null }
   }
 
   // СТРАХОВКА ОТ ВЕЧНОЙ ПАУЗЫ. Сторож в _adStart снимается по onOpen, поэтому
@@ -208,7 +233,17 @@ class YandexPlatform {
   wakeFromStuckAd() {
     if (Pause.has(PAUSE.REVIEW)) Pause.remove(PAUSE.REVIEW)
     if (!Pause.has(PAUSE.AD)) return
-    this._adEnd()
+    // ТОЛЬКО про уже ОТКРЫТЫЙ ролик. Между нажатием кнопки и onOpen проходит от
+    // сотен миллисекунд до секунд — игра в это время уже стоит (паузу берём до
+    // вызова SDK, иначе музыка успеет заиграть под роликом). Экран замер, и
+    // игрок жмёт ещё раз — вот этот второй тап и приходит сюда. Если сдаться на
+    // нём, показ считается несостоявшимся: ролик потом откроется, честно
+    // прокрутится до конца, а награда уже никому не достанется («settled»).
+    // Случай «ролик так и не открылся» закрывает сторож на 15 секунд.
+    if (!this._adOpened) return
+    // Ролик открылся и молчит: показа фактически нет, и вызвавшая сторона должна
+    // это узнать — иначе переход, ждавший конца ролика, не состоится никогда.
+    this._adGiveUp()
   }
 
   // На платформе игра всегда живёт в iframe Яндекса. Вне его (localhost,
@@ -218,21 +253,45 @@ class YandexPlatform {
   // висела до 15-секундного сторожа. Выглядело как зависание на смене зоны.
   _embedded() { try { return window.self !== window.top } catch (e) { return true } }
 
-  // Реклама за награду. Гарантирует РОВНО один вызов onReward (успех/ошибка).
-  // Локально (без SDK или вне iframe) — сразу выдаём награду.
-  showRewarded(onReward, onClose) {
+  // Реклама за награду (Яндекс 4.5).
+  //
+  // ГЛАВНОЕ ПРАВИЛО: награду выдаёт ТОЛЬКО колбэк onRewarded самого SDK. Раньше
+  // здесь стояло «не наказываем игрока — если награды не было, выдаём», и
+  // onClose выдавал приз даже когда ролик закрывали на первой секунде. Для
+  // игрока это значило, что смотреть рекламу незачем, а для платформы — прямое
+  // нарушение п.4.5 (награда при отказе от просмотра), с которым игра и
+  // вернулась с модерации.
+  //
+  // Ровно один из колбэков срабатывает всегда: onReward — досмотрел; onFail — во
+  // всех остальных случаях (закрыл раньше, ошибка показа, ролик не открылся,
+  // сработал сторож). onFail нужен, чтобы экран объяснил игроку, почему награды
+  // нет, — иначе кнопка выглядит сломанной.
+  //
+  // Награду отдаём после _adEnd(), уже без паузы: всплывашки и твины, созданные
+  // под роликом, стояли бы неподвижно до его конца.
+  showRewarded(onReward, onFail) {
     let settled = false
-    const reward = () => { if (settled) return; settled = true; try { onReward && onReward() } catch (e) { /* */ } }
-    const closed = () => { try { onClose && onClose() } catch (e) { /* */ } }
-    if (!this.available || !this.ya?.adv || !this._embedded()) { reward(); closed(); return }
-    const finish = () => { this._adEnd(); reward(); closed() }
-    this._adStart()
+    let rewarded = false
+    // Один показ за раз. Сторожа и флаги показа в Platform одни на всех, и
+    // второй вызов затёр бы их у первого — тот остался бы вообще без развязки:
+    // ни награды, ни отказа, кнопка молча ничего не делает.
+    if (this._adBusy) { try { if (onFail) onFail() } catch (e) { /* */ } return }
+    const fire = (fn) => { if (settled) return; settled = true; try { if (fn) fn() } catch (e) { /* */ } }
+    const finish = () => { this._adEnd(); fire(rewarded ? onReward : onFail) }
+    // Вне iframe платформы (localhost, dist открытый файлом) рекламы нет вовсе:
+    // postMessage слать некому, колбэки не придут. Это режим разработки — награду
+    // выдаём сразу, чтобы экраны можно было проверять. На Яндексе игра всегда в
+    // iframe, так что сюда там не попасть.
+    if (!this._embedded()) { fire(onReward); return }
+    // В iframe, но SDK нет (не загрузился, вырезан блокировщиком): показать
+    // рекламу нечем — значит, и награды нет.
+    if (!this.available || !this.ya?.adv) { fire(onFail); return }
+    this._adStart(() => fire(onFail))
     try {
       this.ya.adv.showRewardedVideo({
         callbacks: {
           onOpen: () => this._adOpen(),
-          onRewarded: () => reward(),
-          // Досмотрели/закрыли: не наказываем игрока — если награды не было, выдаём.
+          onRewarded: () => { rewarded = true },
           onClose: finish,
           onError: finish,
         },
@@ -240,28 +299,46 @@ class YandexPlatform {
     } catch (e) { finish() }
   }
 
-  // Межстраничная реклама. Клиентский троттлинг ≥75с (Яндекс требует ≥60с и
-  // не одобряет частый показ; зоны могут сменяться чаще).
-  showInterstitial() {
-    if (!this.available || !this.ya?.adv || !this._embedded()) return
+  // Межстраничная реклама (Яндекс 4.4).
+  //
+  // ГДЕ ЕЁ ЗОВУТ. Игра — реалтайм с короткими локациями, а для такого случая
+  // требование прямо запрещает показ по ИГРОВОМУ действию: ролик уместен только
+  // на неигровом. Поэтому точка вызова одна — выход из вылазки в лагерь, то есть
+  // переход в меню. Раньше реклама висела на кнопках «идти дальше» и «смириться
+  // и продолжить»: обе продолжают геймплей, и именно за это игра вернулась с
+  // модерации по п.4.4.
+  //
+  // onDone вызывается РОВНО один раз и всегда: после закрытия ролика, сразу же
+  // при отказе от показа (троттл, нет SDK) и по сторожу, если SDK замолчал.
+  // Через него сцена делает переход — экран сменяется после рекламы, а не под ней.
+  //
+  // Клиентский троттлинг ≥75 с (Яндекс требует ≥60 с и не одобряет частый показ).
+  showInterstitial(onDone = null) {
+    let settled = false
+    const done = () => { if (settled) return; settled = true; try { if (onDone) onDone() } catch (e) { /* */ } }
+    if (!this.available || !this.ya?.adv || !this._embedded()) { done(); return }
+    // Показ уже идёт — второй не начинаем и onDone НЕ зовём: переход принадлежит
+    // первому вызову, он его и сделает, когда ролик закроется. Позвать done()
+    // здесь значило бы открыть лагерь прямо под работающей рекламой (п.4.7).
+    if (this._adBusy) return
     const now = Date.now()
-    if (now - this._lastAd < 75000) return
+    if (now - this._lastAd < 75000) { done(); return }
     // Отдельный троттл на ПОПЫТКИ: если реклама не показалась (нет инвентаря),
-    // _lastAd не обновится, и без этого мы дёргали бы SDK на каждой смерти.
-    if (now - (this._lastAdTry || 0) < 20000) return
+    // _lastAd не обновится, и без этого мы дёргали бы SDK на каждом выходе.
+    if (now - (this._lastAdTry || 0) < 20000) { done(); return }
     this._lastAdTry = now
     // Глушим звук и геймплей ДО вызова: ролик может стартовать раньше onOpen.
-    this._adStart()
+    this._adStart(done)
     try {
       this.ya.adv.showFullscreenAdv({
         callbacks: {
           // Троттл сбрасываем только когда реклама реально открылась (onOpen).
           onOpen: () => { this._lastAd = Date.now(); this._adOpen() },
-          onClose: () => this._adEnd(),
-          onError: () => this._adEnd(),
+          onClose: () => { this._adEnd(); done() },
+          onError: () => { this._adEnd(); done() },
         },
       })
-    } catch (e) { this._adEnd() }
+    } catch (e) { this._adEnd(); done() }
   }
 
   // ---------------- Оценка игры ----------------
@@ -301,6 +378,9 @@ class YandexPlatform {
     this._reviewAsked = true // ровно один запрос за сессию, даже если ниже упадём
     // Яндекс 4.7: пока поверх игры висит окно платформы, игра не идёт и молчит.
     Pause.add(PAUSE.REVIEW)
+    // Тот же сторож, что у рекламы (п.1.14): если промис SDK не придёт никогда,
+    // снимать паузу будет некому, и для игрока игра просто зависнет.
+    const guard = setTimeout(() => Pause.remove(PAUSE.REVIEW), 60000)
     let opened = true
     try {
       const r = await this.ya.feedback.requestReview()
@@ -313,6 +393,7 @@ class YandexPlatform {
       opened = false
       this._reviewSent = false
     } finally {
+      clearTimeout(guard)
       Pause.remove(PAUSE.REVIEW)
     }
     return opened

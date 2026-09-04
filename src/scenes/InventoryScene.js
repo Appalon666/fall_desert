@@ -5,7 +5,7 @@
 import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
-import { RARITY_BY_ID, SLOT_BY_ID, STAT_LABEL, scrapValue } from '../data/loot.js'
+import { RARITY_BY_ID, SLOT_BY_ID, STAT_SHORT, STAT_ICON, scrapValue, itemQuality, itemRank, itemStats } from '../data/loot.js'
 import { RELIC_PARTS } from '../data/relics.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX, resIcon, itemIcon } from '../ui/scenery.js'
@@ -28,11 +28,38 @@ const SLOT_META = {
 // чтобы они не наезжали друг на друга.
 const RELIC_PANEL_Y = 528
 
+// Сравнение с тем, что уже надето в этом гнезде. Без него список — набор
+// несравнимых процентов: «+20.0% шанс крита» у реликвии рядом с «+75% крышек» у
+// легенды читается как понижение, хотя реликвия сильнее в 1.6 раза (проценты
+// разных статов просто считаются по разным коэффициентам, см. itemRank).
+//
+// Для аксессуаров сравниваем с ЗАНЯТЫМ гнездом — с тем, что реально уступит
+// место (targetKey в GameState отдаёт acc1, когда оба заняты).
+function compareToEquipped(it) {
+  const cur = State.equipment[State.targetKey(it.slot)]
+  if (!cur) return { mark: t('↑ пусто'), color: CSS.toxic }
+  const a = itemRank(it), b = itemRank(cur)
+  if (a > b) return { mark: t('↑ лучше'), color: CSS.toxic }
+  if (a < b) return { mark: t('↓ хуже'), color: '#c98a8a' }
+  return { mark: t('= как есть'), color: '#b8ad9a' }
+}
+
+// Только что добытый предмет (ковка, дроп, крафт на верстаке) — см.
+// GameState.addItem. Список показывает шесть строк из сотен, и без этого
+// свежая вещь тонула среди старых.
+const isNew = (it) => !!(it && State.lastItemUid && it.uid === State.lastItemUid)
+
+// Проценты у статов печатаются по-разному: шанс крита считается по другому
+// коэффициенту и бывает дробным, остальные — целые.
+const pct = (st) => (st.stat === 'critChance' ? (st.value * 100).toFixed(1) : (st.value * 100).toFixed(0))
+
+// Статы словами — для списка добычи (там на строку есть 320 px).
 function statText(it) {
-  const v = it.value
-  const label = t(STAT_LABEL[it.stat] || it.stat)
-  if (it.stat === 'critChance') return `+${(v * 100).toFixed(1)}% ${label}`
-  return `+${(v * 100).toFixed(0)}% ${label}`
+  return itemStats(it).map(st => `+${pct(st)}% ${t(STAT_SHORT[st.stat] || st.stat)}`).join(' · ')
+}
+// Статы значками — для карточек «куклы», где строка вдвое уже.
+function statIcons(it) {
+  return itemStats(it).map(st => `${STAT_ICON[st.stat] || ''}${pct(st)}`).join('  ')
 }
 
 export default class InventoryScene extends Phaser.Scene {
@@ -181,7 +208,7 @@ export default class InventoryScene extends Phaser.Scene {
     }).setOrigin(0)
     c.add([bg, head])
 
-    // Гнёзда частей: собранная — своя иконка и оранжевая рамка, недостающая — тусклая.
+    // Гнёзда частей: собранная — своя иконка и красная рамка, недостающая — тусклая.
     RELIC_PARTS.forEach((p, i) => {
       const px = 14 + i * 62, py = 42, s = 54
       const has = State.hasRelicPart(p.id)
@@ -230,12 +257,14 @@ export default class InventoryScene extends Phaser.Scene {
   }
 
   equipSummary() {
+    // Короткими ярлыками: со смешанными статами ненулевыми становятся почти все
+    // пять, и полными названиями строка вылезала за пределы экрана.
     const parts = []
     for (const stat of ['clickMul', 'hpMul', 'critChance', 'allyMul', 'capsMul']) {
       const v = State.equipSum(stat)
       if (v > 0) {
-        const label = t(STAT_LABEL[stat])
-        parts.push(stat === 'critChance' ? `+${(v * 100).toFixed(1)}% ${label}` : `+${(v * 100).toFixed(0)}% ${label}`)
+        const n = stat === 'critChance' ? (v * 100).toFixed(1) : (v * 100).toFixed(0)
+        parts.push(`${STAT_ICON[stat]}+${n}%`)
       }
     }
     return parts.length ? t('От экипировки:  {parts}', { parts: parts.join('   ') }) : t('Экипировка пуста')
@@ -262,7 +291,9 @@ export default class InventoryScene extends Phaser.Scene {
       fontFamily: 'Rubik, sans-serif', fontSize: '16px',
       color: it ? rar.css : '#9a9078', fontStyle: 'bold', wordWrap: { width: w - 62 },
     }).setOrigin(0, 0.5)
-    const st = this.add.text(-w / 2 + 52, 32, it ? statText(it) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.toxic }).setOrigin(0, 0.5)
+    // Значками, а не словами: три стата словами в 150 px не помещаются, а
+    // уменьшить кегль нельзя — 16 px это минимум по читаемости (см. MIN_FONT).
+    const st = this.add.text(-w / 2 + 52, 32, it ? statIcons(it) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.toxic }).setOrigin(0, 0.5)
     c.add([bg, icon, head, body, st])
     if (it) {
       const z = this.add.zone(-w / 2, -h / 2, w, h).setOrigin(0).setInteractive({ useHandCursor: true })
@@ -275,8 +306,13 @@ export default class InventoryScene extends Phaser.Scene {
   }
 
   renderLoot() {
+    // Порядок: сначала только что добытое, потом по тиру, внутри тира — по
+    // качеству (доля от потолка), а не по сырому value: value у крит-вещей
+    // впятеро меньше по формуле, и лучший шлем оказывался ниже рядовых сапог.
     const items = [...State.inventory].sort((a, b) =>
-      (RARITY_BY_ID[b.rarity].mul - RARITY_BY_ID[a.rarity].mul) || (b.value - a.value))
+      (isNew(b) - isNew(a))
+      || (RARITY_BY_ID[b.rarity].mul - RARITY_BY_ID[a.rarity].mul)
+      || (itemQuality(b) - itemQuality(a)))
     const ix = GAME.WIDTH * 0.72 - 260
     let iy = 108
     const maxRows = 6
@@ -297,8 +333,24 @@ export default class InventoryScene extends Phaser.Scene {
       bg.lineStyle(2, rar.color, 1); bg.strokeRoundedRect(0, 0, w, h, 8)
       const icon = this.slotIcon(14, h / 2, it, slot.icon, 34, it.slot)
       const name = this.add.text(50, 12, itemName(it.name), { fontFamily: 'Rubik, sans-serif', fontSize: '17px', color: rar.css, fontStyle: 'bold' }).setOrigin(0)
-      const st = this.add.text(50, 33, `${t(slot.name)} · ${t(rar.name)} · ${statText(it)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#ddd2b4' }).setOrigin(0)
+      // Название слота из подписи убрано: его и так показывают иконка предмета и
+      // гнездо, в которое он пойдёт, а место на строке нужно приговору справа.
+      // Три стата вместо одного, поэтому названия статов короткие, а имя тира из
+      // подписи убрано: тир и так виден по цвету имени и рамки.
+      const st = this.add.text(50, 33, statText(it), { fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#ddd2b4' }).setOrigin(0)
       c.add([bg, icon, name, st])
+      if (isNew(it)) {
+        c.add(this.add.text(56 + name.width, 14, t('НОВОЕ'), {
+          fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: CSS.toxic, fontStyle: 'bold',
+        }).setOrigin(0))
+      }
+      // Приговор «лучше/хуже» — на строку С ИМЕНЕМ, к правому краю. Вторая строка
+      // теперь занята тремя статами: любой кегль в игре не меньше 16 px
+      // (см. MIN_FONT), и приговор туда уже не помещался.
+      const cmp = compareToEquipped(it)
+      c.add(this.add.text(w - 158, 14, cmp.mark, {
+        fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: cmp.color, fontStyle: 'bold',
+      }).setOrigin(1, 0))
 
       const equipZone = this.add.zone(0, 0, w - 150, h).setOrigin(0).setInteractive({ useHandCursor: true })
       equipZone.on('pointerup', () => { State.equip(it.uid); this.safeRender() })

@@ -14,7 +14,7 @@
 
 import { BAL } from '../src/data/balance.js'
 import { defOf } from '../src/data/bosses.js'
-import { enemyStats } from '../src/data/scaling.js'
+import { enemyStats, deepRampMul, deepRampSpeedMul } from '../src/data/scaling.js'
 import { getZone, zoneHpMul } from '../src/data/zones.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
 import { ALLIES, allyCost } from '../src/data/allies.js'
@@ -49,7 +49,7 @@ function runOne(classId, rng) {
       hero: { level: 1, xp: 0, points: 0, str: cls.startStats.str, vit: cls.startStats.vit, luck: cls.startStats.luck },
       upgrades: meta.prestige.quickstart > 0 ? { damage: meta.prestige.quickstart } : {},
       allies: { ...cls.startAllies },
-      zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, bossActive: false, waveCount: 0, deepKills: 0,
+      zoneIndex: 0, killsInZone: 0, totalKills: 0, combo: 0, hp: 0, bossActive: false, waveCount: 0, deepKills: 0, abyssKills: 0,
     }
     st.hp = heroMaxHp()
   }
@@ -110,12 +110,10 @@ function runOne(classId, rng) {
     const prog = Math.pow(BAL.enemyLevelRamp, Math.min(lv, BAL.enemyLevelRampCap)) * Math.pow(BAL.enemyLevelTail, Math.max(0, lv - BAL.enemyLevelRampCap)) * zoneHpMul(st.zoneIndex)
     const wv = Math.pow(BAL.enemyWaveRamp, st.waveCount)
     const b = enemyStats(def, st.totalKills, boss)
-    // Глубинный рамп — тот же, что в бою (см. GameState.deepZoneMul): ступенька
-    // за локацию × рост по убийствам, сделанным на глубине.
-    const deep = Math.pow(BAL.deepZoneRamp, Math.max(0, (st.zoneIndex + 1) - BAL.deepZoneStart))
-      * Math.pow(BAL.deepKillRamp, Math.floor(st.deepKills / BAL.deepKillStep))
+    // Глубинный рамп берём той же функцией, что и бой (см. GameState.deepZoneMul).
+    const deep = deepRampMul(st.zoneIndex + 1, st.deepKills, st.abyssKills)
     const hp = b.hp * af.hp * mHp * prog * wv * deep, reward = b.reward * af.rew, dmg = b.dmg * af.dmg * mDmg * wv * deep
-    const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd * Math.min(BAL.deepSpeedCap, deep)
+    const speed = BAL.enemySpeed * def.speedMul * (boss ? 0.7 : 1) * af.spd * deepRampSpeedMul(st.zoneIndex + 1, st.deepKills, st.abyssKills)
     const approach = boss ? 0.3 : Math.max(0, (710 - BAL.enemyAttackRange) / speed)
     wave.push({ hp, reward, dmg, approach, attackAccum: 0, boss })
     if (!boss) { spawned++; if (spawned % WAVE_EVERY === 0) st.waveCount++ }
@@ -136,6 +134,7 @@ function runOne(classId, rng) {
     while (st.hero.xp >= xpNeed()) { st.hero.xp -= xpNeed(); st.hero.level++; st.hero.points += BAL.pointsPerLevel }
     // Убийство на глубине — топливо глубинного рампа (см. GameState.registerKill).
     if ((st.zoneIndex + 1) >= BAL.deepZoneStart) st.deepKills++
+    if ((st.zoneIndex + 1) >= BAL.abyssZoneStart) st.abyssKills++
     if (e.boss) { st.totalKills++; st.bossActive = false; st.zoneIndex++; st.killsInZone = 0; st.waveCount = 0 }
     else { st.totalKills++; st.killsInZone++ }
   }

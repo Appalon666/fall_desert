@@ -65,30 +65,30 @@ Platform.attachGame(game)
 // (правый клик на ПК, долгий тап на мобиле).
 game.events.once('ready', () => {
   try { game.input.mouse?.disableContextMenu() } catch (e) { /* */ }
-  // Если пауза уже была запрошена до готовности движка (скрытая вкладка,
-  // портретный телефон) — применяем её к звуку и сценам сейчас.
+  // Если пауза уже была запрошена до готовности движка (например, вкладку
+  // свернули на загрузке) — применяем её к звуку и сценам сейчас.
   Pause.reapply()
 })
 try { window.addEventListener('contextmenu', (e) => e.preventDefault()) } catch (e) { /* */ }
 
-// Одна пауза на всех: реклама, скрытая вкладка и портретная ориентация просто
+// Одна пауза на всех: реклама, скрытая вкладка и окно оценки просто
 // «набрасывают» свою причину. Игра звучит и идёт, только когда причин нет.
 Pause.onChange = (paused) => { paused ? Platform.gameplayStop() : Platform.gameplayStart() }
 
-// Яндекс 1.8: игра ландшафтная. В портрете игровое поле сжимается в узкую
-// полоску — кнопки и текст становятся мелкими, промахнуться легко. Поэтому на
-// сенсорных устройствах в портрете показываем экран «поверни устройство».
-try {
-  const coarse = () => { try { return window.matchMedia('(pointer: coarse)').matches } catch (e) { return false } }
-  const applyOrientation = () => {
-    const want = window.innerHeight > window.innerWidth && coarse()
-    try { document.body.classList.toggle('portrait-lock', want) } catch (e) { /* */ }
-    want ? Pause.add(PAUSE.ORIENTATION) : Pause.remove(PAUSE.ORIENTATION)
-  }
-  window.addEventListener('resize', applyOrientation)
-  window.addEventListener('orientationchange', applyOrientation)
-  applyOrientation()
-} catch (e) { /* */ }
+// Про ориентацию экрана здесь НЕТ НИ СТРОЧКИ — и это намеренно (Яндекс 1.15).
+//
+// Раньше тут жил экран «поверни устройство»: в портрете на сенсорном устройстве
+// он показывался и вдобавок ставил игру на паузу (причина ORIENTATION). Две беды
+// сразу:
+//   1) свои заглушки о повороте платформа запрещает — ориентация объявляется в
+//      консоли разработчика (у нас ландшафт), и заглушку рисует сам Яндекс;
+//   2) он залипал. `orientationchange` на мобильных прилетает ДО того, как
+//      window.innerWidth/innerHeight обновятся, поэтому при повороте в ландшафт
+//      условие «высота больше ширины» ещё истинно — заглушка вставала и в
+//      ландшафте, а если следом не приходил resize, снять её было некому. Пауза
+//      при этом висела: экран живой, игра стоит. Ровно это модерация и увидела —
+//      «заглушка в обеих ориентациях» и «игра зависает».
+// Игра просто масштабируется под окно (Phaser Scale.FIT + autoCenter).
 
 // Страховка от зависания на рекламе: см. Platform.wakeFromStuckAd. Слушаем на
 // уровне документа, а не сцены, — при паузе сцены ввод Phaser не обрабатывает.
@@ -102,6 +102,12 @@ try {
 // вкладки и уходе страницы в фон на Android звука быть не должно вообще.
 // visibilitychange закрывает оба случая в Chromium/Firefox; pagehide/freeze —
 // подстраховка для мобильных браузеров, усыпляющих страницу без него.
+//
+// Возврат на вкладку (Яндекс 1.14) страхуем с запасом: паузу снимает не только
+// visibilitychange, но и focus/pageshow/resume, а сверх того — секундный сторож.
+// Пауза, снятая лишний раз, ничего не стоит; ЗАЛИПШАЯ пауза выглядит как
+// зависшая игра, а какое именно событие браузер пришлёт при возврате из фона
+// (особенно на мобильных, из bfcache), заранее не известно.
 try {
   const syncVisibility = () => {
     if (document.hidden) Pause.add(PAUSE.HIDDEN)
@@ -112,6 +118,8 @@ try {
   window.addEventListener('freeze', () => Pause.add(PAUSE.HIDDEN))
   window.addEventListener('pageshow', syncVisibility)
   window.addEventListener('resume', syncVisibility)
+  window.addEventListener('focus', syncVisibility)
+  setInterval(syncVisibility, 1000) // сторож: событие могло не прийти вовсе
   syncVisibility()
 } catch (e) { /* */ }
 
