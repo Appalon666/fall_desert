@@ -1,7 +1,21 @@
 import { t } from '../i18n.js'
 
 // Форматирование больших чисел (крышки растут быстро): 1234 -> «1.2K».
-const SUF = ['', 'K', 'M', 'B', 'T', 'aa', 'ab', 'ac', 'ad']
+//
+// Суффиксы: K, M, B, T, дальше двухбуквенные aa, ab, … zz. Раньше список
+// кончался на `ad` (10^24), и всё, что выше, печаталось как есть: на глубине
+// награда за локацию выглядела как «2.3583123223069979e+30ad» и уезжала за край
+// экрана. Двух букв хватает до 10^2039 — заведомо больше числового предела
+// игры (1e300, см. data/scaling.js).
+const BASE_SUF = ['', 'K', 'M', 'B', 'T']
+const LETTERS = 'abcdefghijklmnopqrstuvwxyz'
+const MAX_TIER = BASE_SUF.length - 1 + LETTERS.length * LETTERS.length
+
+function suffix(tier) {
+  if (tier < BASE_SUF.length) return BASE_SUF[tier]
+  const i = tier - BASE_SUF.length
+  return LETTERS[Math.floor(i / LETTERS.length)] + LETTERS[i % LETTERS.length]
+}
 
 export function fmt(n) {
   if (!Number.isFinite(n)) return '∞'
@@ -9,9 +23,9 @@ export function fmt(n) {
   if (n < 1000) return `${n}`
   let tier = 0
   let v = n
-  while (v >= 1000 && tier < SUF.length - 1) { v /= 1000; tier++ }
+  while (v >= 1000 && tier < MAX_TIER) { v /= 1000; tier++ }
   const s = v >= 100 ? v.toFixed(0) : v.toFixed(1)
-  return `${s}${SUF[tier]}`
+  return `${s}${suffix(tier)}`
 }
 
 // Короткое «сколько прошло»: 3720 сек -> «1 ч 2 мин».

@@ -26,7 +26,7 @@ const SLOT_META = {
 
 // Панель набора реликвии живёт под списком добычи; список ужат до 6 строк,
 // чтобы они не наезжали друг на друга.
-const RELIC_PANEL_Y = 528
+const RELIC_PANEL_Y = 516
 
 // Сравнение с тем, что уже надето в этом гнезде. Без него список — набор
 // несравнимых процентов: «+20.0% шанс крита» у реликвии рядом с «+75% крышек» у
@@ -197,7 +197,11 @@ export default class InventoryScene extends Phaser.Scene {
   // Части падают только с босса десятой локации (см. isRelicZone), поэтому до
   // первой части панель объясняет, куда идти, а не просто светит пустотой.
   renderRelicPanel() {
-    const x = GAME.WIDTH * 0.72 - 260, y = RELIC_PANEL_Y, w = 520, h = 108
+    // Панель шире и выше прежней (520×108). Причина: подписи частей набраны
+    // 16-м кеглем — ниже нельзя (MIN_FONT, п.1.8), — и в прежний шаг гнёзд 62 px
+    // «Сердечник» не помещался: подписи налезали друг на друга, а нижняя строка
+    // уезжала за край панели.
+    const x = GAME.WIDTH * 0.72 - 260, y = RELIC_PANEL_Y, w = 600, h = 124
     const ready = State.canCraftRelic()
     const relic = RARITY_BY_ID.relic
     const c = this.add.container(x, y)
@@ -212,7 +216,7 @@ export default class InventoryScene extends Phaser.Scene {
 
     // Гнёзда частей: собранная — своя иконка и красная рамка, недостающая — тусклая.
     RELIC_PARTS.forEach((p, i) => {
-      const px = 14 + i * 62, py = 42, s = 54
+      const px = 14 + i * 84, py = 40, s = 54
       const has = State.hasRelicPart(p.id)
       const box = this.add.graphics()
       box.fillStyle(has ? 0x3a2410 : COLORS.steelDark, 1); box.fillRoundedRect(px, py, s, s, 8)
@@ -220,15 +224,19 @@ export default class InventoryScene extends Phaser.Scene {
       const icon = this.add.text(px + s / 2, py + s / 2, has ? p.icon : '·', {
         fontSize: has ? '26px' : '22px', color: has ? '#ffd8a8' : '#6a6458',
       }).setOrigin(0.5)
-      const nm = this.add.text(px + s / 2, py + s + 3, has ? t(p.name).split(' ')[0] : '—', {
+      // Только первое слово имени: «Шестерня Ядра» целиком не влезет ни в какой
+      // разумный шаг гнёзд, а первого слова хватает, чтобы часть узнать.
+      const nm = this.add.text(px + s / 2, py + s + 4, has ? t(p.name).split(' ')[0] : '—', {
         fontFamily: 'Rubik, sans-serif', fontSize: '11px', color: has ? '#ddd2b4' : '#7a7268',
       }).setOrigin(0.5, 0)
       c.add([box, icon, nm])
     })
 
     if (ready) {
-      const btn = createButton(this, x + w - 130, y + h / 2, {
-        label: t('🔥 Выковать'), width: 220, height: 56, fontSize: 19,
+      // Кнопка правее и уже прежней: гнёзда с подписями теперь занимают
+      // 14…404 по ширине панели, и старая (220 px по центру w-130) на них лезла.
+      const btn = createButton(this, x + w - 90, y + h / 2, {
+        label: t('🔥 Выковать'), width: 160, height: 56, fontSize: 19,
         color: 0x8a4b10, hover: 0xc06a18,
         onClick: () => {
           const item = State.craftRelic()
@@ -244,7 +252,8 @@ export default class InventoryScene extends Phaser.Scene {
         ? t('Части падают с босса 10-й локации')
         : t('Собери все части — выкуешь случайную реликвию')
       c.add(this.add.text(w - 14, 18, hint, {
-        fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#b8ad9a', align: 'right', wordWrap: { width: 210 },
+        // Уже прежнего: гнёзда с подписями заканчиваются на 404 по ширине панели.
+        fontFamily: 'Rubik, sans-serif', fontSize: '13px', color: '#b8ad9a', align: 'right', wordWrap: { width: 170 },
       }).setOrigin(1, 0))
     }
     this.uiObjs.push(c)

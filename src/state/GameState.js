@@ -510,10 +510,9 @@ export class GameState extends Emitter {
     const t = CRAFT_TIERS.find(c => c.id === tierId)
     if (!t || this.scrap < t.cost) return null
     this.scrap -= t.cost
-    // Тир с гарантией (relicChance) бросает не по таблице редкостей, а монетку
-    // между реликвией и легендой: хлам за такую цену игрок бы не простил.
-    const forced = t.relicChance ? (rng() < t.relicChance ? 'relic' : 'epic') : null
-    const item = rollItem(rng, Math.floor(this.enemyLevel()), t.luck + this.lootLuck(), forced)
+    // Все тиры здесь бросают по таблице редкостей. Тир «Часть реликвии» сюда не
+    // попадает вовсе — он не про предметы, его обслуживает buyRelicPart.
+    const item = rollItem(rng, Math.floor(this.enemyLevel()), t.luck + this.lootLuck())
     this.addItem(item)
     this.emit('scrap'); this.save()
     return item
@@ -547,6 +546,25 @@ export class GameState extends Emitter {
     this.emit('relic'); this.save()
     return { part: RELIC_PART_BY_ID[id], dupe: false, scrap: 0 }
   }
+  // Купить недостающую часть набора за металлолом (тир верстака relicPart).
+  //
+  // Даёт именно НЕДОСТАЮЩУЮ, а не случайную: за 10000 лома дубликат выглядел бы
+  // издевательством. Когда набор собран, возвращает null и лом не тратит —
+  // верстак в этом случае тир и не показывает.
+  //
+  // relicsCrafted не трогаем: он гейтит выпадение дублей частей с босса, и
+  // покупка за лом не должна портить дроп.
+  buyRelicPart(cost, rng = Math.random) {
+    if (!Number.isFinite(cost) || this.scrap < cost) return null
+    const missing = RELIC_PART_IDS.filter(id => !this.hasRelicPart(id))
+    if (!missing.length) return null
+    this.scrap -= cost
+    const id = missing[Math.floor(rng() * missing.length)]
+    this.relicParts.push(id)
+    this.emit('scrap'); this.emit('relic'); this.save()
+    return RELIC_PART_BY_ID[id]
+  }
+
   // Ковка: тратит все пять частей, даёт случайную реликвию (красный тир).
   craftRelic() {
     if (!this.canCraftRelic()) return null

@@ -97,8 +97,11 @@ const EN = {
   '📺 Реклама: ×2': '📺 Watch ad: ×2',
   'Награда не начислена: ролик не досмотрен': 'No reward: the ad was not watched to the end',
   'НОВОЕ': 'NEW',
-  'Реликтовая ковка': 'Relic forge',
-  'реликвия: {n}%': 'relic: {n}%',
+  'Часть реликвии': 'Relic part',
+  'набор собран': 'set complete',
+  'Собран': 'Complete',
+  'недостающая часть · {a}/{b}': 'a missing part · {a}/{b}',
+  'Часть набора · {a}/{b} · собери все и куй в инвентаре': 'Set part · {a}/{b} · collect all and forge in the inventory',
   'Разбирай лишнее в инвентаре → металлолом. Здесь куй снаряжение.\nДороже сборка — выше шанс редкого. Реликтовая ковка даёт реликвию или легенду.':
     'Scrap what you do not need in the inventory → salvage. Forge gear here.\nPricier the build, better the odds. Relic forge yields a relic or a legendary.',
   '↑ пусто': '↑ empty slot',

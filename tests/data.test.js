@@ -1,13 +1,14 @@
 // Тесты чистых данных: масштабирование, прогрессия, зоны/аффиксы, лут, апгрейды, формат.
 import { describe, it, expect } from 'vitest'
 import { BAL } from '../src/data/balance.js'
-import { enemyStats } from '../src/data/scaling.js'
+import { enemyStats, STAT_CAP } from '../src/data/scaling.js'
 import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../src/data/progression.js'
 import { ZONES, getZone, AFFIXES, affixForLoop, isRelicZone } from '../src/data/zones.js'
 import { ENEMIES, ENEMY_IDS } from '../src/data/enemies.js'
 import { BOSSES, BOSS_IDS, defOf, sheetKey, isBossId } from '../src/data/bosses.js'
 import { setLang, t, itemName } from '../src/i18n.js'
 import { GameState } from '../src/state/GameState.js'
+import { RELIC_PART_IDS } from '../src/data/relics.js'
 import { readFileSync } from 'node:fs'
 import { RARITIES, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID, ITEM_LEVEL_CAP, itemPower, itemQuality, itemRank, SLOTS, STAT_SHARES, STATS_PER_ITEM, STAT_SHORT } from '../src/data/loot.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
@@ -34,7 +35,12 @@ describe('scaling / enemyStats', () => {
       expect(Number.isFinite(s.hp)).toBe(true)
       expect(Number.isFinite(s.reward)).toBe(true)
       expect(Number.isFinite(s.dmg)).toBe(true)
-      expect(s.hp).toBeLessThanOrEqual(Number.MAX_SAFE_INTEGER)
+      // Сверяемся с ПРЕДЕЛОМ ИЗ ИГРЫ, а не с MAX_SAFE_INTEGER. Раньше здесь
+      // стояло его число, и тест защищал не от Infinity, а от роста как
+      // такового: HP врага упиралось в 9.0e15 примерно к 56-й локации и дальше
+      // не росло вообще, пока урон героя рос без предела. Смысл проверки —
+      // «числа остаются конечными», он и остался.
+      expect(s.hp).toBeLessThanOrEqual(STAT_CAP)
     }
   })
   it('учитывает множители типа врага', () => {
@@ -359,62 +365,72 @@ describe('качество предмета (сортировка инвента
 // Путаница тут родилась из-за формулы: у шанса крита коэффициент 0.01, у всех
 // прочих статов 0.05, поэтому предельный шлем-реликвия показывает «+20.0%», а
 // рядовые легендарные сапоги — «+75%», и снаружи это читается как понижение.
-// Реликтовая ковка — второй путь к реликвии, помимо набора из пяти частей.
-// Обещание на карточке («реликвия: 70%») обязано совпадать с тем, что реально
-// делает craft(): за 10000 лома игрок покупает шанс, а не лотерею.
-describe('реликтовая ковка за металлолом', () => {
-  const TIER = CRAFT_TIERS.find(t => t.id === 'relic')
+// Ковка ЧАСТИ реликвии за металлолом. Тир намеренно даёт не саму реликвию:
+// покупать её готовой значило бы обесценить и выбивание частей с босса 10-й
+// локации, и прохождение локаций. Часть — это ускорение уже начатого пути.
+describe('ковка части реликвии за металлолом', () => {
+  const TIER = CRAFT_TIERS.find(t => t.id === 'relicPart')
+  // relicParts чистим руками: GameState в конструкторе читает сейв, а мок
+  // localStorage в тестах общий — туда пишут соседние проверки.
+  const fresh = () => { const s = new GameState(); s.relicParts = []; s.relicsCrafted = 0; return s }
+  const rich = () => { const s = fresh(); s.scrap = TIER.cost * 10; return s }
 
-  it('тир заведён: 10000 лома и 70% на реликвию', () => {
+  it('тир заведён: 10000 лома, помечен как часть', () => {
     expect(TIER).toBeTruthy()
     expect(TIER.cost).toBe(10000)
-    expect(TIER.relicChance).toBeCloseTo(0.7, 6)
+    expect(TIER.relicPart).toBe(true)
   })
 
   it('это самый дорогой тир', () => {
     for (const t of CRAFT_TIERS) if (t !== TIER) expect(TIER.cost).toBeGreaterThan(t.cost)
   })
 
-  // Главное: ХЛАМА тут быть не может. Ни серого, ни синего — только два исхода.
-  it('выдаёт только реликвию или легенду, ничего третьего', () => {
-    const s = new GameState()
-    s.scrap = TIER.cost * 400
-    const seen = {}
-    for (let i = 0; i < 400; i++) {
-      const it = s.craft('relic')
-      seen[it.rarity] = (seen[it.rarity] || 0) + 1
-    }
-    expect(Object.keys(seen).sort()).toEqual(['epic', 'relic'])
+  it('даёт часть и списывает лом', () => {
+    const s = rich()
+    const before = s.scrap
+    const part = s.buyRelicPart(TIER.cost)
+    expect(part).toBeTruthy()
+    expect(s.scrap).toBe(before - TIER.cost)
+    expect(s.relicPartsOwned()).toHaveLength(1)
   })
 
-  it('доля реликвий держится около обещанных 70%', () => {
-    const s = new GameState()
-    s.scrap = TIER.cost * 4000
-    // Свой генератор: тест про пропорцию, а не про то, как лёг Math.random.
-    const rng = (x => () => (x = (x * 1664525 + 1013904223) >>> 0) / 4294967296)(2026)
-    let relics = 0
-    for (let i = 0; i < 4000; i++) if (s.craft('relic', rng).rarity === 'relic') relics++
-    expect(relics / 4000).toBeCloseTo(TIER.relicChance, 1)
+  // Главное: за такую цену дубликат был бы издевательством.
+  it('всегда даёт НЕДОСТАЮЩУЮ часть, без дублей', () => {
+    const s = rich()
+    for (let i = 0; i < RELIC_PART_IDS.length; i++) s.buyRelicPart(TIER.cost)
+    expect(s.relicParts).toHaveLength(RELIC_PART_IDS.length)
+    expect(new Set(s.relicParts).size).toBe(RELIC_PART_IDS.length)
+  })
+
+  it('когда набор собран — не куёт и лом не тратит', () => {
+    const s = rich()
+    for (let i = 0; i < RELIC_PART_IDS.length; i++) s.buyRelicPart(TIER.cost)
+    const left = s.scrap
+    expect(s.buyRelicPart(TIER.cost)).toBe(null)
+    expect(s.scrap).toBe(left)
   })
 
   it('без лома не куёт и лом не списывает', () => {
-    const s = new GameState()
+    const s = fresh()
     s.scrap = TIER.cost - 1
-    expect(s.craft('relic')).toBe(null)
+    expect(s.buyRelicPart(TIER.cost)).toBe(null)
     expect(s.scrap).toBe(TIER.cost - 1)
+    expect(s.relicPartsOwned()).toHaveLength(0)
   })
 
-  it('обычные тиры гарантии не получили — там по-прежнему таблица редкостей', () => {
-    for (const t of CRAFT_TIERS) if (t.id !== 'relic') expect(t.relicChance).toBeUndefined()
-  })
-
-  // Счётчик relicsCrafted гейтит выпадение ДУБЛЕЙ частей с босса. Покупка
-  // реликвии за лом не должна портить дроп с босса.
-  it('не трогает счётчик выкованных из частей реликвий', () => {
-    const s = new GameState()
-    s.scrap = TIER.cost * 5
-    for (let i = 0; i < 5; i++) s.craft('relic')
+  // Счётчик гейтит выпадение ДУБЛЕЙ частей с босса: покупка за лом не должна
+  // портить дроп.
+  it('не трогает счётчик выкованных реликвий', () => {
+    const s = rich()
+    s.buyRelicPart(TIER.cost)
     expect(s.relicsCrafted).toBe(0)
+  })
+
+  it('собранный покупкой набор кузнеца устраивает', () => {
+    const s = rich()
+    for (let i = 0; i < RELIC_PART_IDS.length; i++) s.buyRelicPart(TIER.cost)
+    expect(s.canCraftRelic()).toBe(true)
+    expect(s.craftRelic().rarity).toBe('relic')
   })
 })
 

@@ -5,6 +5,7 @@ import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES } from '../config.js'
 import { State } from '../state/GameState.js'
 import { CRAFT_TIERS, RARITIES, RARITY_BY_ID, SLOT_BY_ID, STAT_SHORT, itemStats } from '../data/loot.js'
+import { RELIC_PARTS } from '../data/relics.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX, panel, resIcon, itemIcon } from '../ui/scenery.js'
 import { Sfx } from '../audio/sfx.js'
@@ -65,7 +66,9 @@ export default class ForgeScene extends Phaser.Scene {
 
   makeTier(cx, cy, w, tier) {
     const h = 150
-    const afford = State.scrap >= tier.cost
+    // Тир с частью гаснет, когда набор уже собран: покупать нечего.
+    const setDone = !!tier.relicPart && State.relicPartsOwned().length >= RELIC_PARTS.length
+    const afford = State.scrap >= tier.cost && !setDone
     const c = this.add.container(cx, cy)
     const bg = this.add.graphics()
     const border = parseInt(tier.css.slice(1), 16) // цвет рамки из tier.css
@@ -79,14 +82,18 @@ export default class ForgeScene extends Phaser.Scene {
     const cost = this.add.text(0, -h / 2 + 58, `🔩 ${fmt(tier.cost)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: afford ? '#e8e8f0' : '#7a7a82', fontStyle: 'bold' }).setOrigin(0.5)
     // У реликтовой ковки шанс не «редкое и выше», а прямой: реликвия или
     // легенда. Обещание на карточке должно совпадать с тем, что делает craft().
-    const oddsText = tier.relicChance
-      ? t('реликвия: {n}%', { n: Math.round(tier.relicChance * 100) })
+    const parts = State.relicPartsOwned().length
+    const full = parts >= RELIC_PARTS.length
+    const oddsText = tier.relicPart
+      ? (full ? t('набор собран') : t('недостающая часть · {a}/{b}', { a: parts, b: RELIC_PARTS.length }))
       : t('редкое+: ~{n}%', { n: topPct(tier.luck) })
-    const odds = this.add.text(0, -h / 2 + 88, oddsText, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: tier.relicChance ? tier.css : CSS.toxic }).setOrigin(0.5)
+    const odds = this.add.text(0, -h / 2 + 88, oddsText, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: tier.relicPart ? tier.css : CSS.toxic }).setOrigin(0.5)
     c.add([bg, name, cost, odds])
 
     const btn = createButton(this, 0, h / 2 - 26, {
-      label: afford ? t('Ковать') : t('Мало 🔩'), width: w - 50, height: 52, fontSize: 19,
+      // Причина «нельзя» у тира с частью бывает не только в ломе: набор мог быть
+      // уже собран. Подпись «Мало 🔩» при полном кармане просто врала бы.
+      label: afford ? t('Ковать') : (setDone ? t('Собран') : t('Мало 🔩')), width: w - 50, height: 52, fontSize: 19,
       color: afford ? COLORS.rust : COLORS.steelDark, hover: COLORS.rustLight, enabled: afford,
       onClick: () => this.doCraft(tier.id),
     })
@@ -100,11 +107,39 @@ export default class ForgeScene extends Phaser.Scene {
   }
 
   doCraft(tierId) {
+    const tier = CRAFT_TIERS.find(c => c.id === tierId)
+    if (tier && tier.relicPart) {
+      const part = State.buyRelicPart(tier.cost)
+      if (!part) return
+      Sfx.levelup()
+      this.showPart(part)
+      this.render()
+      return
+    }
     const item = State.craft(tierId)
     if (!item) return
     Sfx.levelup()
     this.showResult(item)
     this.render()
+  }
+
+  // Карточка результата для купленной части набора. Отдельная от showResult:
+  // часть — не предмет, у неё нет ни слота, ни редкости, ни статов.
+  showPart(part) {
+    this.resultBox.removeAll(true)
+    const relic = RARITY_BY_ID.relic
+    const w = 520, h = 84
+    const bg = panel(this, -w / 2, -h / 2, w, h, { radius: 10, fill: 0x241d15, border: relic.color, borderW: 3 })
+    const glow = this.add.image(0, 0, 'tex-glow').setTint(relic.color).setAlpha(0.35).setScale(4, 2).setBlendMode('ADD')
+    const icon = this.add.text(-w / 2 + 30, 0, part.icon, { fontSize: '32px' }).setOrigin(0.5)
+    const name = this.add.text(-w / 2 + 62, -16, t(part.name), { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: relic.css, fontStyle: 'bold' }).setOrigin(0, 0.5)
+    const owned = State.relicPartsOwned().length
+    const sub = this.add.text(-w / 2 + 62, 12, t('Часть набора · {a}/{b} · собери все и куй в инвентаре', {
+      a: owned, b: RELIC_PARTS.length,
+    }), { fontFamily: 'Rubik, sans-serif', fontSize: '14px', color: '#ddd2b4' }).setOrigin(0, 0.5)
+    this.resultBox.add([bg, glow, icon, name, sub])
+    this.resultBox.setScale(0.8).setAlpha(0)
+    this.tweens.add({ targets: this.resultBox, scale: 1, alpha: 1, duration: 220, ease: 'Back.out' })
   }
 
   showResult(item) {

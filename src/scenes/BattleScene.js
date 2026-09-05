@@ -9,7 +9,7 @@ import { State } from '../state/GameState.js'
 import { BAL } from '../data/balance.js'
 import { defOf, sheetKey } from '../data/bosses.js'
 import { ALLIES } from '../data/allies.js'
-import { enemyStats } from '../data/scaling.js'
+import { enemyStats, applyDepthCap } from '../data/scaling.js'
 import { getZone, isRelicZone } from '../data/zones.js'
 import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill, spawnGap, spawnBatchMax } from '../data/progression.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
@@ -532,10 +532,17 @@ export default class BattleScene extends Phaser.Scene {
     const deep = State.deepZoneMul()
     // Кэпим ИТОГ (base уже закэплен, но множители могут пробить MAX_SAFE → Infinity
     // → неубиваемый враг). Держим числа конечными.
-    const MAX = Number.MAX_SAFE_INTEGER
-    const hp = Math.min(MAX, Math.ceil(base.hp * af.hp * mHp * prog * wave * deep))
+    // Тот же предел, что в scaling.js: MAX_SAFE_INTEGER здесь пришивал HP врага
+    // к 9.0e15 и обнулял всю глубинную прогрессию — см. комментарий там.
+    const MAX = 1e300
+    const rawHp = Math.min(MAX, Math.ceil(base.hp * af.hp * mHp * prog * wave * deep))
     const reward = Math.min(MAX, Math.ceil(base.reward * af.rew))
-    const dmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave * deep)
+    const rawDmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave * deep)
+    // Глубинный предел — ПОСЛЕДНИМ действием, когда все множители уже учтены.
+    // См. applyDepthCap: до 8000 убийств не срабатывает вовсе.
+    const capped = applyDepthCap(State.totalKills, rawHp, rawDmg, isBoss)
+    const hp = Math.ceil(capped.hp)
+    const dmg = capped.dmg
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd * State.deepZoneSpeedMul()
     // У боссов свой арт со своими пропорциями — берём их собственный scale.
     // BAL.bossScale остаётся запасным для «босса из обычного врага».

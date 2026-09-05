@@ -5,7 +5,26 @@
 
 import { BAL } from './balance.js'
 
-const MAX = Number.MAX_SAFE_INTEGER // жёсткий предел от Infinity/NaN на экстремальной глубине
+// ПОТОЛОК ЧИСЕЛ — защита от Infinity/NaN, и только от них.
+//
+// Раньше здесь стоял Number.MAX_SAFE_INTEGER (9.0e15), и это ломало всю глубину:
+// HP врага упиралось в него примерно к 80-й локации и дальше НЕ РОСЛО ВООБЩЕ,
+// сколько бы рампов сверху ни навесили. Урон клика героя потолка не имел и
+// продолжал расти — к 100-й локации разрыв доходил до двадцати с лишним
+// порядков, и любой враг умирал с одного клика. Замер в игре: на 86-й, 100-й и
+// 110-й локации HP рядового врага было одинаковым — ровно 9.0aa.
+//
+// MAX_SAFE_INTEGER — это граница ТОЧНОГО счёта целых, а не предел числа. HP
+// врага и урон точность до единицы не волнует: разница между 1e40 и 1e40+1
+// невидима. Берём предел на десять порядков ниже Infinity — от переполнения
+// защищает так же, а расти больше не мешает.
+// 1e307 — практически потолок самого JavaScript: числа с плавающей точкой
+// заканчиваются на 1.8e308, дальше только Infinity. Выше поднять нельзя не по
+// решению, а по устройству языка: чтобы числа росли за этот предел, игра должна
+// перестать хранить их обычными числами (мантисса + порядок отдельно), а это
+// переделка всех статов, сравнений и формата сейва.
+export const STAT_CAP = 1e307
+const MAX = STAT_CAP
 
 // Глубинный рамп — множитель к HP, урону и скорости врага на больших локациях.
 //
@@ -34,6 +53,53 @@ export function deepRampSpeedMul(zoneNumber, deepKills, abyssKills = 0) {
   return Math.min(BAL.deepSpeedCap, deepRampMul(zoneNumber, deepKills, abyssKills))
 }
 
+// ГЛУБИННЫЙ ПРЕДЕЛ — та самая кривая сложности после ~20-й локации.
+//
+// Зачем он вообще нужен. Формула HP растёт как hpGrowth^убийства, а урон игрока
+// — по крышкам, и вторая кривая медленнее. На первых часах разница незаметна,
+// но за десятки тысяч убийств превращается в пропасть: замер на живом сейве
+// (86-я локация, 33 029 убийств, урон клика 51.9aa) дал HP врага 2.4e58 — это
+// 10^41 кликов на одного рядового. Игра туда просто не доходит.
+//
+// Раньше от этого спасал Number.MAX_SAFE_INTEGER: HP упиралось в 9.0e15 и
+// дальше НЕ РОСЛО ВООБЩЕ. Но игрок-то рос, и с 56-й локации враг умирал с
+// первого касания — в том же замере 0.17 клика. То есть константа не держала
+// сложность, а убивала её.
+//
+// Теперь предел РАСТЁТ. До DEPTH_FROM убийств его нет вовсе — ранняя и средняя
+// игра идут по обычной формуле, симуляторы дают те же числа, что и до правки.
+// Дальше HP идёт по своей кривой:
+//   - в точке DEPTH_FROM она совпадает с обычной формулой (стыкуется без ступени);
+//   - растёт медленнее, чем прокачка игрока, — поэтому вложения в урон и крит
+//     остаются главным способом продвинуться, а не декорацией;
+//   - но растёт, а не стоит на месте, — поэтому враг не превращается в мишень.
+//
+// Числа подобраны по замеру живого сейва. Крутить их так: прогнать
+// `node sim/depth-ttk.mjs` и смотреть, сколько кликов уходит на рядового врага
+// в опорной точке — цель 5 кликов по рядовому и 10 по боссу.
+export const DEPTH_FROM = 8000          // с какого числа убийств предел включается
+const DEPTH_AT_FROM = 1.25e15           // HP врага на этой отметке по обычной формуле
+const DEPTH_RATE = 1.00028              // во сколько раз предел растёт за убийство
+
+// Предел HP для этой стадии. Ниже DEPTH_FROM возвращает Infinity — то есть не
+// ограничивает ничего.
+export function depthCap(stage) {
+  if (!(stage > DEPTH_FROM)) return Infinity
+  return DEPTH_AT_FROM * Math.pow(DEPTH_RATE, stage - DEPTH_FROM)
+}
+
+// Накладывает предел на ИТОГОВЫЕ числа врага — после прогрессии, волны и
+// глубинных рампов. Урон режется в той же доле, что и HP: иначе враг, ставший
+// убиваемым, всё равно сносил бы героя с одного удара — та же стена, только с
+// другой стороны. Босс жирнее рядового ровно на bossHpMul, и предел это
+// соотношение сохраняет.
+export function applyDepthCap(stage, hp, dmg, isBoss) {
+  const cap = depthCap(stage) * (isBoss ? BAL.bossHpMul : 1)
+  if (!(hp > cap)) return { hp, dmg }
+  const clip = cap / hp
+  return { hp: cap, dmg: dmg * clip }
+}
+
 export function enemyStats(def, stage, isBoss) {
   // Сквозной рамп забега (A/B): за каждые killScaleStep убийств +killScaleRamp
   // к HP и +killScaleRampDmg к урону. Награду НЕ трогает — доход игрока
@@ -43,12 +109,20 @@ export function enemyStats(def, stage, isBoss) {
   const rampSteps = Math.floor(stage / BAL.killScaleStep)
   const hpRamp = Math.pow(BAL.killScaleRamp, rampSteps)
   const dmgRamp = Math.pow(BAL.killScaleRampDmg, rampSteps)
-  const hp = BAL.enemyBaseHp * Math.pow(BAL.hpGrowth, stage) * hpRamp * def.hpMul * (isBoss ? BAL.bossHpMul : 1)
+  const hpRaw = BAL.enemyBaseHp * Math.pow(BAL.hpGrowth, stage) * hpRamp * def.hpMul * (isBoss ? BAL.bossHpMul : 1)
   const reward = BAL.enemyBaseReward * Math.pow(BAL.rewardGrowth, stage) * def.rewardMul * (isBoss ? BAL.bossRewardMul : 1)
-  const dmg = BAL.enemyBaseDamage * Math.pow(BAL.dmgGrowth, stage) * dmgRamp * def.dmgMul * (isBoss ? BAL.bossDamageMul : 1)
+  const dmgRaw = BAL.enemyBaseDamage * Math.pow(BAL.dmgGrowth, stage) * dmgRamp * def.dmgMul * (isBoss ? BAL.bossDamageMul : 1)
+  // Урон срезаем В ТОЙ ЖЕ ДОЛЕ, что и HP: иначе враг, ставший убиваемым, всё
+  // равно сносил бы героя с одного удара — а это та же стена, только с другой
+  // стороны. У босса режем по его же множителю (он входит в hpRaw), поэтому
+  // соотношение «босс вдвое жирнее рядового» сохраняется.
+  // Предел здесь НЕ применяем: это только база, а бой домножает её на
+  // прогрессию, волну и глубинные рампы — срезанное тут же вернулось бы обратно
+  // (проверено замером: HP оставалось астрономическим). Предел накладывает
+  // BattleScene.makeEnemy, последним действием, — см. applyDepthCap ниже.
   return {
-    hp: Math.min(MAX, Math.ceil(hp)),
+    hp: Math.min(MAX, Math.ceil(hpRaw)),
     reward: Math.min(MAX, Math.ceil(reward)),
-    dmg: Math.min(MAX, dmg),
+    dmg: Math.min(MAX, dmgRaw),
   }
 }
