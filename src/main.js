@@ -119,7 +119,9 @@ try {
   window.addEventListener('pageshow', syncVisibility)
   window.addEventListener('resume', syncVisibility)
   window.addEventListener('focus', syncVisibility)
-  setInterval(syncVisibility, 1000) // сторож: событие могло не прийти вовсе
+  // Сторож раз в секунду: и причина паузы (событие могло не прийти вовсе), и
+  // само состояние сцен — см. Pause.enforce.
+  setInterval(() => { syncVisibility(); Pause.enforce() }, 1000)
   syncVisibility()
 } catch (e) { /* */ }
 

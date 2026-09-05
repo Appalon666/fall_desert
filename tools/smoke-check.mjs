@@ -154,6 +154,64 @@ for (const key of scenes) {
     `босс: ${r.tex}, окно локации: ${r.zoneModal}, окно смерти: ${r.death}`)
 }
 
+// --- Окно «локация взята»: бой обязан стоять, пока игрок выбирает ---
+//
+// Раньше вставала только подача НОВЫХ врагов, а те, кто уже стоял на арене,
+// продолжали подходить и бить: игрок читал награду, а его в это время убивали.
+{
+  const before = errors.length
+  // Работаем с ТОЙ ЖЕ сценой боя, что осталась от предыдущего блока (там герой
+  // пал). Перезапускать её не нужно: stop+start в одном кадре оставляют сцену
+  // полусобранной — cameras.main ещё нет, и spawnBoss падает.
+  await page.evaluate(() => {
+    const { State, game } = window.__yp
+    const sc = game.scene.getScene('BattleScene')
+    sc.closeDeathModal()
+    State.resolvePendingDeath()
+    State.hp = State.heroMaxHp()
+  })
+  await page.waitForTimeout(500)
+  const r = await page.evaluate(async () => {
+    const { State, game } = window.__yp
+    const sc = game.scene.getScene('BattleScene')
+    // Ставим полную волну вплотную к герою и добиваем босса — ровно та картинка,
+    // на которой игрока и убивали.
+    sc.clearEnemies()
+    for (let i = 0; i < 6; i++) sc.enemies.push(sc.makeEnemy(sc.zone.enemies[0], false, i, 6, sc.hero.x + 50 + i * 30))
+    State.hp = State.heroMaxHp()
+    State.killsInZone = 100
+    sc.spawnBoss()
+    sc.killEnemy(sc.enemies.find(x => x.isBoss))
+    const t0 = { hp: State.hp, n: sc.enemies.length, bs: State.battleSeconds, modal: !!sc._zoneModal }
+    await new Promise(res => setTimeout(res, 5000))     // «игрок читает и выбирает»
+    const t1 = { hp: State.hp, n: sc.enemies.length, bs: State.battleSeconds }
+    return { t0, t1 }
+  })
+  check('окно «локация взята»: герой не теряет HP и волна не растёт',
+    errors.length === before && r.t0.modal && r.t1.hp === r.t0.hp && r.t1.n === r.t0.n,
+    `HP ${Math.round(r.t0.hp)} → ${Math.round(r.t1.hp)}, врагов ${r.t0.n} → ${r.t1.n}`)
+  check('и время боя на окне не копится (бюджет рекорда не растёт)',
+    Math.abs(r.t1.bs - r.t0.bs) < 0.5, `+${(r.t1.bs - r.t0.bs).toFixed(2)} с за 5 с`)
+
+  // Кнопка «Идти дальше» закрывает окно и начинает новую локацию с чистой ареной.
+  const btn = await page.evaluate(() => {
+    const sc = window.__yp.game.scene.getScene('BattleScene')
+    for (const o of sc._zoneModal || []) {
+      const txt = o.list && o.list.find(k => k.type === 'Text' && String(k.text).includes('дальше'))
+      if (txt) return { x: Math.round(o.x), y: Math.round(o.y) }
+    }
+    return null
+  })
+  if (btn) await page.mouse.click(btn.x, btn.y)
+  await page.waitForTimeout(900)
+  const after = await page.evaluate(() => {
+    const sc = window.__yp.game.scene.getScene('BattleScene')
+    return { modal: !!sc._zoneModal, n: sc.enemies.length }
+  })
+  check('«Идти дальше» закрывает окно и убирает прошлую волну',
+    btn && !after.modal, `окно: ${after.modal ? 'осталось' : 'закрыто'}, врагов на арене: ${after.n}`)
+}
+
 // --- Английский язык: все экраны ещё раз ---
 {
   const before = errors.length

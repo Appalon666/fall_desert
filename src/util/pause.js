@@ -27,6 +27,7 @@ class PauseManager {
     this.onChange = null // (paused) => {} — сюда вешаем GameplayAPI Яндекса
     this._mute = false        // громкость до паузы (чтобы вернуть как было)
     this._muteCaptured = false
+    this._paused = []         // сцены, которые остановили МЫ (см. _restore)
   }
 
   attach(game) { this.game = game }
@@ -48,6 +49,25 @@ class PauseManager {
   remove(reason) {
     if (!this.reasons.delete(reason)) return
     if (!this.paused) this._apply(false)
+  }
+
+  // СТОРОЖ РАССИНХРОНА: причин паузы нет, а сцена всё равно стоит.
+  //
+  // Phaser разбирает очередь pause/resume только в игровом цикле, а на скрытой
+  // вкладке цикла нет — из-за этого пара «поставили паузу / сняли паузу» может
+  // разъехаться и оставить сцену стоять без всякой причины. Игрок видит живую
+  // картинку, на которой ничего не нажимается, и лечит это перезагрузкой.
+  //
+  // Разбирать, какой именно кадр потерялся, дороже, чем раз в секунду сверить
+  // состояние. Поднимаем только то, что ЧИСЛИТСЯ приостановленным: остановленные
+  // и спящие сцены не трогаем — resume поднял бы их без create().
+  enforce() {
+    if (this.paused || !this.game) return
+    try {
+      for (const sc of this.game.scene.getScenes(false)) {
+        if (sc.scene.isPaused()) sc.scene.resume()
+      }
+    } catch (e) { /* */ }
   }
 
   _apply(paused) {
@@ -74,8 +94,16 @@ class PauseManager {
       // контекст усыплён, назначенное mute-значение не успевает примениться,
       // и после пробуждения звук возвращается. Тишину дают mute + pauseAll.
     }
+    // Запоминаем, кого остановили: на возврате именно их и будим. Полагаться
+    // на «кто сейчас числится приостановленным» нельзя — см. _restore.
     try {
-      if (this.game) for (const sc of this.game.scene.getScenes(true)) sc.scene.pause()
+      this._paused = []
+      if (this.game) {
+        for (const sc of this.game.scene.getScenes(true)) {
+          this._paused.push(sc)
+          sc.scene.pause()
+        }
+      }
     } catch (e) { /* */ }
   }
 
@@ -89,15 +117,33 @@ class PauseManager {
       try { snd.resumeAll() } catch (e) { /* */ }
     }
     this._muteCaptured = false
-    // Снимаем паузу со ВСЕХ приостановленных сцен, а не со списка, снятого в
-    // момент паузы: пока игра стояла, набор сцен мог измениться.
+    // ПОЧЕМУ ЗДЕСЬ НЕЛЬЗЯ СПРАШИВАТЬ isPaused().
+    //
+    // Phaser кладёт и pause, и resume в очередь менеджера сцен и разбирает её
+    // в игровом цикле. На скрытой вкладке цикла нет: браузер не вызывает
+    // requestAnimationFrame. Значит пауза, поставленная по visibilitychange,
+    // в очереди И ОСТАЁТСЯ. Возврат на вкладку приходит тем же событием — до
+    // первого кадра, — и isPaused() честно отвечает «не на паузе», потому что
+    // пауза ещё не применилась. Мы пропускали resume, а следующий кадр разбирал
+    // отложенный pause: игра вставала намертво, и лечила это только
+    // перезагрузка страницы. Ровно на это и жаловались.
+    //
+    // Теперь будим тех, кого сами остановили (_paused), плюс всех, кто числится
+    // приостановленным сейчас — набор сцен за время паузы мог измениться.
+    // Остановленные и спящие не трогаем: resume поднял бы их из небытия без
+    // create(), а это уже другая поломка.
     try {
       if (this.game) {
+        const wake = new Set(this._paused)
         for (const sc of this.game.scene.getScenes(false)) {
-          if (sc.scene.isPaused()) sc.scene.resume()
+          if (sc.scene.isPaused()) wake.add(sc)
+        }
+        for (const sc of wake) {
+          if (sc.scene.isActive() || sc.scene.isPaused()) sc.scene.resume()
         }
       }
     } catch (e) { /* */ }
+    this._paused = []
   }
 }
 

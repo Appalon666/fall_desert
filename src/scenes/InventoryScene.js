@@ -5,7 +5,7 @@
 import Phaser from 'phaser'
 import { GAME, COLORS, CSS, SCENES, TEX } from '../config.js'
 import { State } from '../state/GameState.js'
-import { RARITY_BY_ID, SLOT_BY_ID, STAT_SHORT, STAT_ICON, scrapValue, itemQuality, itemRank, itemStats } from '../data/loot.js'
+import { RARITY_BY_ID, SLOT_BY_ID, STAT_SHORT, scrapValue, itemQuality, itemRank, itemStats } from '../data/loot.js'
 import { RELIC_PARTS } from '../data/relics.js'
 import { createButton } from '../ui/Button.js'
 import { buildBackground, titleText, applyPostFX, resIcon, itemIcon } from '../ui/scenery.js'
@@ -57,9 +57,11 @@ const pct = (st) => (st.stat === 'critChance' ? (st.value * 100).toFixed(1) : (s
 function statText(it) {
   return itemStats(it).map(st => `+${pct(st)}% ${t(STAT_SHORT[st.stat] || st.stat)}`).join(' · ')
 }
-// Статы значками — для карточек «куклы», где строка вдвое уже.
-function statIcons(it) {
-  return itemStats(it).map(st => `${STAT_ICON[st.stat] || ''}${pct(st)}`).join('  ')
+// Статы для карточки «куклы» — одной строкой; переносит её wordWrap по ширине
+// карточки. Раскладывать вручную нельзя: длина подписи зависит от стата
+// («союзники» вдвое длиннее «HP»), и любое ручное деление где-нибудь вылезет.
+function statLines(it) {
+  return itemStats(it).map(st => `+${pct(st)}% ${t(STAT_SHORT[st.stat] || st.stat)}`).join(' · ')
 }
 
 export default class InventoryScene extends Phaser.Scene {
@@ -257,17 +259,25 @@ export default class InventoryScene extends Phaser.Scene {
   }
 
   equipSummary() {
-    // Короткими ярлыками: со смешанными статами ненулевыми становятся почти все
-    // пять, и полными названиями строка вылезала за пределы экрана.
+    // Словами, но КОРОТКИМИ: значок стата без подписи не читается, а полными
+    // названиями строка вылезала за экран — со смешанными статами ненулевыми
+    // становятся почти все пять сразу.
     const parts = []
     for (const stat of ['clickMul', 'hpMul', 'critChance', 'allyMul', 'capsMul']) {
       const v = State.equipSum(stat)
       if (v > 0) {
         const n = stat === 'critChance' ? (v * 100).toFixed(1) : (v * 100).toFixed(0)
-        parts.push(`${STAT_ICON[stat]}+${n}%`)
+        parts.push(`+${n}% ${t(STAT_SHORT[stat] || stat)}`)
       }
     }
-    return parts.length ? t('От экипировки:  {parts}', { parts: parts.join('   ') }) : t('Экипировка пуста')
+    if (!parts.length) return t('Экипировка пуста')
+    // В ДВЕ строки: пять статов словами в одну не помещаются — строка уходила
+    // за левый край экрана и под панель добычи справа.
+    // Заголовок ставим В ОДНУ строку с первой половиной статов: отдельной
+    // строкой сводка вырастала до трёх и наезжала на кнопку «В лагерь».
+    const half = Math.ceil(parts.length / 2)
+    const nl = String.fromCharCode(10)
+    return t('От экипировки:') + '  ' + parts.slice(0, half).join('   ') + nl + parts.slice(half).join('   ')
   }
 
   // Сама иконка живёт в ui/scenery.js — её делит с верстаком (результат ковки).
@@ -276,7 +286,7 @@ export default class InventoryScene extends Phaser.Scene {
   }
 
   makeSlot(key, x, y) {
-    const w = 210, h = 96
+    const w = 210, h = 112
     const raw = State.equipment[key]
     const it = (raw && RARITY_BY_ID[raw.rarity] && SLOT_BY_ID[raw.slot]) ? raw : null
     const rar = it ? RARITY_BY_ID[it.rarity] : null
@@ -286,14 +296,35 @@ export default class InventoryScene extends Phaser.Scene {
     bg.fillStyle(COLORS.steelDark, 1); bg.fillRoundedRect(-w / 2, -h / 2, w, h, 8)
     bg.lineStyle(2, rar ? rar.color : COLORS.ink, 0.9); bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 8)
     const icon = this.slotIcon(-w / 2 + 10, 0, it, meta.icon, 36, key)
-    const head = this.add.text(-w / 2 + 52, -34, t(meta.name), { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: '#c4b998' }).setOrigin(0, 0.5)
-    const body = this.add.text(-w / 2 + 52, -4, it ? itemName(it.name) : t('— пусто —'), {
-      fontFamily: 'Rubik, sans-serif', fontSize: '16px',
-      color: it ? rar.css : '#9a9078', fontStyle: 'bold', wordWrap: { width: w - 62 },
-    }).setOrigin(0, 0.5)
-    // Значками, а не словами: три стата словами в 150 px не помещаются, а
+    // Заголовок слота показываем только у ПУСТОЙ карточки: там он единственное,
+    // что объясняет, чего не хватает. У занятой его роль играют иконка предмета
+    // и место на кукле, а строка нужна статам — их три, и в две они не влезают.
+    const head = this.add.text(-w / 2 + 52, -44, it ? '' : t(meta.name), { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: '#c4b998' }).setOrigin(0, 0)
+    // Имя — РОВНО В ОДНУ СТРОКУ. С переносом («Счастливый самопал» в 148 px не
+    // помещается) вторая строка съезжала на статы, а те вылезали за карточку;
     // уменьшить кегль нельзя — 16 px это минимум по читаемости (см. MIN_FONT).
-    const st = this.add.text(-w / 2 + 52, 32, it ? statIcons(it) : '', { fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.toxic }).setOrigin(0, 0.5)
+    // Режем по факту ширины, а не по числу букв: буквы разной ширины.
+    const body = this.add.text(-w / 2 + 52, it ? -44 : -22, it ? itemName(it.name) : t('— пусто —'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '16px',
+      color: it ? rar.css : '#9a9078', fontStyle: 'bold',
+    }).setOrigin(0, 0)
+    if (it) {
+      const maxW = w - 62
+      let txt = itemName(it.name)
+      while (body.width > maxW && txt.length > 4) {
+        txt = txt.slice(0, -1)
+        body.setText(txt.trimEnd() + '…')
+      }
+    }
+    // СЛОВАМИ, а не значками: значок статa читается только если помнишь, какой
+    // из них какой, — по одной иконке понять «это урон или крышки» нельзя.
+    // Три стата в одну строку не влезают (кегль ниже 16 px запрещён, см.
+    // MIN_FONT), поэтому раскладываем в две: главный стат отдельно, два
+    // остальных — под ним. Ради этого карточка и подросла с 96 до 112.
+    const st = this.add.text(-w / 2 + 52, -20, it ? statLines(it) : '', {
+      fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.toxic, lineSpacing: 2,
+      wordWrap: { width: w - 62 },
+    }).setOrigin(0, 0)
     c.add([bg, icon, head, body, st])
     if (it) {
       const z = this.add.zone(-w / 2, -h / 2, w, h).setOrigin(0).setInteractive({ useHandCursor: true })
@@ -306,12 +337,15 @@ export default class InventoryScene extends Phaser.Scene {
   }
 
   renderLoot() {
-    // Порядок: сначала только что добытое, потом по тиру, внутри тира — по
-    // качеству (доля от потолка), а не по сырому value: value у крит-вещей
-    // впятеро меньше по формуле, и лучший шлем оказывался ниже рядовых сапог.
+    // Порядок как был: по тиру, внутри тира — по качеству (доля от потолка), а
+    // не по сырому value: value у крит-вещей впятеро меньше по формуле, и лучший
+    // шлем оказывался ниже рядовых сапог.
+    //
+    // Свежую вещь наверх БОЛЬШЕ НЕ поднимаем — так решили: список должен
+    // отвечать на вопрос «что у меня лучшее», а не «что упало последним».
+    // Пометка «НОВОЕ» осталась: она ничего не двигает, просто помечает.
     const items = [...State.inventory].sort((a, b) =>
-      (isNew(b) - isNew(a))
-      || (RARITY_BY_ID[b.rarity].mul - RARITY_BY_ID[a.rarity].mul)
+      (RARITY_BY_ID[b.rarity].mul - RARITY_BY_ID[a.rarity].mul)
       || (itemQuality(b) - itemQuality(a)))
     const ix = GAME.WIDTH * 0.72 - 260
     let iy = 108
