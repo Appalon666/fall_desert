@@ -81,6 +81,7 @@ export class GameState extends Emitter {
     this.bossActive = false // идёт бой с боссом-воротами зоны
     // престиж (сохраняется между перерождениями)
     this.cores = 0
+    this.powerRef = 0        // отстающая мера силы героя, см. powerRefValue()
     this.prestige = { legacy: 0, stash: 0, vitality: 0, quickstart: 0 }
     this.prestigeCount = 0
     this.lastSeen = Date.now()
@@ -116,6 +117,9 @@ export class GameState extends Emitter {
     this.lastZoneCaps = 0
     this.deepKills = 0
     this.abyssKills = 0
+    // Мера силы тоже обнуляется: забег начинается заново, и враг на глубине
+    // должен соотноситься с новым слабым героем, а не с прошлым прокачанным.
+    this.powerRef = 0
     this.lastItemUid = null
     // battleSeconds и killBudget перерождение НЕ трогает: они обосновывают
     // bestScore, а тот тоже живёт через перерождения.
@@ -281,6 +285,34 @@ export class GameState extends Emitter {
     if (withCombo) dmg *= this.comboMult()
     return dmg
   }
+  // Ожидаемый урон за клик — с учётом крита, но без комбо (комбо живёт секунды
+  // и меры силы из себя не представляет). Это то, чем меряется сила героя, когда
+  // враг подстраивается под неё на глубине.
+  effectiveClick() {
+    return this.clickDamage(false) * (1 + this.critChance() * (this.critMultiplier() - 1))
+  }
+
+  // ОТСТАЮЩАЯ мера силы героя — то, к чему привязан враг на глубине.
+  //
+  // Берём не текущий урон, а догоняющий: иначе вложение в «Калибр» мгновенно
+  // делало бы врагов ровно во столько же раз жирнее, и качать урон и крит стало
+  // бы бессмысленно. С отставанием вложение даёт настоящий всплеск — локацию
+  // рубишь заметно легче, — а враг подтягивается примерно за локацию
+  // (BAL.powerRefCatchup = половина разрыва за ~115 убийств).
+  //
+  // Работает в обе стороны: сняли снаряжение — враг так же плавно ослабеет.
+  powerRefValue() {
+    const now = this.effectiveClick()
+    if (!Number.isFinite(this.powerRef) || this.powerRef <= 0) this.powerRef = now
+    return this.powerRef
+  }
+  tickPowerRef() {
+    const now = this.effectiveClick()
+    if (!Number.isFinite(now) || now <= 0) return
+    if (!Number.isFinite(this.powerRef) || this.powerRef <= 0) { this.powerRef = now; return }
+    this.powerRef += (now - this.powerRef) * BAL.powerRefCatchup
+  }
+
   // Картечь: доля урона, которую попадание переносит на соседних врагов.
   splashFrac() { return this.upgAdd('splash') }
   // Крит считаем в три шага, потому что вклад сверх потолка не пропадает,
@@ -628,6 +660,7 @@ export class GameState extends Emitter {
   // Регистрация убийства обычного врага: счётчики/рекорд. Босс-ворота не считаются
   // сюда (у него отдельный registerBossKill → продвижение зоны).
   registerKill() {
+    this.tickPowerRef()
     this.totalKills++
     this.killsInZone++
     if (this.onDeepZone()) this.deepKills++
@@ -637,6 +670,7 @@ export class GameState extends Emitter {
   }
   // Убит босс-ворота → зона пройдена.
   registerBossKill() {
+    this.tickPowerRef()
     this.totalKills++
     // Босса засчитываем ДО продвижения зоны: он убит ещё в той локации.
     if (this.onDeepZone()) this.deepKills++
@@ -726,7 +760,7 @@ export class GameState extends Emitter {
       relicParts: this.relicParts, relicsCrafted: this.relicsCrafted, pendingDeath: this.pendingDeath,
       zoneIndex: this.zoneIndex, killsInZone: this.killsInZone, totalKills: this.totalKills, waveCount: this.waveCount,
       capsInZone: this.capsInZone, deepKills: this.deepKills, abyssKills: this.abyssKills,
-      battleSeconds: this.battleSeconds, killBudget: this.killBudget,
+      battleSeconds: this.battleSeconds, killBudget: this.killBudget, powerRef: this.powerRef,
       cores: this.cores, prestige: this.prestige, prestigeCount: this.prestigeCount,
       bestScore: this.bestScore, lastSeen: Date.now(),
     }
@@ -788,6 +822,9 @@ export class GameState extends Emitter {
       capsInZone: fin(d.capsInZone),
       deepKills: fin(d.deepKills),
       abyssKills: fin(d.abyssKills),
+      // Ноль — законное значение: сейв старой версии поля не знает, и мера
+      // силы возьмётся с первого же обращения (powerRefValue).
+      powerRef: fin(d.powerRef),
       battleSeconds: fin(d.battleSeconds) || fin(d.bestScore) / MAX_KILLS_PER_SEC,
       // Сейвы, сделанные до появления счётчика, поля не знают. Ноль означал бы
       // «набить это было нельзя» и обнулил бы рекорд всем, кто играет давно,

@@ -337,6 +337,71 @@ describe('пометка «новое» у последнего добытого
   })
 })
 
+describe('отстающая мера силы героя (powerRef)', () => {
+  it('первое обращение берёт текущую силу', () => {
+    const s = new GameState()
+    s.heroClass = 'gunner'
+    expect(s.powerRef).toBe(0)
+    expect(s.powerRefValue()).toBeCloseTo(s.effectiveClick(), 6)
+  })
+
+  it('вложение в урон даёт всплеск, а не мгновенную компенсацию', () => {
+    // Ради этого powerRef и существует. Привяжи врага к ТЕКУЩЕМУ урону — и
+    // покупка «Калибра» ровно во столько же раз раздует врага, то есть качать
+    // урон и крит станет бессмысленно.
+    const s = new GameState()
+    s.heroClass = 'gunner'
+    s.powerRefValue()
+    const before = s.powerRef
+    s.upgrades.damage = (s.upgrades.damage || 0) + 40
+    expect(s.effectiveClick()).toBeGreaterThan(before * 100)
+    expect(s.powerRef).toBe(before) // враг ещё не в курсе
+  })
+
+  it('за локацию догоняет больше половины разрыва', () => {
+    const s = new GameState()
+    s.heroClass = 'gunner'
+    s.powerRefValue()
+    s.upgrades.damage = (s.upgrades.damage || 0) + 40
+    const target = s.effectiveClick()
+    for (let i = 0; i < 115; i++) s.tickPowerRef()
+    expect(s.powerRef).toBeGreaterThan(target * 0.5)
+    expect(s.powerRef).toBeLessThan(target)
+  })
+
+  it('работает и вниз: снял снаряжение — враг плавно слабеет', () => {
+    const s = new GameState()
+    s.heroClass = 'gunner'
+    s.upgrades.damage = 40
+    s.powerRefValue()
+    const high = s.powerRef
+    s.upgrades.damage = 0
+    for (let i = 0; i < 200; i++) s.tickPowerRef()
+    expect(s.powerRef).toBeLessThan(high)
+    expect(s.powerRef).toBeGreaterThan(s.effectiveClick())
+  })
+
+  it('переживает сохранение и не ломается битым числом', () => {
+    const s = new GameState()
+    s.heroClass = 'gunner'
+    s.powerRef = 1234
+    const back = new GameState()
+    back._apply(JSON.parse(JSON.stringify(s.toJSON())))
+    expect(back.powerRef).toBe(1234)
+    back._apply({ powerRef: Infinity })
+    expect(back.powerRef).toBe(0)
+    expect(back.powerRefValue()).toBeGreaterThan(0)
+  })
+
+  it('перерождение обнуляет меру силы', () => {
+    const s = new GameState()
+    s.heroClass = 'gunner'
+    s.powerRef = 999
+    s.resetRun()
+    expect(s.powerRef).toBe(0)
+  })
+})
+
 describe('вложение очков пачкой', () => {
   const withPoints = (n) => { const s = new GameState(); s.hero.points = n; return s }
 

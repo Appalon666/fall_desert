@@ -9,7 +9,7 @@ import { State } from '../state/GameState.js'
 import { BAL } from '../data/balance.js'
 import { defOf, sheetKey } from '../data/bosses.js'
 import { ALLIES } from '../data/allies.js'
-import { enemyStats, applyDepthCap } from '../data/scaling.js'
+import { enemyStats, applyDepthBand } from '../data/scaling.js'
 import { getZone, isRelicZone } from '../data/zones.js'
 import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill, spawnGap, spawnBatchMax } from '../data/progression.js'
 import { rollItem, RARITY_BY_ID } from '../data/loot.js'
@@ -539,8 +539,13 @@ export default class BattleScene extends Phaser.Scene {
     const reward = Math.min(MAX, Math.ceil(base.reward * af.rew))
     const rawDmg = Math.min(MAX, base.dmg * af.dmg * mDmg * wave * deep)
     // Глубинный предел — ПОСЛЕДНИМ действием, когда все множители уже учтены.
-    // См. applyDepthCap: до 8000 убийств не срабатывает вовсе.
-    const capped = applyDepthCap(State.totalKills, rawHp, rawDmg, isBoss)
+    // См. applyDepthBand: до 8000 убийств не срабатывает вовсе.
+    // Полоса глубины: враг соотносится с РЕАЛЬНОЙ силой героя, а не с числом
+    // убийств. Сила берётся отстающая (powerRefValue) — вложение в урон даёт
+    // всплеск на локацию, и только потом враг подтягивается.
+    const capped = applyDepthBand(State.totalKills, rawHp, rawDmg, isBoss, {
+      click: State.powerRefValue(), maxHp: State.heroMaxHp(),
+    })
     const hp = Math.ceil(capped.hp)
     const dmg = capped.dmg
     const speed = BAL.enemySpeed * def.speedMul * (isBoss ? 0.7 : 1) * af.spd * State.deepZoneSpeedMul()

@@ -1,7 +1,7 @@
 // Тесты чистых данных: масштабирование, прогрессия, зоны/аффиксы, лут, апгрейды, формат.
 import { describe, it, expect } from 'vitest'
 import { BAL } from '../src/data/balance.js'
-import { enemyStats, applyDepthCap, depthCap, depthDmgCap, DEPTH_FROM, STAT_CAP } from '../src/data/scaling.js'
+import { enemyStats, applyDepthBand, DEPTH_FROM, STAT_CAP } from '../src/data/scaling.js'
 import { enemiesInWave, bossDue, zoneKillsFor, xpFromKill } from '../src/data/progression.js'
 import { ZONES, getZone, AFFIXES, affixForLoop, isRelicZone } from '../src/data/zones.js'
 import { ENEMIES, ENEMY_IDS } from '../src/data/enemies.js'
@@ -50,57 +50,52 @@ describe('scaling / enemyStats', () => {
   })
 })
 
-describe('глубинные кривые: HP и урон врага', () => {
-  // Стадии выше DEPTH_FROM — там, где пределы вообще работают.
-  const STAGES = [12000, 20000, 33029, 35982, 47000, 63000]
-  // Огромные сырые числа: на глубине формула даёт именно такие
-  // (замер: 5e67 HP и 6.7e48 урона на 114-й локации), и режет их как раз предел.
-  const cap = (stage, isBoss = false) => applyDepthCap(stage, 1e300, 1e300, isBoss)
+describe('полоса глубины: враг против реальной силы героя', () => {
+  // Замер живой игры, 129-я локация: урон клика 12.6aj (с критом 145aj),
+  // HP героя 70.4ak. Формулы врага на этой глубине дают 6.2e72 HP и 1.6e52
+  // урона — 4.3e28 кликов на рядового и мгновенная смерть от касания.
+  const PLAYER = { click: 1.45e44, maxHp: 7.04e46 }
+  const DEEP = 37544
+  const RAW = { hp: 6.2e72, dmg: 1.6e52 }
+  const band = (isBoss = false, raw = RAW, stage = DEEP, player = PLAYER) =>
+    applyDepthBand(stage, raw.hp, raw.dmg, isBoss, player)
 
-  it('урон врага РАСТЁТ с глубиной, а не падает в ноль', () => {
-    // Регрессия на живой баг: урон 8.4B на 20-й локации, 225K на 60-й, 99 на
-    // 86-й и РОВНО НОЛЬ на 114-й — враги переставали наносить урон вовсе.
-    // Причина была в том, что урон резался в той же доле, что и HP.
-    for (let i = 1; i < STAGES.length; i++) {
-      expect(cap(STAGES[i]).dmg).toBeGreaterThan(cap(STAGES[i - 1]).dmg)
-    }
-    expect(cap(STAGES[STAGES.length - 1]).dmg).toBeGreaterThan(0)
+  it('рядовой живёт не больше пяти кликов, босс — десяти', () => {
+    expect(band().hp / PLAYER.click).toBeCloseTo(BAL.depthClicksMax, 6)
+    expect(band(true).hp / PLAYER.click).toBeCloseTo(BAL.depthClicksMax * BAL.bossHpMul, 6)
   })
 
-  it('урон растёт МЕДЛЕННЕЕ HP', () => {
-    // Главное требование к балансу глубины: сложность живёт в числе
-    // кликов на врага и в плотности волны, а не в мгновенной смерти от удара.
-    for (let i = 1; i < STAGES.length; i++) {
-      const a = cap(STAGES[i - 1]), b = cap(STAGES[i])
-      expect(b.dmg / b.hp).toBeLessThan(a.dmg / a.hp)
-    }
-  })
-
-  it('босс сильнее рядового ровно на свои множители', () => {
-    const n = cap(35982), b = cap(35982, true)
-    expect(b.hp / n.hp).toBeCloseTo(BAL.bossHpMul, 6)
-    expect(b.dmg / n.dmg).toBeCloseTo(BAL.bossDamageMul, 6)
-  })
-
-  it('до DEPTH_FROM не ограничивает ничего', () => {
-    expect(depthCap(DEPTH_FROM - 1)).toBe(Infinity)
-    expect(depthDmgCap(DEPTH_FROM - 1)).toBe(Infinity)
-    const raw = { hp: 1e40, dmg: 1e30 }
-    expect(applyDepthCap(100, raw.hp, raw.dmg, false)).toEqual(raw)
+  it('враг не становится мишенью в один клик', () => {
+    // Обратная сторона: без нижней границы прокачанный игрок сносил бы всё с
+    // первого касания — замер давал 0.17 клика на рядового.
+    const weak = { hp: 1, dmg: 1 }
+    expect(band(false, weak).hp / PLAYER.click).toBeCloseTo(BAL.depthClicksMin, 6)
   })
 
   it('один удар не убивает героя с полного HP', () => {
-    // Сама гарантия живёт в BattleScene.heroTakeDamage — единственном месте,
-    // где известно HP героя. Здесь стережём два условия сразу: доли дают
-    // запас ходов — и кламп действительно применён к входящему урону.
-    expect(BAL.maxHitShare).toBeGreaterThan(0)
-    expect(1 / BAL.maxHitShare).toBeGreaterThanOrEqual(4)
-    expect(1 / BAL.maxHitShareBoss).toBeGreaterThanOrEqual(2)
-    const src = readFileSync(new URL('../src/scenes/BattleScene.js', import.meta.url), 'utf8')
-    const at = src.indexOf('heroTakeDamage(dmg')
-    const fn = src.slice(at, src.indexOf('clearEnemies()', at))
-    expect(fn).toMatch(/State\.heroMaxHp\(\)\s*\*\s*share/)
-    expect(fn).toMatch(/maxHitShareBoss/)
+    const hits = PLAYER.maxHp / band().dmg
+    expect(hits).toBeGreaterThanOrEqual(4)
+    expect(band().dmg).toBeCloseTo(PLAYER.maxHp * BAL.maxHitShare, 6)
+    expect(band(true).dmg).toBeCloseTo(PLAYER.maxHp * BAL.maxHitShareBoss, 6)
+  })
+
+  it('и не перестаёт наносить урон вовсе', () => {
+    // Прямая регрессия на живой баг: HP героя растёт как лом^0.874, урон врага
+    // — как dmgGrowth^убийства, поэтому герой обгоняет урон всегда. Замер:
+    // 8.4B урона на 20-й локации, 99 на 86-й и РОВНО НОЛЬ на 114-й.
+    const weak = { hp: 1, dmg: 1 }
+    expect(band(false, weak).dmg).toBeCloseTo(PLAYER.maxHp * BAL.minHitShare, 6)
+    expect(band(true, weak).dmg).toBeCloseTo(PLAYER.maxHp * BAL.minHitShareBoss, 6)
+  })
+
+  it('до DEPTH_FROM не трогает ничего', () => {
+    expect(band(false, RAW, DEPTH_FROM - 1)).toEqual(RAW)
+    expect(band(false, RAW, 100)).toEqual(RAW)
+  })
+
+  it('без силы героя (симуляции) полоса не применяется', () => {
+    expect(applyDepthBand(DEEP, RAW.hp, RAW.dmg, false, null)).toEqual(RAW)
+    expect(band(false, RAW, DEEP, { click: 0, maxHp: 0 })).toEqual(RAW)
   })
 })
 
