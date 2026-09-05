@@ -956,7 +956,13 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // ---------------- Урон герою / смерть ----------------
-  heroTakeDamage(dmg) {
+  heroTakeDamage(dmg, isBoss = false) {
+    // Потолок одного удара (BAL.maxHitShare): на глубине урон врага обгоняет HP
+    // героя на десятки порядков, и без него любое касание убивало бы сразу.
+    // Считаем от МАКСИМАЛЬНОГО HP, а не от текущего: иначе добить героя было бы
+    // нечем — каждый следующий удар слабел бы вместе с полоской.
+    const share = isBoss ? BAL.maxHitShareBoss : BAL.maxHitShare
+    dmg = Math.min(dmg, State.heroMaxHp() * share)
     State.hp -= dmg
     this.floatText(this.hero.x, this.hero.y - 60, `-${fmt(Math.round(dmg))}`, '#ff5a5a', 20)
     this.cameras.main.shake(120, 0.006)
@@ -1134,7 +1140,7 @@ export default class BattleScene extends Phaser.Scene {
         e.attackTimer += delta
         if (e.attackTimer >= BAL.enemyAttackRate) {
           e.attackTimer = 0
-          this.heroTakeDamage(e.dmg)
+          this.heroTakeDamage(e.dmg, e.isBoss)
           if (State.hp <= 0) break // герой мёртв → врагов уже уничтожили, не твиним
           this.tweens.add({ targets: e.sprite, x: e.sprite.x - 14, duration: 90, yoyo: true })
         }
