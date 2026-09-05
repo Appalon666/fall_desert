@@ -97,6 +97,10 @@ const EN = {
   '📺 Реклама: ×2': '📺 Watch ad: ×2',
   'Награда не начислена: ролик не досмотрен': 'No reward: the ad was not watched to the end',
   'НОВОЕ': 'NEW',
+  'Реликтовая ковка': 'Relic forge',
+  'реликвия: {n}%': 'relic: {n}%',
+  'Разбирай лишнее в инвентаре → металлолом. Здесь куй снаряжение.\nДороже сборка — выше шанс редкого. Реликтовая ковка даёт реликвию или легенду.':
+    'Scrap what you do not need in the inventory → salvage. Forge gear here.\nPricier the build, better the odds. Relic forge yields a relic or a legendary.',
   '↑ пусто': '↑ empty slot',
   '↑ лучше': '↑ better',
   '↓ хуже': '↓ worse',
@@ -246,8 +250,6 @@ const EN = {
   '…и ещё {n} предметов': '…and {n} more items',
   'Не удалось открыть инвентарь.\nВернись в лагерь.': 'Couldn’t open inventory.\nReturn to camp.',
   '🔨 ВЕРСТАК': '🔨 WORKBENCH',
-  'Разбирай лишнее в инвентаре → металлолом. Здесь куй снаряжение.\nДороже сборка — выше шанс редкого.':
-    'Break down spare gear in the inventory → scrap. Forge equipment here.\nPricier builds — higher rare chance.',
   '{n} металлолома': '{n} scrap', 'редкое+: ~{n}%': 'rare+: ~{n}%',
   'Ковать': 'Forge', 'Мало 🔩': 'Low 🔩', 'скован!': 'forged!',
   // — реликвии (части, набор, ковка) —

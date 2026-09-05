@@ -18,6 +18,8 @@
     "check:audio": "node tools/audio-check.mjs",
     "check:ads": "node tools/ads-check.mjs",
     "check:score": "node tools/score-check.mjs",
+    "check:boss": "node tools/boss-check.mjs",
+    "check:smoke": "node tools/smoke-check.mjs",
     "pack": "vite build && python tools/pack.py"
   },
   "devDependencies": {

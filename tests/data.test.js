@@ -7,6 +7,7 @@ import { ZONES, getZone, AFFIXES, affixForLoop, isRelicZone } from '../src/data/
 import { ENEMIES, ENEMY_IDS } from '../src/data/enemies.js'
 import { BOSSES, BOSS_IDS, defOf, sheetKey, isBossId } from '../src/data/bosses.js'
 import { setLang, t, itemName } from '../src/i18n.js'
+import { GameState } from '../src/state/GameState.js'
 import { readFileSync } from 'node:fs'
 import { RARITIES, rollItem, scrapValue, CRAFT_TIERS, RARITY_BY_ID, SLOT_BY_ID, ITEM_LEVEL_CAP, itemPower, itemQuality, itemRank, SLOTS, STAT_SHARES, STATS_PER_ITEM, STAT_SHORT } from '../src/data/loot.js'
 import { UPGRADES, upgradeCost } from '../src/data/upgrades.js'
@@ -358,6 +359,65 @@ describe('качество предмета (сортировка инвента
 // Путаница тут родилась из-за формулы: у шанса крита коэффициент 0.01, у всех
 // прочих статов 0.05, поэтому предельный шлем-реликвия показывает «+20.0%», а
 // рядовые легендарные сапоги — «+75%», и снаружи это читается как понижение.
+// Реликтовая ковка — второй путь к реликвии, помимо набора из пяти частей.
+// Обещание на карточке («реликвия: 70%») обязано совпадать с тем, что реально
+// делает craft(): за 10000 лома игрок покупает шанс, а не лотерею.
+describe('реликтовая ковка за металлолом', () => {
+  const TIER = CRAFT_TIERS.find(t => t.id === 'relic')
+
+  it('тир заведён: 10000 лома и 70% на реликвию', () => {
+    expect(TIER).toBeTruthy()
+    expect(TIER.cost).toBe(10000)
+    expect(TIER.relicChance).toBeCloseTo(0.7, 6)
+  })
+
+  it('это самый дорогой тир', () => {
+    for (const t of CRAFT_TIERS) if (t !== TIER) expect(TIER.cost).toBeGreaterThan(t.cost)
+  })
+
+  // Главное: ХЛАМА тут быть не может. Ни серого, ни синего — только два исхода.
+  it('выдаёт только реликвию или легенду, ничего третьего', () => {
+    const s = new GameState()
+    s.scrap = TIER.cost * 400
+    const seen = {}
+    for (let i = 0; i < 400; i++) {
+      const it = s.craft('relic')
+      seen[it.rarity] = (seen[it.rarity] || 0) + 1
+    }
+    expect(Object.keys(seen).sort()).toEqual(['epic', 'relic'])
+  })
+
+  it('доля реликвий держится около обещанных 70%', () => {
+    const s = new GameState()
+    s.scrap = TIER.cost * 4000
+    // Свой генератор: тест про пропорцию, а не про то, как лёг Math.random.
+    const rng = (x => () => (x = (x * 1664525 + 1013904223) >>> 0) / 4294967296)(2026)
+    let relics = 0
+    for (let i = 0; i < 4000; i++) if (s.craft('relic', rng).rarity === 'relic') relics++
+    expect(relics / 4000).toBeCloseTo(TIER.relicChance, 1)
+  })
+
+  it('без лома не куёт и лом не списывает', () => {
+    const s = new GameState()
+    s.scrap = TIER.cost - 1
+    expect(s.craft('relic')).toBe(null)
+    expect(s.scrap).toBe(TIER.cost - 1)
+  })
+
+  it('обычные тиры гарантии не получили — там по-прежнему таблица редкостей', () => {
+    for (const t of CRAFT_TIERS) if (t.id !== 'relic') expect(t.relicChance).toBeUndefined()
+  })
+
+  // Счётчик relicsCrafted гейтит выпадение ДУБЛЕЙ частей с босса. Покупка
+  // реликвии за лом не должна портить дроп с босса.
+  it('не трогает счётчик выкованных из частей реликвий', () => {
+    const s = new GameState()
+    s.scrap = TIER.cost * 5
+    for (let i = 0; i < 5; i++) s.craft('relic')
+    expect(s.relicsCrafted).toBe(0)
+  })
+})
+
 describe('реликвия сильнее легенды', () => {
   const best = (rarityId, crit) => itemPower(RARITY_BY_ID[rarityId].mul, ITEM_LEVEL_CAP, crit)
 

@@ -16,7 +16,7 @@ import { rollItem, RARITY_BY_ID } from '../data/loot.js'
 import { createButton } from '../ui/Button.js'
 import {
   loadBattle, battleAssetsReady, buildEnemySheets, buildEnemyAnims, heroScaleFor, buildHeroAnim,
-  loadBosses, bossAssetsReady, buildBossSheets, buildAllySheets,
+  loadBosses, bossAssetsReady, bossLoadInFlight, buildBossSheets, buildAllySheets,
 } from '../assets.js'
 import { darken, lighten, addRim, addDust, addVignette, addFog, addGodRays, applyPostFX, resIcon } from '../ui/scenery.js'
 import { floatText, toast, hitSpark, capsBurst, explode, impactRing } from '../gfx/fx.js'
@@ -83,17 +83,35 @@ export default class BattleScene extends Phaser.Scene {
     this.load.once('complete', () => { [label, bg, fill, pct].forEach(o => o.destroy()) })
   }
 
-  // Листы боссов (~2.5 МБ) не держат вход в бой: босс приходит только после
-  // zoneKillsFor(зона) убийств. Догружаем их фоном и режем, когда приехали; если не
-  // успели (или файла нет) — босс выйдет на процедурном фолбэке, бой не встанет.
+  // Листы боссов (девять файлов, ~900 КБ). Основную загрузку делает BootScene
+  // фоном, сюда она обычно приходит уже готовой; этот метод — страховка на
+  // случай, если игрок добрался до боя раньше, чем догрузка закончилась.
+  //
+  // ТРИ ПОЛОМКИ, из-за которых боссы показывались процедурными заглушками:
+  //
+  // 1) Нарезка запускалась только когда доехали ВСЕ девять листов
+  //    (`if (bossAssetsReady) { buildBossSheets }`). Пока не хватало хотя бы
+  //    одного файла, не нарезался ни один — хотя восемь уже лежали готовыми.
+  //    Теперь режем всё, что доехало: sliceSheet сам пропускает и уже
+  //    нарезанное, и ещё не приехавшее.
+  //
+  // 2) В колбэке загрузки стояла проверка `this.scene.isActive()`. Если
+  //    загрузка добегала, пока сцена на паузе — под рекламой, на скрытой
+  //    вкладке, — листы не нарезались ВООБЩЕ и повторить было некому: босс
+  //    оставался заглушкой до конца забега. Нарезка не зависит от того, идёт
+  //    сцена или стоит: текстуры и анимации в Phaser общие для всей игры.
+  //
+  // 3) Загрузку тут заказывали, не глядя на то, что её уже ведёт BootScene:
+  //    `loadBosses` кладёт в очередь все девять файлов без разбора, а Phaser
+  //    сверяет дубли только внутри своей сцены. Выходило по два запроса на
+  //    файл ровно на медленной связи. Теперь спрашиваем bossLoadInFlight().
   ensureBossAssets() {
     try {
-      if (bossAssetsReady(this)) { buildBossSheets(this); return }
-      // Не доехавший лист — не повод падать: у босса останется процедурный
-      // фолбэк (как и у врагов, см. preload).
-      this.load.on('loaderror', () => { /* */ })
+      buildBossSheets(this)
+      if (bossAssetsReady(this)) return
+      if (bossLoadInFlight()) return // качает BootScene, она же и нарежет
       this.load.once('complete', () => {
-        try { if (this.scene && this.scene.isActive()) buildBossSheets(this) } catch (e) { /* */ }
+        try { buildBossSheets(this) } catch (e) { /* битый файл — останется фолбэк */ }
       })
       loadBosses(this.load)
       this.load.start()
@@ -469,6 +487,11 @@ export default class BattleScene extends Phaser.Scene {
 
   // Босс-ворота: один жирный враг, поток обычных на это время выключен.
   spawnBoss() {
+    // Последняя попытка нарезать листы: файл мог доехать, а событие 'complete'
+    // — прийти в другую сцену (игрок успел уйти в лагерь и вернуться).
+    // Вызов дешёвый и идемпотентный, а босс на арене — ровно тот момент, когда
+    // подмена на заглушку и видна.
+    try { buildBossSheets(this) } catch (e) { /* */ }
     State.bossActive = true
     // У зоны свой пул боссов; на старых сейвах/самопальных зонах его может не
     // быть — тогда, как раньше, ворота держит раздутый обычный враг.

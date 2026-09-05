@@ -193,7 +193,25 @@ export function bossAssetsReady(scene) {
   return true
 }
 
+// Кто сейчас качает листы боссов. Нужен, потому что загрузчик Phaser
+// дедуплицирует файлы только ВНУТРИ своей сцены: он сверяется с менеджером
+// текстур и со своими очередями, но не видит очередь чужой сцены
+// (LoaderPlugin.keyExists). Без этой сверки бой, начатый пока BootScene ещё
+// тянет боссов фоном, перекачивал бы те же ~900 КБ заново — ровно на медленной
+// связи, ради которой фоновая догрузка и делалась. Плюс каждый второй файл
+// печатал бы в консоль «Texture key already in use».
+let bossLoader = null
+
+// Идёт ли загрузка прямо сейчас. Спрашиваем сам загрузчик, а не свой флаг:
+// если сцена закрылась с недокачанным списком, её loader переходит в покой
+// сам, и следующая сцена спокойно возьмётся за дело. Флаг в такой ситуации
+// остался бы поднятым навсегда, и листы не догрузились бы уже никогда.
+export function bossLoadInFlight() {
+  return !!(bossLoader && typeof bossLoader.isLoading === 'function' && bossLoader.isLoading())
+}
+
 export function loadBosses(load) {
+  bossLoader = load
   for (const id of BOSS_IDS) load.image(`boss-${id}-src`, `sprites/boss-${id}.png`)
 }
 

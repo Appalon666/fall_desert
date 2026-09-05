@@ -34,7 +34,7 @@ export default class ForgeScene extends Phaser.Scene {
     applyPostFX(this, true, 0.5)
     titleText(this, GAME.WIDTH / 2, 46, t('🔨 ВЕРСТАК'), { size: 34, color: '#ffb46a', glow: 0xff8a2a })
 
-    this.add.text(GAME.WIDTH / 2, 92, t('Разбирай лишнее в инвентаре → металлолом. Здесь куй снаряжение.\nДороже сборка — выше шанс редкого.'), {
+    this.add.text(GAME.WIDTH / 2, 92, t('Разбирай лишнее в инвентаре → металлолом. Здесь куй снаряжение.\nДороже сборка — выше шанс редкого. Реликтовая ковка даёт реликвию или легенду.'), {
       fontFamily: 'Rubik, sans-serif', fontSize: '16px', color: CSS.paper, align: 'center', lineSpacing: 4,
     }).setOrigin(0.5)
 
@@ -54,9 +54,10 @@ export default class ForgeScene extends Phaser.Scene {
     this.uiObjs = []
     this.scrapText.setText(t('{n} металлолома', { n: fmt(State.scrap) }))
 
-    // Тиры крафта
+    // Тиры крафта. Карточки ужаты с 260 до 230 (и зазор с 20 до 16): пятый тир
+    // в прежнюю ширину не влезал — 5×260+4×20 это 1380 при экране 1280.
     const n = CRAFT_TIERS.length
-    const cardW = 260, gap = 20
+    const cardW = 230, gap = 16
     const totalW = n * cardW + (n - 1) * gap
     const startX = (GAME.WIDTH - totalW) / 2 + cardW / 2
     CRAFT_TIERS.forEach((tier, i) => this.makeTier(startX + i * (cardW + gap), 210, cardW, tier))
@@ -76,7 +77,12 @@ export default class ForgeScene extends Phaser.Scene {
     paint2(false)
     const name = this.add.text(0, -h / 2 + 24, t(tier.name), { fontFamily: 'Rubik, sans-serif', fontSize: '20px', color: tier.css, fontStyle: 'bold' }).setOrigin(0.5)
     const cost = this.add.text(0, -h / 2 + 58, `🔩 ${fmt(tier.cost)}`, { fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: afford ? '#e8e8f0' : '#7a7a82', fontStyle: 'bold' }).setOrigin(0.5)
-    const odds = this.add.text(0, -h / 2 + 88, t('редкое+: ~{n}%', { n: topPct(tier.luck) }), { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: CSS.toxic }).setOrigin(0.5)
+    // У реликтовой ковки шанс не «редкое и выше», а прямой: реликвия или
+    // легенда. Обещание на карточке должно совпадать с тем, что делает craft().
+    const oddsText = tier.relicChance
+      ? t('реликвия: {n}%', { n: Math.round(tier.relicChance * 100) })
+      : t('редкое+: ~{n}%', { n: topPct(tier.luck) })
+    const odds = this.add.text(0, -h / 2 + 88, oddsText, { fontFamily: 'Rubik, sans-serif', fontSize: '15px', color: tier.relicChance ? tier.css : CSS.toxic }).setOrigin(0.5)
     c.add([bg, name, cost, odds])
 
     const btn = createButton(this, 0, h / 2 - 26, {

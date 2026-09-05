@@ -506,11 +506,14 @@ export class GameState extends Emitter {
   }
 
   // Крафт случайного предмета за металлолом; тир задаёт шанс качества (luck).
-  craft(tierId) {
+  craft(tierId, rng = Math.random) {
     const t = CRAFT_TIERS.find(c => c.id === tierId)
     if (!t || this.scrap < t.cost) return null
     this.scrap -= t.cost
-    const item = rollItem(Math.random, Math.floor(this.enemyLevel()), t.luck + this.lootLuck())
+    // Тир с гарантией (relicChance) бросает не по таблице редкостей, а монетку
+    // между реликвией и легендой: хлам за такую цену игрок бы не простил.
+    const forced = t.relicChance ? (rng() < t.relicChance ? 'relic' : 'epic') : null
+    const item = rollItem(rng, Math.floor(this.enemyLevel()), t.luck + this.lootLuck(), forced)
     this.addItem(item)
     this.emit('scrap'); this.save()
     return item

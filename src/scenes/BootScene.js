@@ -6,7 +6,7 @@
 import Phaser from 'phaser'
 import { SCENES } from '../config.js'
 import { generateTextures } from '../gfx/textures.js'
-import { loadCore, loadDeferredUi, loadMusic, buildHeroSheets } from '../assets.js'
+import { loadCore, loadDeferredUi, loadBosses, loadMusic, buildHeroSheets, buildBossSheets } from '../assets.js'
 import { State } from '../state/GameState.js'
 import { Platform } from '../platform/yandex.js'
 import { Music } from '../audio/music.js'
@@ -108,7 +108,20 @@ export default class BootScene extends Phaser.Scene {
   backgroundLoadMusic() {
     try {
       this.load.removeAllListeners('progress')
-      this.loadChain([loadDeferredUi, loadMusic], () => {
+      // Режем лист босса СРАЗУ, как он доехал, а не когда до него доберётся бой.
+      // Текстуры и анимации в Phaser общие для всей игры, так что нарезка из
+      // загрузочной сцены работает так же. Иначе к первым воротам файл лежал
+      // готовым, но не нарезанным — и босс показывался процедурной заглушкой.
+      this.load.on('filecomplete', (key) => {
+        if (typeof key === 'string' && key.startsWith('boss-')) {
+          try { buildBossSheets(this) } catch (e) { /* останется фолбэк */ }
+        }
+      })
+      // Боссы (девять листов, ~900 КБ) идут ВТОРЫМИ: до первых ворот у игрока
+      // около минуты, и раньше они грузились только из боя — кто добегал
+      // быстрее загрузки, видел вместо босса процедурную заглушку. Музыка
+      // тяжелее всего (~4 МБ) и ждёт последней: без неё игра просто тише.
+      this.loadChain([loadDeferredUi, loadBosses, loadMusic], () => {
         try { Music.retry() } catch (e) { /* */ }
         this.scene.stop() // всё догружено — Boot больше не нужен
       })
