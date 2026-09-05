@@ -7,7 +7,7 @@ import { BAL } from '../data/balance.js'
 import { UPGRADES, upgradeCost } from '../data/upgrades.js'
 import { ALLIES, allyCost } from '../data/allies.js'
 import { CLASS_BY_ID } from '../data/classes.js'
-import { EQUIP_KEYS, SLOT_BY_ID, RARITY_BY_ID, rollItem, scrapValue, sellValue, CRAFT_TIERS, weaponStyleFor, itemPower, ITEM_LEVEL_CAP, itemStats } from '../data/loot.js'
+import { EQUIP_KEYS, SLOT_BY_ID, RARITIES, RARITY_BY_ID, rollItem, scrapValue, sellValue, CRAFT_TIERS, weaponStyleFor, itemPower, ITEM_LEVEL_CAP, itemStats } from '../data/loot.js'
 import { RELIC_PART_IDS, RELIC_PART_BY_ID, RELIC_DUPE_SCRAP } from '../data/relics.js'
 import { zoneHpMul } from '../data/zones.js'
 import { zoneKillsFor, maxKillsPerSec, MAX_KILLS_PER_SEC } from '../data/progression.js'
@@ -497,7 +497,10 @@ export class GameState extends Emitter {
   }
   // Разобрать весь хлам до заданной редкости включительно (по индексу RARITIES).
   scrapAllUpTo(maxIdx) {
-    const order = ['common', 'uncommon', 'rare', 'epic', 'relic']
+    // Порядок берём ИЗ таблицы редкостей, а не списком: добавление тира
+    // (оранжевый легендарный) молча сдвинуло бы индексы и «Хлам и годное»
+    // начало бы жрать не то.
+    const order = RARITIES.map(r => r.id)
     let gained = 0, count = 0
     this.inventory = this.inventory.filter((it) => {
       const rIdx = order.indexOf(it.rarity)

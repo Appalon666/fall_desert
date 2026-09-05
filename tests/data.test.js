@@ -483,35 +483,117 @@ describe('ковка части реликвии за металлолом', () 
   })
 })
 
-describe('реликвия сильнее легенды', () => {
-  const best = (rarityId, crit) => itemPower(RARITY_BY_ID[rarityId].mul, ITEM_LEVEL_CAP, crit)
+describe('реликвия не выпадает из добычи', () => {
+  // Единственный путь к реликвии — пять частей и ковка. Регрессия на живой баг:
+  // вес 0.6 плюс множитель от удачи давали красный предмет каждым сорок восьмым
+  // броском, и смысл выбивать части пропадал.
+  const rolls = (n, luck) => {
+    const out = []
+    for (let i = 0; i < n; i++) out.push(rollItem(Math.random, 40, luck))
+    return out
+  }
 
-  it('в каждом слоте предельная реликвия сильнее предельной легенды', () => {
-    for (const s of SLOTS) {
-      const crit = s.stat === 'critChance'
-      expect(best('relic', crit), s.name).toBeGreaterThan(best('epic', crit))
+  it('ни одного красного за 20 000 бросков без удачи', () => {
+    expect(rolls(20000, 0).some(it => it.rarity === 'relic')).toBe(false)
+  })
+
+  it('и с запредельной удачей тоже', () => {
+    // 121 очко удачи у игрока = lootLuck 6.05; берём с большим запасом.
+    expect(rolls(20000, 50).some(it => it.rarity === 'relic')).toBe(false)
+  })
+
+  it('потолок добычи — оранжевое легендарное, и оно выпадает', () => {
+    const got = new Set(rolls(20000, 6).map(it => it.rarity))
+    expect(got.has('legendary')).toBe(true)
+    expect(got.has('relic')).toBe(false)
+  })
+
+  it('верстак тоже не выдаёт реликвию ни на одном тире', () => {
+    for (const tier of CRAFT_TIERS.filter(c => !c.relicPart)) {
+      const s = new GameState()
+      s.heroClass = 'gunner'
+      s.hero.luck = 500
+      for (let i = 0; i < 400; i++) {
+        s.scrap = tier.cost
+        const item = s.craft(tier.id)
+        expect(item && item.rarity).not.toBe('relic')
+      }
     }
   })
 
-  it('разрыв одинаковый во всех слотах — ровно множитель тира', () => {
-    const ratio = RARITY_BY_ID.relic.mul / RARITY_BY_ID.epic.mul
+  it('а ковка из частей — выдаёт', () => {
+    const s = new GameState()
+    s.heroClass = 'gunner'
+    s.relicParts = [...RELIC_PART_IDS]
+    const item = s.craftRelic()
+    expect(item).toBeTruthy()
+    expect(item.rarity).toBe('relic')
+  })
+})
+
+describe('лестница редкостей: шесть тиров', () => {
+  // Порядок с экрана игрока: серый → зелёный → синий → фиолетовый →
+  // оранжевый легендарный → красная реликвия.
+  const LADDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'relic']
+
+  it('ровно шесть тиров в заданном порядке', () => {
+    expect(RARITIES.map(r => r.id)).toEqual(LADDER)
+  })
+
+  it('каждый следующий сильнее предыдущего', () => {
+    for (let i = 1; i < RARITIES.length; i++) {
+      expect(RARITIES[i].mul, RARITIES[i].name).toBeGreaterThan(RARITIES[i - 1].mul)
+    }
+  })
+
+  it('каждый следующий реже предыдущего, реликвия не выпадает вовсе', () => {
+    for (let i = 1; i < RARITIES.length - 1; i++) {
+      expect(RARITIES[i].weight, RARITIES[i].name).toBeLessThan(RARITIES[i - 1].weight)
+    }
+    expect(RARITY_BY_ID.relic.weight).toBe(0)
+  })
+
+  it('у каждого тира свой цвет', () => {
+    expect(new Set(RARITIES.map(r => r.css)).size).toBe(RARITIES.length)
+  })
+
+  it('дороже в разбор с каждым тиром', () => {
+    const val = (rarity) => scrapValue({ rarity, level: 50 })
+    for (let i = 1; i < RARITIES.length; i++) {
+      expect(val(RARITIES[i].id), RARITIES[i].name).toBeGreaterThan(val(RARITIES[i - 1].id))
+    }
+  })
+})
+
+describe('реликвия ровно вдвое сильнее легендарного', () => {
+  const best = (rarityId, crit) => itemPower(RARITY_BY_ID[rarityId].mul, ITEM_LEVEL_CAP, crit)
+
+  it('в каждом слоте предельная реликвия сильнее предельного легендарного', () => {
     for (const s of SLOTS) {
       const crit = s.stat === 'critChance'
-      expect(best('relic', crit) / best('epic', crit), s.name).toBeCloseTo(ratio, 6)
+      expect(best('relic', crit), s.name).toBeGreaterThan(best('legendary', crit))
+    }
+  })
+
+  it('разрыв ровно вдвое и одинаковый во всех слотах', () => {
+    expect(RARITY_BY_ID.relic.mul / RARITY_BY_ID.legendary.mul).toBeCloseTo(2, 6)
+    for (const s of SLOTS) {
+      const crit = s.stat === 'critChance'
+      expect(best('relic', crit) / best('legendary', crit), s.name).toBeCloseTo(2, 6)
     }
   })
 
   // itemRank — то, чем инвентарь сравнивает вещи с РАЗНЫМИ статами и печатает
   // «лучше/хуже надетого». Без него список сравнивал несравнимые проценты.
-  it('ранг ставит реликвию выше легенды даже при разных статах', () => {
+  it('ранг ставит реликвию выше легендарного даже при разных статах', () => {
     const item = (rarity, stat) => ({
       uid: 'u', slot: stat === 'critChance' ? 'helmet' : 'boots', rarity, stat, level: ITEM_LEVEL_CAP,
       value: itemPower(RARITY_BY_ID[rarity].mul, ITEM_LEVEL_CAP, stat === 'critChance'),
     })
-    const relicHelm = item('relic', 'critChance')   // «+20.0% шанс крита»
-    const epicBoots = item('epic', 'capsMul')       // «+75% крышек»
-    expect(relicHelm.value).toBeLessThan(epicBoots.value)      // проценты обманывают…
-    expect(itemRank(relicHelm)).toBeGreaterThan(itemRank(epicBoots)) // …ранг — нет
+    const relicHelm = item('relic', 'critChance')       // «+32% шанс крита»
+    const legendBoots = item('legendary', 'capsMul')   // «+120% крышек»
+    expect(relicHelm.value).toBeLessThan(legendBoots.value)      // проценты обманывают…
+    expect(itemRank(relicHelm)).toBeGreaterThan(itemRank(legendBoots)) // …ранг — нет
   })
 
   it('у предельного предмета ранг равен множителю его тира', () => {

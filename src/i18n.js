@@ -167,7 +167,8 @@ const EN = {
   '+10% урона по врагам рядом с целью за уровень': '+10% splash damage to enemies near the target per level',
   '+1% шанс крита за уровень (сверх потолка — крит-урон)': '+1% crit chance per level (past the cap — crit damage)',
   // — лут: редкости/слоты/статы/крафт —
-  'Хлам': 'Junk', 'Годное': 'Decent', 'Редкое': 'Rare', 'Легенда': 'Legend', 'Реликвия': 'Relic',
+  'Хлам': 'Junk', 'Годное': 'Decent', 'Редкое': 'Rare', 'Эпическое': 'Epic',
+  'Легендарное': 'Legendary', 'Реликвия': 'Relic',
   'Оружие': 'Weapon', 'Шлем': 'Helmet', 'Обувь': 'Boots', 'Аксессуар': 'Accessory',
   'урон клика': 'click damage', 'макс. HP': 'max HP', 'шанс крита': 'crit chance',
   'урон союзников': 'ally damage', 'крышек': 'caps',
