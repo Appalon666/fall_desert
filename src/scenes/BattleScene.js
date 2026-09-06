@@ -51,6 +51,9 @@ const PANEL_DEPTH = 50
 // Каждые столько выпущенных врагов считаем «волной» — только ради нарастания
 // сложности внутри зоны (State.bumpWave, +1%).
 const WAVE_EVERY = 5
+// Сколько секунд висит предупреждение о рекламе (см. showAdNotice). Две — это
+// достаточно, чтобы прочитать и не успеть заскучать; бой на это время стоит.
+const AD_NOTICE_SEC = 2
 
 export default class BattleScene extends Phaser.Scene {
   constructor() { super(SCENES.BATTLE) }
@@ -385,7 +388,12 @@ export default class BattleScene extends Phaser.Scene {
         if (this._leaving) return // ролик уже идёт — второй клик его не удвоит
         this._leaving = true
         State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.leaderboardScore())
-        Platform.showInterstitial(() => this.scene.start(SCENES.HUB))
+        const go = () => Platform.showInterstitial(() => this.scene.start(SCENES.HUB))
+        // Плашку показываем ТОЛЬКО когда ролик действительно пойдёт: спрашиваем
+        // об этом платформу, иначе предупреждение висело бы и на выходах, где
+        // рекламы не будет (троттл 75 с), и превратилось бы в лишний экран.
+        if (Platform.interstitialReady()) this.showAdNotice(go)
+        else go()
       },
     }))
   }
@@ -1046,6 +1054,49 @@ export default class BattleScene extends Phaser.Scene {
     if (this._deathModal) { this._deathModal.forEach(o => o.destroy()); this._deathModal = null }
   }
 
+  // ---------------- Предупреждение о рекламе ----------------
+  //
+  // Отзыв игрока: «появление рекламы в кликере без предупреждения». Формально
+  // точка показа законная (выход в лагерь — неигровое действие, п.4.4), но для
+  // игрока ролик всё равно возникал из ниоткуда: он жал «В лагерь» и получал
+  // рекламу вместо лагеря. Теперь между ними — плашка с отсчётом.
+  //
+  // Отменить показ нельзя намеренно: кнопка «не смотреть» на межстраничной
+  // рекламе — это уже отказ от монетизации, а не предупреждение. Задача плашки
+  // одна: чтобы ролик не был неожиданностью.
+  showAdNotice(next) {
+    const cx = this.arenaW / 2, cy = GAME.HEIGHT / 2
+    const objs = []
+    const push = (o, d = 96) => { objs.push(o.setDepth(d)); return o }
+    // setInteractive на подложке: пока идёт отсчёт, клики не должны доходить до
+    // арены — иначе выстрелы уходили бы «сквозь» плашку по замершим врагам.
+    push(this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.82).setOrigin(0).setInteractive(), 95)
+    push(this.add.text(cx, cy - 24, t('Сейчас будет реклама'), {
+      fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.toxic, fontStyle: 'bold',
+      stroke: '#120d09', strokeThickness: 5,
+    }).setOrigin(0.5))
+    const count = push(this.add.text(cx, cy + 30, '', {
+      fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: '#e8ddc0',
+    }).setOrigin(0.5))
+    this._adNotice = objs
+
+    let left = AD_NOTICE_SEC
+    const tick = () => count.setText(t('через {n}…', { n: left }))
+    tick()
+    this.time.addEvent({
+      delay: 1000, repeat: AD_NOTICE_SEC - 1,
+      callback: () => {
+        left--
+        if (left > 0) { tick(); return }
+        this.closeAdNotice()
+        next()
+      },
+    })
+  }
+  closeAdNotice() {
+    if (this._adNotice) { this._adNotice.forEach(o => o.destroy()); this._adNotice = null }
+  }
+
   // ---------------- Эффекты ----------------
   // Сами эффекты живут в gfx/fx.js — они не знают про состояние боя. Здесь
   // остаются только тонкие обёртки, чтобы вызовы по сцене читались как раньше.
@@ -1085,7 +1136,11 @@ export default class BattleScene extends Phaser.Scene {
     // это время нельзя никого.
     //
     // HUD обновляем и на стопе — иначе крышки и HP замирали бы на полуслове.
-    if (this._zoneModal || this._deathModal) { this.updateHud(); return }
+    // _adNotice здесь по той же причине, что и остальные два: плашка держится
+    // пару секунд, и без остановки боя героя всё это время били бы — тем вернее,
+    // чем глубже локация. Ролик, который пойдёт следом, паузу возьмёт сам
+    // (PAUSE.AD в _adStart), но между нажатием и вызовом SDK её ещё нет.
+    if (this._zoneModal || this._deathModal || this._adNotice) { this.updateHud(); return }
 
     // Время боя — опора проверки рекорда (см. GameState.leaderboardScore).
     // Считаем ЗДЕСЬ, потому что здесь же начисляются убийства: update не идёт

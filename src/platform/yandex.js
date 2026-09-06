@@ -10,6 +10,12 @@ import { Pause, PAUSE } from '../util/pause.js'
 // нет, setLeaderboardScore молча ничего не делает.
 export const LEADERBOARD = 'kills'
 
+// Клиентский троттлинг межстраничной. Яндекс требует ≥60 с между показами и не
+// одобряет частый показ — берём с запасом. Вынесены в константы, потому что по
+// ним же сцена решает, рисовать ли предупреждение (см. interstitialReady).
+const AD_MIN_GAP = 75000  // между СОСТОЯВШИМИСЯ показами
+const AD_TRY_GAP = 20000  // между ПОПЫТКАМИ (показа могло и не быть — нет инвентаря)
+
 class YandexPlatform {
   constructor() {
     this.available = false
@@ -312,21 +318,34 @@ class YandexPlatform {
   // при отказе от показа (троттл, нет SDK) и по сторожу, если SDK замолчал.
   // Через него сцена делает переход — экран сменяется после рекламы, а не под ней.
   //
-  // Клиентский троттлинг ≥75 с (Яндекс требует ≥60 с и не одобряет частый показ).
+  // Клиентский троттлинг — см. AD_MIN_GAP / AD_TRY_GAP.
+  //
+  // ПРЕДУПРЕЖДЕНИЕ. Игрок в отзыве: «появление рекламы в кликере без
+  // предупреждения». Ролик и правда стартовал молча — экран боя просто сменялся
+  // рекламой. Плашку рисует сцена (Phaser здесь недоступен), но решать, показывать
+  // ли её, должна платформа: иначе предупреждение мигало бы на каждом выходе в
+  // лагерь, даже когда рекламы не будет — а не будет её чаще, чем будет (троттл
+  // 75 с при вылазке в пару минут).
+  interstitialReady() {
+    if (!this.available || !this.ya?.adv || !this._embedded()) return false
+    if (this._adBusy) return false
+    const now = Date.now()
+    if (now - this._lastAd < AD_MIN_GAP) return false
+    if (now - (this._lastAdTry || 0) < AD_TRY_GAP) return false
+    return true
+  }
+
   showInterstitial(onDone = null) {
     let settled = false
     const done = () => { if (settled) return; settled = true; try { if (onDone) onDone() } catch (e) { /* */ } }
-    if (!this.available || !this.ya?.adv || !this._embedded()) { done(); return }
     // Показ уже идёт — второй не начинаем и onDone НЕ зовём: переход принадлежит
     // первому вызову, он его и сделает, когда ролик закроется. Позвать done()
     // здесь значило бы открыть лагерь прямо под работающей рекламой (п.4.7).
+    // Проверка идёт ПЕРВОЙ и отдельно от interstitialReady: тот на занятую
+    // рекламу отвечает тем же false, а развязка здесь принципиально другая.
     if (this._adBusy) return
-    const now = Date.now()
-    if (now - this._lastAd < 75000) { done(); return }
-    // Отдельный троттл на ПОПЫТКИ: если реклама не показалась (нет инвентаря),
-    // _lastAd не обновится, и без этого мы дёргали бы SDK на каждом выходе.
-    if (now - (this._lastAdTry || 0) < 20000) { done(); return }
-    this._lastAdTry = now
+    if (!this.interstitialReady()) { done(); return }
+    this._lastAdTry = Date.now()
     // Глушим звук и геймплей ДО вызова: ролик может стартовать раньше onOpen.
     this._adStart(done)
     try {

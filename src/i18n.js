@@ -43,6 +43,8 @@ const EN = {
   'Верстак (крафт)': 'Workbench (craft)',
   'Герой (+{n})': 'Hero (+{n})',
   'Герой': 'Hero',
+  'Сейчас будет реклама': 'An ad is about to play',
+  'через {n}…': 'in {n}…',
   'Перерождение (+{n})': 'Prestige (+{n})',
   'Перерождение': 'Prestige',
   '{n} ядер': '{n} cores',

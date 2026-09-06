@@ -237,6 +237,48 @@ describe('межстраничная: переход ждёт конца рол�
   })
 })
 
+// Отзыв игрока: «появление рекламы в кликере без предупреждения». Точка показа
+// законная, но ролик стартовал молча. Плашку рисует сцена, а решает по этому
+// предикату — иначе предупреждение висело бы и там, где рекламы не будет.
+describe('предупреждение перед межстраничной', () => {
+  it('готова к показу — при тех же условиях, при которых ролик реально пойдёт', () => {
+    Platform.ya = adv()
+    expect(Platform.interstitialReady()).toBe(true)
+  })
+
+  it('троттл показов и попыток гасит предупреждение вместе с рекламой', () => {
+    Platform.ya = adv()
+    Platform._lastAd = Date.now()
+    expect(Platform.interstitialReady()).toBe(false)
+    Platform._lastAd = 0
+    Platform._lastAdTry = Date.now()
+    expect(Platform.interstitialReady()).toBe(false)
+  })
+
+  it('без SDK и вне iframe платформы предупреждать не о чем', () => {
+    Platform.ya = adv()
+    Platform.available = false
+    expect(Platform.interstitialReady()).toBe(false)
+    Platform.available = true
+    Platform._embedded = () => false
+    expect(Platform.interstitialReady()).toBe(false)
+  })
+
+  it('во время идущего ролика — тоже false', () => {
+    const raw = adv(); Platform.ya = raw
+    Platform.showInterstitial(() => {})
+    raw.cb.full.onOpen()
+    expect(Platform.interstitialReady()).toBe(false)
+  })
+
+  it('предикат ничего не расходует: спросить можно, не сжигая троттл попыток', () => {
+    Platform.ya = adv()
+    Platform._lastAdTry = 0
+    for (let i = 0; i < 5; i++) expect(Platform.interstitialReady()).toBe(true)
+    expect(Platform._lastAdTry).toBe(0) // счётчик попыток двигает только сам показ
+  })
+})
+
 // Требование 4.4 живёт не в platform, а в том, ОТКУДА рекламу зовут, — поэтому
 // проверяем исходники сцен (тот же приём, что в ui-copy.test.js: сцены тянут за
 // собой Phaser, а нам нужен текст, а не поведение).
@@ -264,5 +306,15 @@ describe('межстраничная зовётся только с неигро
       expect(at, label).toBeGreaterThan(-1)
       expect(code.slice(at, at + 600), label).not.toContain('showInterstitial')
     }
+  })
+  it('перед роликом сцена показывает плашку, а бой на это время стоит', () => {
+    const code = src('../src/scenes/BattleScene.js')
+    const btn = code.slice(code.indexOf("label: t('⟵ В лагерь')"), code.indexOf("label: t('⟵ В лагерь')") + 900)
+    expect(btn).toContain('Platform.interstitialReady()')
+    expect(btn).toContain('this.showAdNotice(')
+    // update обязан считать плашку такой же остановкой боя, как окна зоны и
+    // смерти: иначе героя били бы все две секунды отсчёта.
+    const upd = code.slice(code.indexOf('update(time, delta)'))
+    expect(upd.slice(0, 1600)).toContain('this._adNotice')
   })
 })
