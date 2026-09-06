@@ -94,3 +94,6 @@
       без рамок и коллажей), 1280×720 16:9: `dock/screenshots/`.
       Пересобрать: `npm run dev`, затем `node tools/shots.mjs`.
       Английский комплект: `LANG_UI=en node tools/shots.mjs` → `dock/screenshots-en/`.
+      Один кадр: `SHOTS=2-liteyka node tools/shots.mjs`, только мобильные — `SET=mobile`.
+      Состав волны на кадре — не лотерея: запрещённые п.8.3.6 враги вырезаны из
+      пула съёмки (список `BANNED` в `tools/shots.mjs`), кадр с ними не пишется.
