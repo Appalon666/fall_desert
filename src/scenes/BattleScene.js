@@ -1081,20 +1081,38 @@ export default class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5))
     this._adNotice = objs
 
-    let left = AD_NOTICE_SEC
-    const tick = () => count.setText(t('через {n}…', { n: left }))
+    // Отсчёт идёт по РЕАЛЬНЫМ часам, а не по игровому времени.
+    //
+    // Phaser сглаживает delta (deltaSmoothing): при просадке кадров игровое
+    // время течёт медленнее реального — замер в headless дал rawDelta 83 мс
+    // против delta 17 мс, то есть впятеро. Для боя это правильно, а вот
+    // обещание «реклама через 3 секунды» растянулось бы на слабом устройстве в
+    // полторы минуты, и плашка из предупреждения превратилась бы в зависание.
+    //
+    // Само событие всё равно сценинное: так таймер гарантированно умирает
+    // вместе со сценой, а не остаётся висеть и дёргать переход после ухода
+    // в лагерь. Шаг 100 мс — цена этого решения: на очень низком FPS отсчёт
+    // закончится на один тик позже, чем ровно на секунде.
+    const endAt = Date.now() + AD_NOTICE_SEC * 1000
+    const tick = () => {
+      const left = Math.ceil((endAt - Date.now()) / 1000)
+      count.setText(t('через {n}…', { n: Math.max(left, 0) }))
+    }
     tick()
-    this.time.addEvent({
-      delay: 1000, repeat: AD_NOTICE_SEC - 1,
+    // loop-событие обязано сняться на первом же срабатывании отсчёта: иначе оно
+    // продолжит тикать и позовёт next() второй раз — то есть ещё один показ
+    // рекламы поверх уже идущего.
+    this._adNoticeEvt = this.time.addEvent({
+      delay: 100, loop: true,
       callback: () => {
-        left--
-        if (left > 0) { tick(); return }
+        if (Date.now() < endAt) { tick(); return }
         this.closeAdNotice()
         next()
       },
     })
   }
   closeAdNotice() {
+    if (this._adNoticeEvt) { this._adNoticeEvt.remove(); this._adNoticeEvt = null }
     if (this._adNotice) { this._adNotice.forEach(o => o.destroy()); this._adNotice = null }
   }
 
