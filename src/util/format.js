@@ -24,7 +24,12 @@ export function fmt(n) {
   let tier = 0
   let v = n
   while (v >= 1000 && tier < MAX_TIER) { v /= 1000; tier++ }
-  const s = v >= 100 ? v.toFixed(0) : v.toFixed(1)
+  // Округление способно дотянуть мантиссу до 1000: 999 999 -> v = 999.999 ->
+  // toFixed(0) = «1000», и на экран уходило «1000K» вместо «1.0M». Порог берём
+  // 99.95, чтобы 99 999 не печаталось как «100.0K». Если после округления всё
+  // же вышла тысяча — поднимаем тир.
+  let s = v >= 99.95 ? v.toFixed(0) : v.toFixed(1)
+  if (s === '1000' && tier < MAX_TIER) { v /= 1000; tier++; s = v.toFixed(1) }
   return `${s}${suffix(tier)}`
 }
 

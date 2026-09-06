@@ -85,7 +85,7 @@ export default class HubScene extends Phaser.Scene {
     })
     by += gap
     createButton(this, bx, by, {
-      label: State.canPrestige() ? t('Перерождение (+{n})', { n: State.coresFromRun() }) : t('Перерождение'),
+      label: State.canPrestige() ? t('Перерождение (+{n})', { n: fmt(State.coresFromRun()) }) : t('Перерождение'),
       width: 340, height: 58,
       color: State.canPrestige() ? COLORS.toxicDark : COLORS.rust, hover: COLORS.toxic,
       onClick: () => this.scene.start(SCENES.PRESTIGE),
