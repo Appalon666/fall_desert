@@ -307,14 +307,26 @@ describe('межстраничная зовётся только с неигро
       expect(code.slice(at, at + 600), label).not.toContain('showInterstitial')
     }
   })
-  it('перед роликом сцена показывает плашку, а бой на это время стоит', () => {
+  // Отказ модерации 8 сентября: «реклама показывается с задержкой» (п.4.4). На
+  // неигровое действие платформа даёт 0.33 с до старта ролика, а предупреждение
+  // с таймером разрешает только длинным реалтайм-уровням. Наша плашка с
+  // отсчётом на выходе в лагерь была ровно такой задержкой — и её здесь быть
+  // больше не должно, ни в каком виде.
+  it('ролик идёт сразу по нажатию — ни плашки, ни отсчёта, ни таймера', () => {
     const code = src('../src/scenes/BattleScene.js')
-    const btn = code.slice(code.indexOf("label: t('⟵ В лагерь')"), code.indexOf("label: t('⟵ В лагерь')") + 900)
-    expect(btn).toContain('Platform.interstitialReady()')
-    expect(btn).toContain('this.showAdNotice(')
-    // update обязан считать плашку такой же остановкой боя, как окна зоны и
-    // смерти: иначе героя били бы все две секунды отсчёта.
-    const upd = code.slice(code.indexOf('update(time, delta)'))
-    expect(upd.slice(0, 1600)).toContain('this._adNotice')
+    const at = code.indexOf("label: t('⟵ В лагерь')")
+    const btn = code.slice(at, at + 900)
+    const call = btn.indexOf('Platform.showInterstitial(')
+    expect(call).toBeGreaterThan(-1)
+    // Между нажатием и вызовом SDK — только синхронные строки. Любой таймер,
+    // твин или ожидание чужого колбэка здесь и есть та самая задержка.
+    const before = btn.slice(btn.indexOf('onClick:'), call)
+    for (const bad of ['this.time.', 'setTimeout', 'tweens', 'delayedCall', 'AdNotice', 'interstitialReady']) {
+      expect(before, bad).not.toContain(bad)
+    }
+    // И самой плашки в сцене не осталось — ни рисования, ни поля, ни строк.
+    expect(code).not.toContain('showAdNotice')
+    expect(code).not.toContain('_adNotice')
+    expect(code).not.toContain('Сейчас будет реклама')
   })
 })

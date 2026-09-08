@@ -51,10 +51,6 @@ const PANEL_DEPTH = 50
 // Каждые столько выпущенных врагов считаем «волной» — только ради нарастания
 // сложности внутри зоны (State.bumpWave, +1%).
 const WAVE_EVERY = 5
-// Сколько секунд висит предупреждение о рекламе (см. showAdNotice). Три — чтобы
-// плашку успели прочитать и заметить отсчёт, а не поймать её краем глаза; бой на
-// это время стоит. Пропускать нечего: реклама и так идёт не чаще раза в 75 с.
-const AD_NOTICE_SEC = 3
 
 export default class BattleScene extends Phaser.Scene {
   constructor() { super(SCENES.BATTLE) }
@@ -383,18 +379,24 @@ export default class BattleScene extends Phaser.Scene {
     // короткими локациями показ разрешён только на таком действии.
     // Переход в лагерь ждёт конца ролика (onDone), иначе лагерь ожил бы под
     // рекламой — со своей музыкой и живыми кнопками (нарушение п.4.7).
+    //
+    // И между нажатием и вызовом SDK не должно быть НИЧЕГО. Требование 4.4 даёт
+    // на неигровое действие 0.33 секунды до старта ролика (и не больше двух в
+    // любом случае), а предупреждение с таймером разрешает только длинным
+    // реалтайм-уровням — не переходу в меню. Здесь стояла плашка «сейчас будет
+    // реклама» с отсчётом на три секунды, и игра вернулась с модерации ровно за
+    // неё: «реклама показывается с задержкой». Плашка убрана целиком.
+    //
+    // Сохранение и рекорд идут ДО показа и только потому, что они синхронные:
+    // после вызова делать это поздно — игра уже под паузой ролика, а следом за
+    // ним сцена сменится лагерем.
     up(createButton(this, cx, GAME.HEIGHT - 52, {
       label: t('⟵ В лагерь'), width: PANEL_W - 44, height: 60, fontSize: 22,
       onClick: () => {
         if (this._leaving) return // ролик уже идёт — второй клик его не удвоит
         this._leaving = true
         State.lastSeen = Date.now(); State.save(true); Platform.submitScore(State.leaderboardScore())
-        const go = () => Platform.showInterstitial(() => this.scene.start(SCENES.HUB))
-        // Плашку показываем ТОЛЬКО когда ролик действительно пойдёт: спрашиваем
-        // об этом платформу, иначе предупреждение висело бы и на выходах, где
-        // рекламы не будет (троттл 75 с), и превратилось бы в лишний экран.
-        if (Platform.interstitialReady()) this.showAdNotice(go)
-        else go()
+        Platform.showInterstitial(() => this.scene.start(SCENES.HUB))
       },
     }))
   }
@@ -1055,67 +1057,6 @@ export default class BattleScene extends Phaser.Scene {
     if (this._deathModal) { this._deathModal.forEach(o => o.destroy()); this._deathModal = null }
   }
 
-  // ---------------- Предупреждение о рекламе ----------------
-  //
-  // Отзыв игрока: «появление рекламы в кликере без предупреждения». Формально
-  // точка показа законная (выход в лагерь — неигровое действие, п.4.4), но для
-  // игрока ролик всё равно возникал из ниоткуда: он жал «В лагерь» и получал
-  // рекламу вместо лагеря. Теперь между ними — плашка с отсчётом.
-  //
-  // Отменить показ нельзя намеренно: кнопка «не смотреть» на межстраничной
-  // рекламе — это уже отказ от монетизации, а не предупреждение. Задача плашки
-  // одна: чтобы ролик не был неожиданностью.
-  showAdNotice(next) {
-    const cx = this.arenaW / 2, cy = GAME.HEIGHT / 2
-    const objs = []
-    const push = (o, d = 96) => { objs.push(o.setDepth(d)); return o }
-    // setInteractive на подложке: пока идёт отсчёт, клики не должны доходить до
-    // арены — иначе выстрелы уходили бы «сквозь» плашку по замершим врагам.
-    push(this.add.rectangle(0, 0, GAME.WIDTH, GAME.HEIGHT, COLORS.ink, 0.82).setOrigin(0).setInteractive(), 95)
-    push(this.add.text(cx, cy - 24, t('Сейчас будет реклама'), {
-      fontFamily: 'Rubik, sans-serif', fontSize: '30px', color: CSS.toxic, fontStyle: 'bold',
-      stroke: '#120d09', strokeThickness: 5,
-    }).setOrigin(0.5))
-    const count = push(this.add.text(cx, cy + 30, '', {
-      fontFamily: 'Rubik, sans-serif', fontSize: '22px', color: '#e8ddc0',
-    }).setOrigin(0.5))
-    this._adNotice = objs
-
-    // Отсчёт идёт по РЕАЛЬНЫМ часам, а не по игровому времени.
-    //
-    // Phaser сглаживает delta (deltaSmoothing): при просадке кадров игровое
-    // время течёт медленнее реального — замер в headless дал rawDelta 83 мс
-    // против delta 17 мс, то есть впятеро. Для боя это правильно, а вот
-    // обещание «реклама через 3 секунды» растянулось бы на слабом устройстве в
-    // полторы минуты, и плашка из предупреждения превратилась бы в зависание.
-    //
-    // Само событие всё равно сценинное: так таймер гарантированно умирает
-    // вместе со сценой, а не остаётся висеть и дёргать переход после ухода
-    // в лагерь. Шаг 100 мс — цена этого решения: на очень низком FPS отсчёт
-    // закончится на один тик позже, чем ровно на секунде.
-    const endAt = Date.now() + AD_NOTICE_SEC * 1000
-    const tick = () => {
-      const left = Math.ceil((endAt - Date.now()) / 1000)
-      count.setText(t('через {n}…', { n: Math.max(left, 0) }))
-    }
-    tick()
-    // loop-событие обязано сняться на первом же срабатывании отсчёта: иначе оно
-    // продолжит тикать и позовёт next() второй раз — то есть ещё один показ
-    // рекламы поверх уже идущего.
-    this._adNoticeEvt = this.time.addEvent({
-      delay: 100, loop: true,
-      callback: () => {
-        if (Date.now() < endAt) { tick(); return }
-        this.closeAdNotice()
-        next()
-      },
-    })
-  }
-  closeAdNotice() {
-    if (this._adNoticeEvt) { this._adNoticeEvt.remove(); this._adNoticeEvt = null }
-    if (this._adNotice) { this._adNotice.forEach(o => o.destroy()); this._adNotice = null }
-  }
-
   // ---------------- Эффекты ----------------
   // Сами эффекты живут в gfx/fx.js — они не знают про состояние боя. Здесь
   // остаются только тонкие обёртки, чтобы вызовы по сцене читались как раньше.
@@ -1155,11 +1096,10 @@ export default class BattleScene extends Phaser.Scene {
     // это время нельзя никого.
     //
     // HUD обновляем и на стопе — иначе крышки и HP замирали бы на полуслове.
-    // _adNotice здесь по той же причине, что и остальные два: плашка держится
-    // пару секунд, и без остановки боя героя всё это время били бы — тем вернее,
-    // чем глубже локация. Ролик, который пойдёт следом, паузу возьмёт сам
-    // (PAUSE.AD в _adStart), но между нажатием и вызовом SDK её ещё нет.
-    if (this._zoneModal || this._deathModal || this._adNotice) { this.updateHud(); return }
+    // Рекламы в этом списке нет и быть не должно: ролик паузу берёт сам
+    // (PAUSE.AD в _adStart) ещё до вызова SDK, а своих экранов перед ним у нас
+    // не осталось — см. кнопку «В лагерь».
+    if (this._zoneModal || this._deathModal) { this.updateHud(); return }
 
     // Время боя — опора проверки рекорда (см. GameState.leaderboardScore).
     // Считаем ЗДЕСЬ, потому что здесь же начисляются убийства: update не идёт

@@ -41,7 +41,7 @@ await page.evaluate(() => {
   P.ya = {
     adv: {
       showRewardedVideo({ callbacks }) { window.__ads.rewarded++; window.__ads.cb.r = callbacks },
-      showFullscreenAdv({ callbacks }) { window.__ads.full++; window.__ads.cb.f = callbacks },
+      showFullscreenAdv({ callbacks }) { window.__ads.full++; window.__ads.fullAt = performance.now(); window.__ads.cb.f = callbacks },
     },
   }
 })
@@ -70,8 +70,10 @@ const snap = () => page.evaluate(() => {
     reasons: [...Pause.reasons],
     scene: game.scene.getScenes(true).map(s => s.scene.key),
     toast: texts.some(x => x.includes('Награда не начислена')),
-    adNotice: !!sc._adNotice,
-    noticeText: texts.some(x => x.includes('Сейчас будет реклама')),
+    // Любое своё предупреждение о рекламе — это задержка (п.4.4). Ищем по
+    // смыслу, а не по одной строке: вернётся под другим текстом — всё равно
+    // поймаем.
+    noticeText: texts.some(x => /реклам/i.test(x) && !x.includes('📺')),
     killsTime: State.battleSeconds,
   }
 })
@@ -120,24 +122,19 @@ check('и окно смерти закрылось, игра идёт', !s.death
 
 // ---------- 4. Выход в лагерь — единственная точка межстраничной ----------
 //
-// Между кнопкой и роликом стоит предупреждение с отсчётом (отзыв игрока:
-// «появление рекламы без предупреждения»). Поэтому сначала проверяем плашку и
-// что SDK ещё НЕ дёрнут, и только потом — сам показ.
+// И показ обязан начаться СРАЗУ (п.4.4: на неигровое действие 0.33 с, в любом
+// случае не больше 2 с). Отказ 8 сентября был именно про задержку — про нашу
+// плашку с отсчётом, — поэтому здесь замеряется само время до вызова SDK, а не
+// только факт показа. Часы берём в странице: playwright-овские тики считают и
+// свою дорогу до браузера.
+await page.evaluate(() => { window.__ads.t0 = performance.now() })
 await page.mouse.click(1120, 668) // «⟵ В лагерь»
-await page.waitForTimeout(500)
-s = await snap()
-check('перед роликом висит предупреждение', s.adNotice && s.noticeText)
-check('и реклама пока не запущена', s.full === fullBefore, `показов: ${s.full}`)
-const timeUnderNotice = s.killsTime
-await page.waitForTimeout(700)
-check('бой под плашкой стоит', (await snap()).killsTime === timeUnderNotice)
-
-// Отсчёт идёт по реальным часам, но проверяет их сценинное событие — в headless
-// кадры редкие, поэтому ждём событие, а не фиксированную паузу.
 await page.waitForFunction(() => window.__ads.full > 0, null, { timeout: 15000 })
+const lag = await page.evaluate(() => window.__ads.fullAt - window.__ads.t0)
 s = await snap()
 check('п.4.4 выход в лагерь показывает межстраничную', s.full === fullBefore + 1, `показов: ${s.full}`)
-check('плашка убрана перед роликом', !s.adNotice)
+check('п.4.4 ролик стартует без задержки (< 330 мс)', lag < 330, `задержка: ${Math.round(lag)} мс`)
+check('перед роликом НЕ появляется своя плашка', !s.noticeText)
 // getScenes(true) под рекламой пуст — все сцены приостановлены (это и есть
 // требование 4.7). Важно другое: лагерь ещё не запущен.
 check('под рекламой лагерь ещё НЕ открыт', !s.scene.includes('HubScene'), `идут: ${s.scene.join(',') || 'ни одной'}`)
